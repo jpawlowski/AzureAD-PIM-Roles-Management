@@ -1,40 +1,46 @@
 # Optional, otherwise received from $env:TenantId or script parameter -TenantId
-$TenantId = ''
+#$TenantId = ''
 
 $AADCAAuthContexts = @(
-    # Tier 0 Authorization Contexts
+    #:-------------------------------------------------------------------------
+    # Tier 0 Authentication Contexts
+    #
     @{
         default  = @{
             id          = "c1"
-            name        = "Tier0-Admin-AuthContext"
+            displayName = "Tier0-Admin-AuthContext"
             description = "Tier0 administration using Privileged Identity Management"
         }
         scopable = @{
             id          = "c4"
-            name        = "Tier0-Scoped-Admin-AuthContext"
+            displayName = "Tier0-Scoped-Admin-AuthContext"
             description = "Tier 0 administration for scope-enabled roles that could also be used in Tier 1 when scope was assigned"
         }
     },
 
-    # Tier 1 Authorization Contexts
+    #:-------------------------------------------------------------------------
+    # Tier 1 Authentication Contexts
+    #
     @{
         default  = @{
             id          = "c2"
-            name        = "Tier1-Admin-AuthContext"
+            displayName = "Tier1-Admin-AuthContext"
             description = "Tier1 administration using Privileged Identity Management"
         }
         scopable = @{
             id          = "c5"
-            name        = "Tier1-Scoped-Admin-AuthContext"
+            displayName = "Tier1-Scoped-Admin-AuthContext"
             description = "Tier 1 administration for scope-enabled roles that could also be used in Tier 2 when scope was assigned"
         }
     },
 
-    # Tier 2 Authorization Contexts
+    #:-------------------------------------------------------------------------
+    # Tier 2 Authentication Contexts
+    #
     @{
         default = @{
             id          = "c3"
-            name        = "Tier2-Admin-AuthContext"
+            displayName = "Tier2-Admin-AuthContext"
             description = "Tier2 administration using Privileged Identity Management"
         }
     }
@@ -272,9 +278,9 @@ $AADRoleClassifications = @(
             IsBuiltIn   = $true
         }
         @{
-            displayName = "Extended Directory User Administrator"
-            TemplateId  = "dd13091a-6207-4fc0-82ba-3641e056ab95"
-            IsBuiltIn   = $true
+            displayName                   = "Extended Directory User Administrator"
+            TemplateId                    = "dd13091a-6207-4fc0-82ba-3641e056ab95"
+            IsBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -653,9 +659,9 @@ $AADRoleClassifications = @(
             }
         }
         @{
-            displayName = "Service Support Administrator"
-            TemplateId  = "f023fd81-a637-4b56-95fd-791ac0226033"
-            IsBuiltIn   = $true
+            displayName                              = "Service Support Administrator"
+            TemplateId                               = "f023fd81-a637-4b56-95fd-791ac0226033"
+            IsBuiltIn                                = $true
             Enablement_EndUser_Assignment            = @{
                 enabledRules = @(
                 )
@@ -1873,6 +1879,69 @@ $AADRoleManagementRulesDefaults = @(
                 enforcedSettings    = @(
                 )
             }
+        }
+    )
+)
+
+$AADCAAuthStrengths = @(
+    #:-------------------------------------------------------------------------
+    # Tier 0 Authentication Strengths
+    #
+    @{
+        default = @{
+            # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
+            displayName         = 'Tier0-Admin-AuthStrength'
+            description         = 'Authentication methods for Tier0 administration'
+            allowedCombinations = @(
+            )
+        }
+    }
+
+    #:-------------------------------------------------------------------------
+    # Tier 1 Authentication Strengths
+    #
+    @{
+        default = @{
+            # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
+            displayName = 'Tier1-Admin-AuthStrength'
+            description = 'Authentication methods for Tier1 administration'
+        }
+    }
+
+    #:-------------------------------------------------------------------------
+    # Tier 2 Authentication Strengths
+    #
+    @{
+        default = @{
+            # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
+            displayName = 'Tier2-Admin-AuthStrength'
+            description = 'Authentication methods for Tier2 administration'
+        }
+    }
+)
+
+$AADCAPolicies = @(
+    #:-------------------------------------------------------------------------
+    # Tier 0 Conditional Access Policies
+    #
+    @(
+        @{
+        }
+    )
+
+    #:-------------------------------------------------------------------------
+    # Tier 1 Conditional Access Policies
+    #
+    @(
+        @{
+        }
+    )
+
+    #:-------------------------------------------------------------------------
+    # Tier 2 Conditional Access Policies
+    #
+    @(
+        @{
         }
     )
 )
