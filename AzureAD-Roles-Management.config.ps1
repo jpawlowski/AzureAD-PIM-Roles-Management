@@ -86,11 +86,6 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName = "Cloud App Security Administrator"
-            templateId  = "892c5842-a9a6-463a-8041-72aa08ca3cf6"
-            isBuiltIn   = $true
-        }
-        @{
             displayName                              = "Cloud Device Administrator"
             templateId                               = "7698a772-787b-4ac8-901f-60d6b08affd2"
             isBuiltIn                                = $true
@@ -260,6 +255,19 @@ $AADRoleClassifications = @(
             displayName                   = "Billing Administrator"
             templateId                    = "b0f54661-2d74-4c50-afa3-1ec803f12efe"
             isBuiltIn                     = $true
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    "Justification"
+                )
+            }
+        }
+        @{
+            displayName                   = "Cloud App Security Administrator"    # aka Defender for Cloud Apps Administrator
+            templateId                    = "892c5842-a9a6-463a-8041-72aa08ca3cf6"
+            isBuiltIn                     = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = "PT4H"
+            }
             Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     "Justification"
