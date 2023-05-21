@@ -356,6 +356,26 @@ if ($UpdateRoleRules) {
                 continue
             }
 
+            if (($AADRoleClassifications[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
+                Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is defined for this Tier already"
+                continue
+            }
+
+            $previousTier = $tier - 1;
+            $duplicate = $false
+            do {
+                if (($AADRoleClassifications[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                    Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from higher Tier ${previousTier}"
+                    $duplicate = $true
+                }
+                $previousTier--
+            } while (
+                $previousTier -ge 0
+            )
+            if ($duplicate) {
+                continue
+            }
+
             if ($RoleTemplateIDsWhitelist -or $RoleNamesWhitelist) {
                 $found = $false
                 if (
@@ -408,7 +428,7 @@ if ($UpdateRoleRules) {
                     $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
                     if (-Not $roleDefinition) {
                         Write-Warning (
-                            "`n[Tier $tier] " +
+                            "[Tier $tier] " +
                             ('{0:d' + $totalCountChars + '}') -f $i +
                             "/${totalCount}: " +
                             "SKIPPED " +
