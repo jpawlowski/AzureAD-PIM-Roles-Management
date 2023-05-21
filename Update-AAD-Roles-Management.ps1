@@ -387,14 +387,18 @@ if ($UpdateRoleRules) {
 
         $roleList = $roleList | Sort-Object -Property displayName
         $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, IsBuiltIn, TemplateId
+        $totalCount = $roleList.Count
+        $totalCountLen = ($totalCount | Measure-Object -Character).Characters
 
         $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
-        $message = "Do you confirm to update the management policies for a total of $($roleList.Count) Azure AD role(s) in Tier ${tier} listed above?"
+        $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
         $result = $host.ui.PromptForChoice($title, $message, $options, 1)
         switch ($result) {
             0 {
                 Write-Output " Yes: Continue with update."
+                $i = 0
                 foreach ($role in $roleList) {
+                    $i++
                     if ($role.TemplateId) {
                         $filter = "TemplateId eq '$($role.TemplateId)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
                     }
@@ -403,29 +407,58 @@ if ($UpdateRoleRules) {
                     }
                     $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
                     if (-Not $roleDefinition) {
-                        Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No role definition found"
+                        Write-Warning (
+                            "`n[Tier $tier] " +
+                            ('{0:d' + $totalCountLen + '}') -f $i +
+                            "/${totalCount}: " +
+                            "SKIPPED " +
+                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
+                            " role " +
+                            $roleDefinition.displayName +
+                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
+                            ": No role definition found"
+                        )
                         continue
                     }
 
                     $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
                     $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
                     if (-Not $policyAssignment) {
-                        Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No policy assignment found"
+                        Write-Warning (
+                            "`n[Tier $tier] " +
+                            ('{0:d' + $totalCountLen + '}') -f $i +
+                            "/${totalCount}: " +
+                            "SKIPPED " +
+                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
+                            " role " +
+                            $roleDefinition.displayName +
+                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
+                            ": No policy assignment found"
+                        )
                         continue
                     }
 
-                    Write-Output "`n[Tier $tier] Updating management policy rules for $($role.IsBuiltIn ? "built-in" : "custom") role $($roleDefinition.TemplateId) ($($roleDefinition.displayName)):"
+                    Write-Output (
+                        "`n[Tier $tier] " +
+                        ('{0:d' + $totalCountLen + '}') -f $i +
+                        "/${totalCount}: " +
+                        "Updating management policy rules for " +
+                        ($role.IsBuiltIn ? "built-in" : "custom") +
+                        " role " +
+                        $roleDefinition.TemplateId +
+                        " ($($roleDefinition.displayName)):"
+                    )
                     foreach ($rolePolicyRuleTemplate in $AADRoleManagementRulesDefaults[$tier]) {
                         $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
 
                         if ($role.ContainsKey($rolePolicyRule.Id)) {
-                            Write-Output "            [Deviating] $($rolePolicyRule.Id)"
+                            Write-Output "                [Deviating] $($rolePolicyRule.Id)"
                             foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
                                 $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
                             }
                         }
                         else {
-                            Write-Output "            [Default]   $($rolePolicyRule.Id)"
+                            Write-Output "                [Default]   $($rolePolicyRule.Id)"
                         }
 
                         try {
@@ -442,7 +475,7 @@ if ($UpdateRoleRules) {
                 }
             }
             1 {
-                Write-Output " No: Skipping rules update for Tier $tier Azure AD Roles."
+                Write-Output " No: Skipping management policy rules update for Tier $tier Azure AD Roles."
             }
             2 {
                 Write-Output " Cancel: Aborting command."
