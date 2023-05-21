@@ -282,6 +282,11 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
+            displayName = "Edge Administrator"
+            templateId  = "3f1acade-1e04-4fbc-9b69-f0302cd84aef"
+            isBuiltIn   = $true
+        }
+        @{
             displayName = "Desktop Analytics Administrator"
             templateId  = "38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4"
             isBuiltIn   = $true
@@ -579,11 +584,6 @@ $AADRoleClassifications = @(
         @{
             displayName = "Attribute Definition Reader"
             templateId  = "1d336d2c-4ae8-42ef-9711-b3604ce3fc2c"
-            isBuiltIn   = $true
-        }
-        @{
-            displayName = "Edge Administrator"
-            templateId  = "3f1acade-1e04-4fbc-9b69-f0302cd84aef"
             isBuiltIn   = $true
         }
         @{
