@@ -52,6 +52,9 @@ $AADRoleClassifications = @(
     #:-------------------------------------------------------------------------
     # Tier 0 Azure AD Roles
     #
+    # You may move roles to another Tier, based on your own requirements.
+    # Custom Azure AD roles that were created before may also be added here as desired.
+    #
     @(
         @{
             displayName = "Attribute Definition Administrator"
@@ -169,6 +172,9 @@ $AADRoleClassifications = @(
 
     #:-------------------------------------------------------------------------
     # Tier 1 Azure AD Roles
+    #
+    # You may move roles to another Tier, based on your own requirements.
+    # Custom Azure AD roles that were created before may also be added here as desired.
     #
     @(
         @{
@@ -540,6 +546,9 @@ $AADRoleClassifications = @(
 
     #:-------------------------------------------------------------------------
     # Tier 2 Azure AD Roles
+    #
+    # You may move roles to another Tier, based on your own requirements.
+    # Custom Azure AD roles that were created before may also be added here as desired.
     #
     @(
         @{
@@ -2126,10 +2135,17 @@ $AADCAAuthStrengths = @(
 $AADCABreakGlass = @{
     accounts = @(
         #:-------------------------------------------------------------------------
-        # Primary Break Glass Account to exclude from all Conditional Access Policies
+        # Primary Break Glass Account to exclude from ALL Conditional Access Policies
         #
         # The account MUST be created manually before, and the object ID MUST be given here.
         # The account MUST have Global Administrator role permanently assigned and active.
+        # The account MUST be cloud-only, NOT a synced/federated account.
+        #
+        # See https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
+        #
+        # It is highly recommended to have a dedicated CA policy targeted to this account
+        # to have specific MFA methods applied.
+        # The backup break glass admin account MUST be excluded from this policy.
         #
         @{
             id                = '00000000-0000-0000-0000-000000000000'
@@ -2138,10 +2154,16 @@ $AADCABreakGlass = @{
         }
 
         #:-------------------------------------------------------------------------
-        # Backup Break Glass Account to exclude from all Conditional Access Policies
+        # Backup Break Glass Account to exclude from ALL Conditional Access Policies
         #
         # The account MUST be created manually before, and the object ID MUST be given here.
         # The account MUST have Global Administrator role permanently assigned and active.
+        # The account MUST be cloud-only, NOT a synced/federated account.
+        #
+        # See https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
+        #
+        # This backup break glass admin account MUST be excluded from _ALL_ Conditional Access policies,
+        # including the CA policy that is protecting the primary break glass admin account from above.
         #
         @{
             id                = '00000000-0000-0000-0000-000000000000'
