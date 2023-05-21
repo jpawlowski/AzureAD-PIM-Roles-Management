@@ -11,11 +11,13 @@ $AADCAAuthContexts = @(
             id          = "c1"
             displayName = "Tier0-Admin-AuthCon"
             description = "Tier0 administration using Privileged Identity Management"
+            isAvailable = $true
         }
         scopable = @{
             id          = "c4"
             displayName = "Tier0-Scoped-Admin-AuthCon"
             description = "Tier 0 administration for scope-enabled roles that could also be used in Tier 1 when scope was assigned"
+            isAvailable = $true
         }
     },
 
@@ -27,11 +29,13 @@ $AADCAAuthContexts = @(
             id          = "c2"
             displayName = "Tier1-Admin-AuthCon"
             description = "Tier1 administration using Privileged Identity Management"
+            isAvailable = $true
         }
         scopable = @{
             id          = "c5"
             displayName = "Tier1-Scoped-Admin-AuthCon"
             description = "Tier 1 administration for scope-enabled roles that could also be used in Tier 2 when scope was assigned"
+            isAvailable = $true
         }
     },
 
@@ -43,6 +47,7 @@ $AADCAAuthContexts = @(
             id          = "c3"
             displayName = "Tier2-Admin-AuthCon"
             description = "Tier2 administration using Privileged Identity Management"
+            isAvailable = $true
         }
     }
 )
@@ -55,118 +60,128 @@ $AADRoleClassifications = @(
     # You may move roles to another Tier, based on your own requirements.
     # Custom Azure AD roles that were created before may also be added here as desired.
     #
+    # Note: Roles 'Global Administrator' and 'Privileged Role Administrator'
+    #       explicitly need to be added to Tier 0. Remove the respective comments
+    #       below when you are ready.
+    #
     @(
         @{
             displayName = "Attribute Definition Administrator"
-            TemplateId  = "8424c6f0-a189-499e-bbd0-26c1753c96d4"
-            IsBuiltIn   = $true
+            templateId  = "8424c6f0-a189-499e-bbd0-26c1753c96d4"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Authentication Extensibility Administrator"
-            TemplateId  = "25a516ed-2fa0-40ea-a2d0-12923a21473a"
-            IsBuiltIn   = $true
+            templateId  = "25a516ed-2fa0-40ea-a2d0-12923a21473a"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Authentication Policy Administrator"
-            TemplateId  = "0526716b-113d-4c15-b2c8-68e3c22b9f80"
-            IsBuiltIn   = $true
+            templateId  = "0526716b-113d-4c15-b2c8-68e3c22b9f80"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Azure Information Protection Administrator"
-            TemplateId  = "7495fdc4-34c4-4d15-a289-98788ce399fd"
-            IsBuiltIn   = $true
+            templateId  = "7495fdc4-34c4-4d15-a289-98788ce399fd"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Cloud App Security Administrator"
-            TemplateId  = "892c5842-a9a6-463a-8041-72aa08ca3cf6"
-            IsBuiltIn   = $true
+            templateId  = "892c5842-a9a6-463a-8041-72aa08ca3cf6"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Cloud Device Administrator"
-            TemplateId                               = "7698a772-787b-4ac8-901f-60d6b08affd2"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "7698a772-787b-4ac8-901f-60d6b08affd2"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[0].scopable.Id
             }
         }
         @{
             displayName = "Compliance Administrator"
-            TemplateId  = "17315797-102d-40b4-93e0-432062caca18"
-            IsBuiltIn   = $true
+            templateId  = "17315797-102d-40b4-93e0-432062caca18"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Conditional Access Administrator"
-            TemplateId  = "b1be1c3e-b65d-4f19-8427-f6fa0d97feb9"
-            IsBuiltIn   = $true
+            templateId  = "b1be1c3e-b65d-4f19-8427-f6fa0d97feb9"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Domain Name Administrator"
-            TemplateId  = "8329153b-31d0-4727-b945-745eb3bc5f31"
-            IsBuiltIn   = $true
+            templateId  = "8329153b-31d0-4727-b945-745eb3bc5f31"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Exchange Administrator"
-            TemplateId  = "29232cdf-9323-42fd-ade2-1d097af3e4de"
-            IsBuiltIn   = $true
+            templateId  = "29232cdf-9323-42fd-ade2-1d097af3e4de"
+            isBuiltIn   = $true
         }
-        @{
-            displayName = "Global Administrator"
-            TemplateId  = "62e90394-69f5-4237-9190-012177145e10"
-            IsBuiltIn   = $true
-        }
+        # Remove the comment when you are ready
+        # to update your Global Administrator role by this script
+        #
+        # @{
+        #     displayName = "Global Administrator"
+        #     templateId  = "62e90394-69f5-4237-9190-012177145e10"
+        #     isBuiltIn   = $true
+        # }
         @{
             displayName                              = "Groups Administrator"
-            TemplateId                               = "fdd7a751-b60b-444a-984c-02652fe8fa1c"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "fdd7a751-b60b-444a-984c-02652fe8fa1c"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[0].scopable.Id
             }
         }
         @{
             displayName = "Hybrid Identity Administrator"
-            TemplateId  = "8ac3fc64-6eca-42ea-9e69-59f4c7b60eb2"
-            IsBuiltIn   = $true
+            templateId  = "8ac3fc64-6eca-42ea-9e69-59f4c7b60eb2"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Intune Administrator"
-            TemplateId  = "3a2c62db-5318-420d-8d74-23affee5d9d5"
-            IsBuiltIn   = $true
+            templateId  = "3a2c62db-5318-420d-8d74-23affee5d9d5"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Privileged Authentication Administrator"
-            TemplateId  = "7be44c8a-adaf-4e2a-84d6-ab2649e08a13"
-            IsBuiltIn   = $true
+            templateId  = "7be44c8a-adaf-4e2a-84d6-ab2649e08a13"
+            isBuiltIn   = $true
         }
-        @{
-            displayName = "Privileged Role Administrator"
-            TemplateId  = "e8611ab8-c189-46e8-94e1-60213ab1f814"
-            IsBuiltIn   = $true
-        }
+        # Remove the comment when you are ready
+        # to update your Privileged Role Administrator role by this script
+        #
+        # @{
+        #     displayName = "Privileged Role Administrator"
+        #     templateId  = "e8611ab8-c189-46e8-94e1-60213ab1f814"
+        #     isBuiltIn   = $true
+        # }
         @{
             displayName = "Security Administrator"
-            TemplateId  = "194ae4cb-b126-40b2-bd5b-6091b380977d"
-            IsBuiltIn   = $true
+            templateId  = "194ae4cb-b126-40b2-bd5b-6091b380977d"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Tenant Creator"
-            TemplateId  = "112ca1a2-15ad-4102-995e-45b0bc479a6a"
-            IsBuiltIn   = $true
+            templateId  = "112ca1a2-15ad-4102-995e-45b0bc479a6a"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "User Administrator"
-            TemplateId                               = "fe930be7-5e62-47db-91af-98c3a49a38b1"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "fe930be7-5e62-47db-91af-98c3a49a38b1"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[0].scopable.Id
             }
         }
         @{
             displayName = "Windows 365 Administrator"
-            TemplateId  = "11451d60-acb2-45eb-a7d6-43d0f0125c13"
-            IsBuiltIn   = $true
+            templateId  = "11451d60-acb2-45eb-a7d6-43d0f0125c13"
+            isBuiltIn   = $true
         }
     ),
 
@@ -179,24 +194,24 @@ $AADRoleClassifications = @(
     @(
         @{
             displayName = "Application Administrator"
-            TemplateId  = "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3"
-            IsBuiltIn   = $true
+            templateId  = "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Attack Simulation Administrator"
-            TemplateId  = "c430b396-e693-46cc-96f3-db01bf8bb62a"
-            IsBuiltIn   = $true
+            templateId  = "c430b396-e693-46cc-96f3-db01bf8bb62a"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Attribute Assignment Administrator"
-            TemplateId  = "58a13ea3-c632-46ae-9ee0-9c0d43cd7f3d"
-            IsBuiltIn   = $true
+            templateId  = "58a13ea3-c632-46ae-9ee0-9c0d43cd7f3d"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Authentication Administrator"
-            TemplateId                               = "c4e39bd9-1100-46d3-8c65-fb160da0071f"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "c4e39bd9-1100-46d3-8c65-fb160da0071f"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             Expiration_EndUser_Assignment            = @{
                 maximumDuration = "PT1H"
             }
@@ -206,8 +221,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                   = "Azure AD Joined Device Local Administrator"
-            TemplateId                    = "9f06204d-73c1-4d4c-880a-6edb90606fd8"
-            IsBuiltIn                     = $true
+            templateId                    = "9f06204d-73c1-4d4c-880a-6edb90606fd8"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT1H"
             }
@@ -220,8 +235,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                   = "Azure DevOps Administrator"
-            TemplateId                    = "e3973bdf-4987-49ae-837a-ba8e231c7286"
-            IsBuiltIn                     = $true
+            templateId                    = "e3973bdf-4987-49ae-837a-ba8e231c7286"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -233,18 +248,18 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "B2C IEF Keyset Administrator"
-            TemplateId  = "aaf43236-0c0d-4d5f-883a-6955382ac081"
-            IsBuiltIn   = $true
+            templateId  = "aaf43236-0c0d-4d5f-883a-6955382ac081"
+            isBuiltIn   = $true
         }
         @{
             displayName = "B2C IEF Policy Administrator"
-            TemplateId  = "3edaf663-341e-4475-9f94-5c398ef6c070"
-            IsBuiltIn   = $true
+            templateId  = "3edaf663-341e-4475-9f94-5c398ef6c070"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Billing Administrator"
-            TemplateId                    = "b0f54661-2d74-4c50-afa3-1ec803f12efe"
-            IsBuiltIn                     = $true
+            templateId                    = "b0f54661-2d74-4c50-afa3-1ec803f12efe"
+            isBuiltIn                     = $true
             Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     "Justification"
@@ -253,23 +268,23 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Cloud Application Administrator"
-            TemplateId  = "158c047a-c907-4556-b7ef-446551a6b5f7"
-            IsBuiltIn   = $true
+            templateId  = "158c047a-c907-4556-b7ef-446551a6b5f7"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Compliance Data Administrator"
-            TemplateId  = "e6d1a23a-da11-4be4-9570-befc86d067a7"
-            IsBuiltIn   = $true
+            templateId  = "e6d1a23a-da11-4be4-9570-befc86d067a7"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Customer LockBox Access Approver"
-            TemplateId  = "5c4f9dcd-47dc-4cf7-8c9a-9e4207cbfc91"
-            IsBuiltIn   = $true
+            templateId  = "5c4f9dcd-47dc-4cf7-8c9a-9e4207cbfc91"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Dynamics 365 Administrator"
-            TemplateId                    = "44367163-eba1-44c3-98af-f5787879f96a"
-            IsBuiltIn                     = $true
+            templateId                    = "44367163-eba1-44c3-98af-f5787879f96a"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -281,21 +296,21 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Exchange Recipient Administrator"
-            TemplateId  = "31392ffb-586c-42d1-9346-e59415a2cc4e"
-            IsBuiltIn   = $true
+            templateId  = "31392ffb-586c-42d1-9346-e59415a2cc4e"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Extended Directory User Administrator"
-            TemplateId                    = "dd13091a-6207-4fc0-82ba-3641e056ab95"
-            IsBuiltIn                     = $true
+            templateId                    = "dd13091a-6207-4fc0-82ba-3641e056ab95"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
         }
         @{
             displayName                   = "External ID User Flow Administrator"
-            TemplateId                    = "6e591065-9bad-43ed-90f3-e9424366d2f0"
-            IsBuiltIn                     = $true
+            templateId                    = "6e591065-9bad-43ed-90f3-e9424366d2f0"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -307,8 +322,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                   = "External ID User Flow Attribute Administrator"
-            TemplateId                    = "0f971eea-41eb-4569-a71e-57bb8a3eff1e"
-            IsBuiltIn                     = $true
+            templateId                    = "0f971eea-41eb-4569-a71e-57bb8a3eff1e"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -320,8 +335,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                   = "External Identity Provider Administrator"
-            TemplateId                    = "be2f45a1-457d-42af-a067-6ec1fa63bc45"
-            IsBuiltIn                     = $true
+            templateId                    = "be2f45a1-457d-42af-a067-6ec1fa63bc45"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -333,9 +348,9 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                              = "Helpdesk Administrator"
-            TemplateId                               = "729827e3-9c14-49f7-bb1b-9608f156bbb8"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "729827e3-9c14-49f7-bb1b-9608f156bbb8"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             Expiration_EndUser_Assignment            = @{
                 maximumDuration = "PT1H"
             }
@@ -350,34 +365,34 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Identity Governance Administrator"
-            TemplateId  = "45d8d3c5-c802-45c6-b32a-1d70b5e1e86e"
-            IsBuiltIn   = $true
+            templateId  = "45d8d3c5-c802-45c6-b32a-1d70b5e1e86e"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Insights Administrator"
-            TemplateId  = "eb1f4a8d-243a-41f0-9fbd-c7cdf6c5ef7c"
-            IsBuiltIn   = $true
+            templateId  = "eb1f4a8d-243a-41f0-9fbd-c7cdf6c5ef7c"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Insights Analyst"
-            TemplateId  = "25df335f-86eb-4119-b717-0ff02de207e9"
-            IsBuiltIn   = $true
+            templateId  = "25df335f-86eb-4119-b717-0ff02de207e9"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Kaizala Administrator"
-            TemplateId  = "74ef975b-6605-40af-a5d2-b9539d836353"
-            IsBuiltIn   = $true
+            templateId  = "74ef975b-6605-40af-a5d2-b9539d836353"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Knowledge Administrator"
-            TemplateId  = "b5a8dcf3-09d5-43a9-a639-8e29ef291470"
-            IsBuiltIn   = $true
+            templateId  = "b5a8dcf3-09d5-43a9-a639-8e29ef291470"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "License Administrator"
-            TemplateId                               = "4d6ac14f-3453-41d0-bef9-a3e0c569773a"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "4d6ac14f-3453-41d0-bef9-a3e0c569773a"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             Expiration_EndUser_Assignment            = @{
                 maximumDuration = "PT1H"
             }
@@ -387,29 +402,29 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Lifecycle Workflows Administrator"
-            TemplateId  = "59d46f88-662b-457b-bceb-5c3809e5908f"
-            IsBuiltIn   = $true
+            templateId  = "59d46f88-662b-457b-bceb-5c3809e5908f"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Microsoft Hardware Warranty Administrator"
-            TemplateId  = "1501b917-7653-4ff9-a4b5-203eaf33784f"
-            IsBuiltIn   = $true
+            templateId  = "1501b917-7653-4ff9-a4b5-203eaf33784f"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Network Administrator"
-            TemplateId  = "d37c8bed-0711-4417-ba38-b4abe66ce4c2"
-            IsBuiltIn   = $true
+            templateId  = "d37c8bed-0711-4417-ba38-b4abe66ce4c2"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Office Apps Administrator"
-            TemplateId  = "2b745bdf-0803-4d80-aa65-822c4493daac"
-            IsBuiltIn   = $true
+            templateId  = "2b745bdf-0803-4d80-aa65-822c4493daac"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Password Administrator"
-            TemplateId                               = "966707d0-3269-4727-9be2-8c3a10f19b9d"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "966707d0-3269-4727-9be2-8c3a10f19b9d"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             Expiration_EndUser_Assignment            = @{
                 maximumDuration = "PT1H"
             }
@@ -424,13 +439,13 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Permissions Management Administrator"
-            TemplateId  = "af78dc32-cf4d-46f9-ba4e-4428526346b5"
-            IsBuiltIn   = $true
+            templateId  = "af78dc32-cf4d-46f9-ba4e-4428526346b5"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Power BI Administrator"
-            TemplateId                    = "a9ea8996-122f-4c74-9520-8edcd192826c"
-            IsBuiltIn                     = $true
+            templateId                    = "a9ea8996-122f-4c74-9520-8edcd192826c"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -442,8 +457,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                   = "Power Platform Administrator"
-            TemplateId                    = "11648597-926c-4cf3-9c36-bcebb0ba8dcc"
-            IsBuiltIn                     = $true
+            templateId                    = "11648597-926c-4cf3-9c36-bcebb0ba8dcc"
+            isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -455,33 +470,33 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                              = "Printer Administrator"
-            TemplateId                               = "644ef478-e28f-4e28-b9dc-3fdde9aa0b1f"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "644ef478-e28f-4e28-b9dc-3fdde9aa0b1f"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[1].scopable.Id
             }
         }
         @{
             displayName = "Printer Technician"
-            TemplateId  = "e8cef6f1-e4bd-4ea8-bc07-4b8d950f4477"
-            IsBuiltIn   = $true
+            templateId  = "e8cef6f1-e4bd-4ea8-bc07-4b8d950f4477"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Search Administrator"
-            TemplateId  = "0964bb5e-9bdb-4d7b-ac29-58e794862a40"
-            IsBuiltIn   = $true
+            templateId  = "0964bb5e-9bdb-4d7b-ac29-58e794862a40"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Security Operator"
-            TemplateId  = "5f2222b1-57c3-48ba-8ad5-d4759f1fde6f"
-            IsBuiltIn   = $true
+            templateId  = "5f2222b1-57c3-48ba-8ad5-d4759f1fde6f"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "SharePoint Administrator"
-            TemplateId                    = "f28a1f50-f6e7-4571-818b-6a12f2af6b6c"
-            IsBuiltIn                     = $true
-            IsScopable                    = $true
+            templateId                    = "f28a1f50-f6e7-4571-818b-6a12f2af6b6c"
+            isBuiltIn                     = $true
+            isScopable                    = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = "PT4H"
             }
@@ -493,14 +508,14 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Skype for Business Administrator"
-            TemplateId  = "75941009-915a-4869-abe7-691bff18279e"
-            IsBuiltIn   = $true
+            templateId  = "75941009-915a-4869-abe7-691bff18279e"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Teams Administrator"
-            TemplateId                               = "69091246-20e8-4a56-aa4d-066075b2a7a8"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "69091246-20e8-4a56-aa4d-066075b2a7a8"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             Expiration_EndUser_Assignment            = @{
                 maximumDuration = "PT4H"
             }
@@ -510,37 +525,37 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Teams Communications Administrator"
-            TemplateId  = "baf37b3a-610e-45da-9e62-d9d1e5e8914b"
-            IsBuiltIn   = $true
+            templateId  = "baf37b3a-610e-45da-9e62-d9d1e5e8914b"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Teams Devices Administrator"
-            TemplateId                               = "3d762c5a-1b6c-493f-843e-55a3b42923d4"
-            IsBuiltIn                                = $true
-            IsScopable                               = $true
+            templateId                               = "3d762c5a-1b6c-493f-843e-55a3b42923d4"
+            isBuiltIn                                = $true
+            isScopable                               = $true
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[1].scopable.Id
             }
         }
         @{
             displayName = "Viva Goals Administrator"
-            TemplateId  = "92b086b3-e367-4ef2-b869-1de128fb986e"
-            IsBuiltIn   = $true
+            templateId  = "92b086b3-e367-4ef2-b869-1de128fb986e"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Viva Pulse Administrator"
-            TemplateId  = "87761b17-1ed2-4af3-9acd-92a150038160"
-            IsBuiltIn   = $true
+            templateId  = "87761b17-1ed2-4af3-9acd-92a150038160"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Windows Update Deployment Administrator"
-            TemplateId  = "32696413-001a-46ae-978c-ce0f6b3620d2"
-            IsBuiltIn   = $true
+            templateId  = "32696413-001a-46ae-978c-ce0f6b3620d2"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Yammer Administrator"
-            TemplateId  = "810a2642-a034-447f-a5e8-41beaa378541"
-            IsBuiltIn   = $true
+            templateId  = "810a2642-a034-447f-a5e8-41beaa378541"
+            isBuiltIn   = $true
         }
     ),
 
@@ -553,38 +568,38 @@ $AADRoleClassifications = @(
     @(
         @{
             displayName = "Application Developer"
-            TemplateId  = "cf1c38e5-3621-4004-a7cb-879624dced7c"
-            IsBuiltIn   = $true
+            templateId  = "cf1c38e5-3621-4004-a7cb-879624dced7c"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Attack Payload Author"
-            TemplateId  = "9c6df0f2-1e7c-4dc3-b195-66dfbd24aa8f"
-            IsBuiltIn   = $true
+            templateId  = "9c6df0f2-1e7c-4dc3-b195-66dfbd24aa8f"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Attribute Assignment Reader"
-            TemplateId  = "ffd52fa5-98dc-465c-991d-fc073eb59f8f"
-            IsBuiltIn   = $true
+            templateId  = "ffd52fa5-98dc-465c-991d-fc073eb59f8f"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Attribute Definition Reader"
-            TemplateId  = "1d336d2c-4ae8-42ef-9711-b3604ce3fc2c"
-            IsBuiltIn   = $true
+            templateId  = "1d336d2c-4ae8-42ef-9711-b3604ce3fc2c"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Desktop Analytics Administrator"
-            TemplateId  = "38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4"
-            IsBuiltIn   = $true
+            templateId  = "38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Edge Administrator"
-            TemplateId  = "3f1acade-1e04-4fbc-9b69-f0302cd84aef"
-            IsBuiltIn   = $true
+            templateId  = "3f1acade-1e04-4fbc-9b69-f0302cd84aef"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Global Reader"
-            TemplateId                    = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
-            IsBuiltIn                     = $true
+            templateId                    = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
+            isBuiltIn                     = $true
             Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     "Justification"
@@ -593,8 +608,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                              = "Guest Inviter"
-            TemplateId                               = "95e79109-95c0-4d8e-aee3-d01accf2d47b"
-            IsBuiltIn                                = $true
+            templateId                               = "95e79109-95c0-4d8e-aee3-d01accf2d47b"
+            isBuiltIn                                = $true
             Enablement_EndUser_Assignment            = @{
                 enabledRules = @(
                     "MultiFactorAuthentication"
@@ -606,18 +621,18 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Insights Business Leader"
-            TemplateId  = "31e939ad-9672-4796-9c2e-873181342d2d"
-            IsBuiltIn   = $true
+            templateId  = "31e939ad-9672-4796-9c2e-873181342d2d"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Knowledge Manager"
-            TemplateId  = "744ec460-397e-42ad-a462-8b3f9747a02c"
-            IsBuiltIn   = $true
+            templateId  = "744ec460-397e-42ad-a462-8b3f9747a02c"
+            isBuiltIn   = $true
         }
         @{
             displayName                              = "Message Center Privacy Reader"
-            TemplateId                               = "ac16e43d-7b2d-40e0-ac05-243ff356ab5b"
-            IsBuiltIn                                = $true
+            templateId                               = "ac16e43d-7b2d-40e0-ac05-243ff356ab5b"
+            isBuiltIn                                = $true
             Enablement_EndUser_Assignment            = @{
                 enabledRules = @(
                 )
@@ -628,8 +643,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                              = "Message Center Reader"
-            TemplateId                               = "790c1fb9-7f7d-4f88-86a1-ef1f95c05c1b"
-            IsBuiltIn                                = $true
+            templateId                               = "790c1fb9-7f7d-4f88-86a1-ef1f95c05c1b"
+            isBuiltIn                                = $true
             Enablement_EndUser_Assignment            = @{
                 enabledRules = @(
                 )
@@ -640,28 +655,28 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Microsoft Hardware Warranty Specialist"
-            TemplateId  = "281fe777-fb20-4fbb-b7a3-ccebce5b0d96"
-            IsBuiltIn   = $true
+            templateId  = "281fe777-fb20-4fbb-b7a3-ccebce5b0d96"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Organizational Messages Writer"
-            TemplateId  = "507f53e4-4e52-4077-abd3-d2e1558b6ea2"
-            IsBuiltIn   = $true
+            templateId  = "507f53e4-4e52-4077-abd3-d2e1558b6ea2"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Reports Reader"
-            TemplateId  = "4a5d8f65-41da-4de4-8968-e035b65339cf"
-            IsBuiltIn   = $true
+            templateId  = "4a5d8f65-41da-4de4-8968-e035b65339cf"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Search Editor"
-            TemplateId  = "8835291a-918c-4fd7-a9ce-faa49f0cf7d9"
-            IsBuiltIn   = $true
+            templateId  = "8835291a-918c-4fd7-a9ce-faa49f0cf7d9"
+            isBuiltIn   = $true
         }
         @{
             displayName                   = "Security Reader"
-            TemplateId                    = "5d6b6bb7-de71-4623-b4af-96380a352509"
-            IsBuiltIn                     = $true
+            templateId                    = "5d6b6bb7-de71-4623-b4af-96380a352509"
+            isBuiltIn                     = $true
             Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     "Justification"
@@ -670,8 +685,8 @@ $AADRoleClassifications = @(
         }
         @{
             displayName                              = "Service Support Administrator"
-            TemplateId                               = "f023fd81-a637-4b56-95fd-791ac0226033"
-            IsBuiltIn                                = $true
+            templateId                               = "f023fd81-a637-4b56-95fd-791ac0226033"
+            isBuiltIn                                = $true
             Enablement_EndUser_Assignment            = @{
                 enabledRules = @(
                 )
@@ -682,28 +697,28 @@ $AADRoleClassifications = @(
         }
         @{
             displayName = "Teams Communications Support Engineer"
-            TemplateId  = "f70938a0-fc10-4177-9e90-2178f8765737"
-            IsBuiltIn   = $true
+            templateId  = "f70938a0-fc10-4177-9e90-2178f8765737"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Teams Communications Support Specialist"
-            TemplateId  = "fcf91098-03e3-41a9-b5ba-6f0ec8188a12"
-            IsBuiltIn   = $true
+            templateId  = "fcf91098-03e3-41a9-b5ba-6f0ec8188a12"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Usage Summary Reports Reader"
-            TemplateId  = "75934031-6c7e-415a-99d7-48dbd49e875e"
-            IsBuiltIn   = $true
+            templateId  = "75934031-6c7e-415a-99d7-48dbd49e875e"
+            isBuiltIn   = $true
         }
         @{
             displayName = "User Experience Success Manager"
-            TemplateId  = "27460883-1df1-4691-b032-3b79643e5e63"
-            IsBuiltIn   = $true
+            templateId  = "27460883-1df1-4691-b032-3b79643e5e63"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Virtual Visits Administrator"
-            TemplateId  = "e300d9e7-4a2b-4295-9eff-f1c78b36cc98"
-            IsBuiltIn   = $true
+            templateId  = "e300d9e7-4a2b-4295-9eff-f1c78b36cc98"
+            isBuiltIn   = $true
         }
     )
 )
@@ -1897,11 +1912,14 @@ $AADCAAuthStrengths = @(
     #:-------------------------------------------------------------------------
     # Tier 0 Authentication Strengths
     #
+    # Note: For security reasons, no built-in Authentication Strengths are supported.
+    # Dedicated custom Authentication Strength policies are required to be created for full Tier separation.
+    #
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Admin-AuthStr'
-            description               = 'Authentication methods for users with active Tier0 Azure AD Roles'
+            description               = 'Authentication methods for users with active Tier0 Azure AD Roles. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -1935,7 +1953,7 @@ $AADCAAuthStrengths = @(
         roleEnablement         = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Admin-PIM-AuthStr'
-            description               = 'Authentication methods during Azure AD Role enablement for Tier0-Admin-AuthCon'
+            description               = 'Authentication methods during Azure AD Role enablement for Tier0-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -1969,7 +1987,7 @@ $AADCAAuthStrengths = @(
         scopableRoleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Scoped-Admin-PIM-AuthStr'
-            description               = 'Authentication methods during Azure AD Role enablement for Tier0-Scoped-Admin-AuthCon'
+            description               = 'Authentication methods during Azure AD Role enablement for Tier0-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -2005,11 +2023,14 @@ $AADCAAuthStrengths = @(
     #:-------------------------------------------------------------------------
     # Tier 1 Authentication Strengths
     #
+    # Note: For security reasons, no built-in Authentication Strengths are supported.
+    # Dedicated custom Authentication Strength policies are required to be created for full Tier separation.
+    #
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Admin-AuthStr'
-            description               = 'Authentication methods for users with active Tier1 Azure AD Roles'
+            description               = 'Authentication methods for users with active Tier1 Azure AD Roles. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -2044,7 +2065,7 @@ $AADCAAuthStrengths = @(
         roleEnablement         = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Admin-PIM-AuthStr'
-            description               = 'Authentication methods during Azure AD Role enablement for Tier1-Admin-AuthCon'
+            description               = 'Authentication methods during Azure AD Role enablement for Tier1-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -2079,7 +2100,7 @@ $AADCAAuthStrengths = @(
         scopableRoleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Scoped-Admin-PIM-AuthStr'
-            description               = 'Authentication methods during Azure AD Role enablement for Tier1-Scoped-Admin-AuthCon'
+            description               = 'Authentication methods during Azure AD Role enablement for Tier1-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -2116,11 +2137,14 @@ $AADCAAuthStrengths = @(
     #:-------------------------------------------------------------------------
     # Tier 2 Authentication Strengths
     #
+    # Note: For security reasons, no built-in Authentication Strengths are supported.
+    # Dedicated custom Authentication Strength policies are required to be created for full Tier separation.
+    #
     @{
         roleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName         = 'Tier2-Admin-PIM-AuthStr'
-            description         = 'Authentication methods during Azure AD Role enablement for Tier2-Admin-AuthCon'
+            description         = 'Authentication methods during Azure AD Role enablement for Tier2-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
             allowedCombinations = @(
                 "windowsHelloForBusiness"
                 "fido2"
@@ -2150,6 +2174,7 @@ $AADCABreakGlass = @{
         @{
             id                = '00000000-0000-0000-0000-000000000000'
             displayName       = 'COMPANY Emergency Admin (Primary)'
+            description       = ''
             userPrincipalName = 'admc-emergency911@tenantname.onmicrosoft.com'
         }
 
@@ -2168,6 +2193,7 @@ $AADCABreakGlass = @{
         @{
             id                = '00000000-0000-0000-0000-000000000000'
             displayName       = 'COMPANY Emergency Admin (Backup)'
+            description       = ''
             userPrincipalName = 'admc-emergency912@tenantname.onmicrosoft.com'
         }
     )
@@ -2178,10 +2204,12 @@ $AADCABreakGlass = @{
     # The group MUST be created manually before with role-assignment capability.
     # The group object ID MUSt be given here.
     # The script will only ensure all break glass accounts are member of this group.
+    # The script will also REMOVE any other account from that group.
     #
     group    = @{
         id             = '00000000-0000-0000-0000-000000000000'
         displayName    = 'COMPANY-T0-S-Break-Glass-Admins'
+        description    = ''
         roleAssignable = $true
     }
 }

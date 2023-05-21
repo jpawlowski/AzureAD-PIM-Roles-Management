@@ -16,27 +16,30 @@ Param (
     [string]$TenantId,
     [Parameter(HelpMessage = "Path to configuration file in PS1 format. Default: './AzureAD-Roles-Management.config.ps1'.")]
     [string]$Config,
-    [Parameter(HelpMessage = "Update all Azure AD roles that are classified as Tier0.")]
-    [switch]$Tier0,
-    [Parameter(HelpMessage = "Update all Azure AD roles that are classified as Tier1.")]
-    [switch]$Tier1,
-    [Parameter(HelpMessage = "Update all Azure AD roles that are classified as Tier2.")]
-    [switch]$Tier2,
-    [Parameter(HelpMessage = "Update only specified list of Azure AD roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.")]
+    [Parameter(HelpMessage = "Update all or only a specified list of Azure AD roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.")]
     [array]$Roles,
     [Parameter(HelpMessage = "Update Azure AD Authentication Contexts")]
     [switch]$UpdateAuthContext,
     [Parameter(HelpMessage = "Create or update Azure AD Authentication Strengths")]
-    [switch]$CreateAuthStrength
+    [switch]$CreateAuthStrength,
+    [Parameter(HelpMessage = "Create or update Azure AD Conditional Access policies")]
+    [switch]$CreateCAPolicies,
+    [Parameter(HelpMessage = "Perform changes to Tier0.")]
+    [switch]$Tier0,
+    [Parameter(HelpMessage = "Perform changes to Tier1.")]
+    [switch]$Tier1,
+    [Parameter(HelpMessage = "Perform changes to Tier2.")]
+    [switch]$Tier2
 )
 
-$MgVersion = Get-Module -ListAvailable -Name "Microsoft.Graph"
-if (
-    (-Not $MgVersion) -or
-    ($MgVersion.Version -lt [System.Version]'2.0')
-) {
-    Write-Error "This script requies Microsoft Graph PowerShell module version 2.0 or higher to be installed."
-    exit 1
+$ErrorActionPreference = 'Stop'
+
+try {
+    Import-Module -Name "Microsoft.Graph.Identity.SignIns" -MinimumVersion 2.0
+    Import-Module -Name "Microsoft.Graph.Identity.Governance" -MinimumVersion 2.0
+}
+catch {
+    throw $_
 }
 
 if (
@@ -50,8 +53,7 @@ try {
     . $Config
 }
 catch {
-    Write-Error "Missing configuration file $config"
-    exit
+    Write-Error "Error reading configuration file ${config}:`n $_"
 }
 
 if (
@@ -66,25 +68,28 @@ if (
     }
     else {
         Write-Error "Missing `$env:TenantId environment variable or -TenantId parameter"
-        exit
     }
+}
+
+if (
+    (-Not $Roles) -and
+    (-Not $UpdateAuthContext) -and
+    (-Not $CreateAuthStrength) -and
+    (-Not $CreateCAPolicies)
+) {
+    Write-Error "Missing parameter: What would you like to update and/or create? -Roles, -UpdateAuthContext, -CreateAuthStrength, -CreateCAPolicies"
 }
 
 # Connect to Microsoft Graph API
 #
 $MgScopes = @()
-if (
-    $Tier0 -or
-    $Tier1 -or
-    $Tier2 -or
-    $Roles
-) {
+if ($Roles) {
     $MgScopes += "RoleManagement.ReadWrite.Directory"
 }
 if ($UpdateAuthContext) {
     $MgScopes += "AuthenticationContext.ReadWrite.All"
 }
-if ($CreateAuthStrength) {
+if ($CreateAuthStrength -or $CreateCAPolicies) {
     $MgScopes += "Policy.ReadWrite.ConditionalAccess"
 }
 
@@ -104,9 +109,6 @@ if (
         -ContextScope Process `
         -TenantId $TenantId `
         -Scopes $MgScopes
-    if (-Not $?) {
-        exit
-    }
 }
 
 $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Description."
@@ -131,13 +133,13 @@ if ($UpdateAuthContext) {
         $AuthContextTiers = @(0, 1, 2)
     }
 
-    $title = "!!! WARNING: Update Azure AD Conditional Access Authentication Contexts !!!"
-    $message = "Do you confirm to update Authentication Contexts for Tier(s) $($AuthContextTiers -join ', ')?"
-    $result = $host.ui.PromptForChoice($title, $message, $options, 1)
-    switch ($result) {
-        0 {
-            Write-Output "Yes: Continue with update."
-            foreach ($tier in $AuthContextTiers) {
+    foreach ($tier in $AuthContextTiers) {
+        $title = "!!! WARNING: Update Tier $tier Azure AD Conditional Access Authentication Contexts !!!"
+        $message = "Do you confirm to update a total of $($AADCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
+        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        switch ($result) {
+            0 {
+                Write-Output " Yes: Continue with update."
                 foreach ($key in $AADCAAuthContexts[$tier].Keys) {
                     foreach ($authContext in $AADCAAuthContexts[$tier][$key]) {
                         try {
@@ -146,23 +148,22 @@ if ($UpdateAuthContext) {
                                 -AuthenticationContextClassReferenceId $authContext.id `
                                 -DisplayName $authContext.displayName `
                                 -Description $authContext.description `
-                                -IsAvailable:$true
+                                -IsAvailable:$authContext.isAvailable
                         }
                         catch {
-                            Write-Output $_
-                            break
+                            throw $_
                         }
                         Start-Sleep -Seconds 0.5
                     }
                 }
             }
-        }
-        1 {
-            Write-Output "No: Skipping Authentication Context updates."
-        }
-        2 {
-            Write-Output "Cancel: Aborting command."
-            exit
+            1 {
+                Write-Output " No: Skipping Tier $tier Authentication Context updates."
+            }
+            2 {
+                Write-Output " Cancel: Aborting command."
+                exit
+            }
         }
     }
 }
@@ -184,15 +185,15 @@ if ($CreateAuthStrength) {
         $AuthStrengthTiers = @(0, 1, 2)
     }
 
-    $title = "!!! WARNING: Create and/or update Azure AD Conditional Access Authentication Strengths !!!"
-    $message = "Do you confirm to create new or update existing Authentication Strengths policies for Tier(s) $($AuthStrengthTiers -join ', ')?"
-    $result = $host.ui.PromptForChoice($title, $message, $options, 1)
-    switch ($result) {
-        0 {
-            Write-Output "Yes: Continue with creation or update."
-            $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'"
+    $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'"
 
-            foreach ($tier in $AuthStrengthTiers) {
+    foreach ($tier in $AuthStrengthTiers) {
+        $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Authentication Strengths !!!"
+        $message = "Do you confirm to create new or update a total of $($AADCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
+        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        switch ($result) {
+            0 {
+                Write-Output " Yes: Continue with creation or update."
                 foreach ($key in $AADCAAuthStrengths[$tier].Keys) {
                     foreach ($authStrength in $AADCAAuthStrengths[$tier][$key]) {
                         $updateOnly = $false
@@ -221,7 +222,7 @@ if ($CreateAuthStrength) {
                                     -DisplayName $authStrength.displayName `
                                     -Description $authStrength.description
 
-                                Write-Output "            Updating allowed combinations"
+                                Write-Output "            Updating allowed combinations: $($authStrength.allowedCombinations -join '; ')"
                                 $null = Update-MgPolicyAuthenticationStrengthPolicyAllowedCombination `
                                     -AuthenticationStrengthPolicyId $authStrength.id `
                                     -AllowedCombinations $authStrength.allowedCombinations
@@ -251,8 +252,7 @@ if ($CreateAuthStrength) {
                                 }
                             }
                             catch {
-                                Write-Output $_
-                                break
+                                throw $_
                             }
                         }
                         else {
@@ -275,168 +275,179 @@ if ($CreateAuthStrength) {
                                 }
                             }
                             catch {
-                                Write-Output $_
-                                break
+                                throw $_
                             }
                         }
                         Start-Sleep -Seconds 0.5
                     }
                 }
             }
-        }
-        1 {
-            Write-Output "No: Skipping Authentication Strengths creation / updates."
-        }
-        2 {
-            Write-Output "Cancel: Aborting command."
-            exit
+            1 {
+                Write-Output " No: Skipping Tier $tier Authentication Strengths creation / updates."
+            }
+            2 {
+                Write-Output " Cancel: Aborting command."
+                exit
+            }
         }
     }
 }
 
 # Update Rules for Azure AD Roles
 #
+$UpdateRoleRules = $false
 $RoleTemplateIDsWhitelist = @();
 $RoleNamesWhitelist = @();
-foreach ($role in $Roles) {
-    if ($role.GetType().Name -eq 'String') {
-        if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
-            $RoleTemplateIDsWhitelist += $role
+if (
+    ($Roles.Count -eq 1) -and
+    ($roles[0].GetType().Name -eq 'String') -and
+    ($roles[0] -eq 'All')
+) {
+    $UpdateRoleRules = $true
+}
+else {
+    foreach ($role in $Roles) {
+        if ($role.GetType().Name -eq 'String') {
+            if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                $RoleTemplateIDsWhitelist += $role
+            }
+            else {
+                $RoleNamesWhitelist += $role
+            }
+            $UpdateRoleRules = $true
         }
-        else {
-            $RoleNamesWhitelist += $role
-        }
-    }
-    elseif ($role.GetType().Name -eq 'Hashtable') {
-        if ($role.TemplateId) {
-            $RoleTemplateIDsWhitelist += $role.TemplateId
-        }
-        elseif ($role.displayName) {
-            $RoleNamesWhitelist += $role.displayName
+        elseif ($role.GetType().Name -eq 'Hashtable') {
+            if ($role.TemplateId) {
+                $RoleTemplateIDsWhitelist += $role.TemplateId
+                $UpdateRoleRules = $true
+            }
+            elseif ($role.displayName) {
+                $RoleNamesWhitelist += $role.displayName
+                $UpdateRoleRules = $true
+            }
         }
     }
 }
 
-$PolicyTiers = @();
-if ($Tier0) {
-    $PolicyTiers += 0
-}
-if ($Tier1) {
-    $PolicyTiers += 1
-}
-if ($Tier2) {
-    $PolicyTiers += 2
-}
-if (-Not $PolicyTiers -and $Roles) {
-    $PolicyTiers = @(0, 1, 2)
-}
+if ($UpdateRoleRules) {
+    $PolicyTiers = @();
+    if ($Tier0) {
+        $PolicyTiers += 0
+    }
+    if ($Tier1) {
+        $PolicyTiers += 1
+    }
+    if ($Tier2) {
+        $PolicyTiers += 2
+    }
+    if ($PolicyTiers.Count -eq 0) {
+        $PolicyTiers = @(0, 1, 2)
+    }
 
-foreach ($tier in $PolicyTiers) {
-    $i = 0
-    [array]$roleList = @()
-    foreach ($role in $AADRoleClassifications[$tier]) {
-        if (
-            ($null -eq $role.IsBuiltIn) -or
-            (-Not $role.displayName)
-        ) {
-            Write-Warning "[Tier $tier] Incomplete role definition ignored at array position $i"
+    foreach ($tier in $PolicyTiers) {
+        $i = 0
+        [array]$roleList = @()
+        foreach ($role in $AADRoleClassifications[$tier]) {
+            if (
+                ($null -eq $role.IsBuiltIn) -or
+                (-Not $role.displayName)
+            ) {
+                Write-Warning "[Tier $tier] Incomplete role definition ignored from configuration at array position $i"
+                continue
+            }
+
+            if ($RoleTemplateIDsWhitelist -or $RoleNamesWhitelist) {
+                $found = $false
+                if (
+                    $RoleTemplateIDsWhitelist -and
+                    $role.TemplateId -and
+                    ($role.TemplateId -in $RoleTemplateIDsWhitelist)
+                ) {
+                    $found = $true
+                }
+                elseif (
+                    $RoleNamesWhitelist -and
+                    $role.displayName -and
+                    ($role.displayName -in $RoleNamesWhitelist)
+                ) {
+                    $found = $true
+                }
+                if (-Not $found) {
+                    continue
+                }
+            }
+
+            $roleList += $role
+            $i++
+        }
+
+        if ($roleList.Count -eq 0) {
             continue
         }
 
-        if ($RoleTemplateIDsWhitelist -or $RoleNamesWhitelist) {
-            $found = $false
-            if (
-                $RoleTemplateIDsWhitelist -and
-                $role.TemplateId -and
-                ($role.TemplateId -in $RoleTemplateIDsWhitelist)
-            ) {
-                $found = $true
-            }
-            elseif (
-                $RoleNamesWhitelist -and
-                $role.displayName -and
-                ($role.displayName -in $RoleNamesWhitelist)
-            ) {
-                $found = $true
-            }
-            if (-Not $found) {
-                continue
-            }
-        }
+        $roleList = $roleList | Sort-Object -Property displayName
+        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, IsBuiltIn, TemplateId
 
-        $roleList += [hashtable]$role
-    }
-
-    if ($roleList.Count -eq 0) {
-        continue
-    }
-
-    $roleList = $roleList | Sort-Object -Property displayName
-    $roleList | ForEach-Object {[PSCustomObject]$_} | Format-Table -AutoSize -Property displayName,IsBuiltIn,TemplateId
-
-    $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
-    $message = "Do you confirm to update the management policies for a total of $($roleList.Count) Azure AD role(s) in Tier ${tier} listed above?"
-    $result = $host.ui.PromptForChoice($title, $message, $options, 1)
-    switch ($result) {
-        0 {
-            Write-Output "Yes: Continue with update."
-            foreach ($role in $roleList) {
-                if ($role.TemplateId) {
-                    $filter = "TemplateId eq '$($role.TemplateId)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
-                }
-                else {
-                    $filter = "displayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
-                }
-                $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
-                if (-Not $roleDefinition) {
-                    Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No role definition found"
-                    continue
-                }
-
-                $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
-                $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
-                if (-Not $policyAssignment) {
-                    Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No policy assignment found"
-                    continue
-                }
-
-                Write-Output "`n[Tier $tier] Updating management policy rules for $($role.IsBuiltIn ? "built-in" : "custom") role $($roleDefinition.TemplateId) ($($roleDefinition.displayName)):"
-                foreach ($rolePolicyRuleTemplate in $AADRoleManagementRulesDefaults[$tier]) {
-                    $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
-
-                    if ($role.ContainsKey($rolePolicyRule.Id)) {
-                        Write-Output "            [Deviating] $($rolePolicyRule.Id)"
-                        foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
-                            $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
-                        }
+        $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
+        $message = "Do you confirm to update the management policies for a total of $($roleList.Count) Azure AD role(s) in Tier ${tier} listed above?"
+        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        switch ($result) {
+            0 {
+                Write-Output " Yes: Continue with update."
+                foreach ($role in $roleList) {
+                    if ($role.TemplateId) {
+                        $filter = "TemplateId eq '$($role.TemplateId)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
                     }
                     else {
-                        Write-Output "            [Default]   $($rolePolicyRule.Id)"
+                        $filter = "displayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
+                    }
+                    $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
+                    if (-Not $roleDefinition) {
+                        Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No role definition found"
+                        continue
                     }
 
-                    try {
-                        Update-MgPolicyRoleManagementPolicyRule `
-                            -UnifiedRoleManagementPolicyId $policyAssignment.PolicyId `
-                            -UnifiedRoleManagementPolicyRuleId $rolePolicyRule.Id `
-                            -BodyParameter $rolePolicyRule
-                    }
-                    catch {
-                        Write-Output $_
-                        break
+                    $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
+                    $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
+                    if (-Not $policyAssignment) {
+                        Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No policy assignment found"
+                        continue
                     }
 
-                    Start-Sleep -Seconds 0.5
+                    Write-Output "`n[Tier $tier] Updating management policy rules for $($role.IsBuiltIn ? "built-in" : "custom") role $($roleDefinition.TemplateId) ($($roleDefinition.displayName)):"
+                    foreach ($rolePolicyRuleTemplate in $AADRoleManagementRulesDefaults[$tier]) {
+                        $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
+
+                        if ($role.ContainsKey($rolePolicyRule.Id)) {
+                            Write-Output "            [Deviating] $($rolePolicyRule.Id)"
+                            foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
+                                $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
+                            }
+                        }
+                        else {
+                            Write-Output "            [Default]   $($rolePolicyRule.Id)"
+                        }
+
+                        try {
+                            Update-MgPolicyRoleManagementPolicyRule `
+                                -UnifiedRoleManagementPolicyId $policyAssignment.PolicyId `
+                                -UnifiedRoleManagementPolicyRuleId $rolePolicyRule.Id `
+                                -BodyParameter $rolePolicyRule
+                        }
+                        catch {
+                            throw
+                        }
+                        Start-Sleep -Seconds 0.5
+                    }
                 }
-
-                $i++
             }
-        }
-        1 {
-            Write-Output "No: Skipping Tier $tier Azure AD Roles update."
-        }
-        2 {
-            Write-Output "Cancel: Aborting command."
-            exit
+            1 {
+                Write-Output " No: Skipping rules update for Tier $tier Azure AD Roles."
+            }
+            2 {
+                Write-Output " Cancel: Aborting command."
+                exit
+            }
         }
     }
 }
