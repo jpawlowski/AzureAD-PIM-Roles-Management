@@ -351,6 +351,8 @@ if ($UpdateRoleRules) {
         foreach ($role in $AADRoleClassifications[$tier]) {
             if (
                 ($null -eq $role.IsBuiltIn) -or
+                ($role.IsBuiltIn -and -not $role.templateId) -or
+                ((-Not $role.IsBuiltIn) -and (-not $role.id) -and (-not $role.templateId)) -or
                 (-Not $role.displayName)
             ) {
                 Write-Output ""
@@ -426,7 +428,7 @@ if ($UpdateRoleRules) {
         }
 
         $roleList = $roleList | Sort-Object -Property displayName
-        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName,isBuiltIn,templateId
+        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName,isBuiltIn,templateId,id
         $totalCount = $roleList.Count
         $totalCountChars = ($totalCount | Measure-Object -Character).Characters
 
@@ -439,11 +441,22 @@ if ($UpdateRoleRules) {
                 $i = 0
                 foreach ($role in $roleList) {
                     $i++
-                    if ($role.TemplateId) {
-                        $filter = "TemplateId eq '$($role.TemplateId)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
+                    if (-Not $role.IsBuiltIn) {
+                        if (-Not $role.templateId) {
+                            $role.templateId = $role.id
+                        }
+                        if (-Not $role.id) {
+                            $role.id = $role.templateId
+                        }
+                    }
+                    if ($role.id) {
+                        $filter = "Id eq '$($role.id)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
+                    }
+                    elseif ($role.templateId) {
+                        $filter = "TemplateId eq '$($role.templateId)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
                     }
                     else {
-                        $filter = "displayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.IsBuiltIn).ToString()).ToLower()
+                        $filter = "DisplayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
                     }
                     $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
                     if (-Not $roleDefinition) {

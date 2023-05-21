@@ -566,6 +566,11 @@ $AADRoleClassifications = @(
             templateId  = "810a2642-a034-447f-a5e8-41beaa378541"
             isBuiltIn   = $true
         }
+        # @{
+        #     displayName = "COMPANY Example Custom Tier1 Administrator"
+        #     Id          = "00000000-0000-0000-0000-000000000000"
+        #     isBuiltIn   = $false
+        # }
     ),
 
     #:-------------------------------------------------------------------------
@@ -737,6 +742,11 @@ $AADRoleClassifications = @(
             templateId  = "e300d9e7-4a2b-4295-9eff-f1c78b36cc98"
             isBuiltIn   = $true
         }
+        # @{
+        #     displayName = "COMPANY Example Custom Tier2 Administrator"
+        #     Id          = "00000000-0000-0000-0000-000000000000"
+        #     isBuiltIn   = $false
+        # }
     )
 )
 
