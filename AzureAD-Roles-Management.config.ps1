@@ -291,11 +291,6 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName = "Customer LockBox Access Approver"
-            templateId  = "5c4f9dcd-47dc-4cf7-8c9a-9e4207cbfc91"
-            isBuiltIn   = $true
-        }
-        @{
             displayName = "Edge Administrator"
             templateId  = "3f1acade-1e04-4fbc-9b69-f0302cd84aef"
             isBuiltIn   = $true
@@ -601,6 +596,11 @@ $AADRoleClassifications = @(
         @{
             displayName = "Attribute Definition Reader"
             templateId  = "1d336d2c-4ae8-42ef-9711-b3604ce3fc2c"
+            isBuiltIn   = $true
+        }
+        @{
+            displayName = "Customer LockBox Access Approver"
+            templateId  = "5c4f9dcd-47dc-4cf7-8c9a-9e4207cbfc91"
             isBuiltIn   = $true
         }
         @{
