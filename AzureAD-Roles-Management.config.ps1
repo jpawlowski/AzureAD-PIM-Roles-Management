@@ -282,6 +282,11 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
+            displayName = "Desktop Analytics Administrator"
+            templateId  = "38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4"
+            isBuiltIn   = $true
+        }
+        @{
             displayName                   = "Dynamics 365 Administrator"
             templateId                    = "44367163-eba1-44c3-98af-f5787879f96a"
             isBuiltIn                     = $true
@@ -574,11 +579,6 @@ $AADRoleClassifications = @(
         @{
             displayName = "Attribute Definition Reader"
             templateId  = "1d336d2c-4ae8-42ef-9711-b3604ce3fc2c"
-            isBuiltIn   = $true
-        }
-        @{
-            displayName = "Desktop Analytics Administrator"
-            templateId  = "38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4"
             isBuiltIn   = $true
         }
         @{
