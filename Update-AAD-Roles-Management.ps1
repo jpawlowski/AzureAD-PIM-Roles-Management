@@ -376,6 +376,21 @@ if ($UpdateRoleRules) {
                 continue
             }
 
+            $nextTier = $tier + 1;
+            $duplicate = $false
+            do {
+                if (($AADRoleClassifications[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                    Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from lower Tier ${nextTier}"
+                    $duplicate = $true
+                }
+                $nextTier++
+            } while (
+                $nextTier -le 2
+            )
+            if ($duplicate) {
+                continue
+            }
+
             if ($RoleTemplateIDsWhitelist -or $RoleNamesWhitelist) {
                 $found = $false
                 if (
