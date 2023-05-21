@@ -202,6 +202,7 @@ if ($CreateAuthStrength) {
                                 $updateOnly = $true
                             }
                             else {
+                                Write-Output ""
                                 Write-Warning "[Tier $tier] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
                                 continue
                             }
@@ -352,11 +353,13 @@ if ($UpdateRoleRules) {
                 ($null -eq $role.IsBuiltIn) -or
                 (-Not $role.displayName)
             ) {
+                Write-Output ""
                 Write-Warning "[Tier $tier] Incomplete role definition ignored from configuration at array position $i"
                 continue
             }
 
             if (($AADRoleClassifications[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
+                Write-Output ""
                 Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is defined for this Tier already"
                 continue
             }
@@ -365,6 +368,7 @@ if ($UpdateRoleRules) {
             $duplicate = $false
             do {
                 if (($AADRoleClassifications[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                    Write-Output ""
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from higher Tier ${previousTier}"
                     $duplicate = $true
                 }
@@ -380,6 +384,7 @@ if ($UpdateRoleRules) {
             $duplicate = $false
             do {
                 if (($AADRoleClassifications[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                    Write-Output ""
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from lower Tier ${nextTier}"
                     $duplicate = $true
                 }
@@ -442,6 +447,7 @@ if ($UpdateRoleRules) {
                     }
                     $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
                     if (-Not $roleDefinition) {
+                        Write-Output ""
                         Write-Warning (
                             "[Tier $tier] " +
                             ('{0:d' + $totalCountChars + '}') -f $i +
@@ -459,6 +465,7 @@ if ($UpdateRoleRules) {
                     $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
                     $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
                     if (-Not $policyAssignment) {
+                        Write-Output ""
                         Write-Warning (
                             "`n[Tier $tier] " +
                             ('{0:d' + $totalCountChars + '}') -f $i +
