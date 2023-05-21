@@ -60,6 +60,9 @@ $AADRoleClassifications = @(
     # You may move roles to another Tier, based on your own requirements.
     # Custom Azure AD roles that were created before may also be added here as desired.
     #
+    # Settings are inherited from $AADRoleManagementRulesDefaults.
+    # Define selected rules here to explicitly replace/overwrite default settings.
+    #
     # Note: Roles 'Global Administrator' and 'Privileged Role Administrator'
     #       explicitly need to be added to Tier 0. Remove the respective comments
     #       below when you are ready.
@@ -185,6 +188,9 @@ $AADRoleClassifications = @(
     #
     # You may move roles to another Tier, based on your own requirements.
     # Custom Azure AD roles that were created before may also be added here as desired.
+    #
+    # Settings are inherited from $AADRoleManagementRulesDefaults.
+    # Define selected rules here to explicitly replace/overwrite default settings.
     #
     @(
         @{
@@ -572,6 +578,9 @@ $AADRoleClassifications = @(
     #
     # You may move roles to another Tier, based on your own requirements.
     # Custom Azure AD roles that were created before may also be added here as desired.
+    #
+    # Settings are inherited from $AADRoleManagementRulesDefaults.
+    # Define selected rules here to explicitly replace/overwrite default settings.
     #
     @(
         @{
@@ -1179,7 +1188,7 @@ $AADRoleManagementRulesDefaults = @(
             "@odata.type" = "#microsoft.graph.unifiedRoleManagementPolicyAuthenticationContextRule"
             id            = "AuthenticationContext_EndUser_Assignment"
             isEnabled     = $true
-            claimValue    = $AADCAAuthContexts[0].default.Id
+            claimValue    = $AADCAAuthContexts[1].default.Id
             target        = @{
                 "@odata.type"       = "microsoft.graph.unifiedRoleManagementPolicyRuleTarget"
                 caller              = "EndUser"
@@ -1572,7 +1581,7 @@ $AADRoleManagementRulesDefaults = @(
             "@odata.type" = "#microsoft.graph.unifiedRoleManagementPolicyAuthenticationContextRule"
             id            = "AuthenticationContext_EndUser_Assignment"
             isEnabled     = $true
-            claimValue    = $AADCAAuthContexts[0].default.Id
+            claimValue    = $AADCAAuthContexts[2].default.Id
             target        = @{
                 "@odata.type"       = "microsoft.graph.unifiedRoleManagementPolicyRuleTarget"
                 caller              = "EndUser"
