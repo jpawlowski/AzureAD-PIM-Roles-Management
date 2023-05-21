@@ -160,7 +160,7 @@ if ($UpdateAuthContext) {
             1 {
                 Write-Output " No: Skipping Tier $tier Authentication Context updates."
             }
-            2 {
+            * {
                 Write-Output " Cancel: Aborting command."
                 exit
             }
@@ -285,7 +285,7 @@ if ($CreateAuthStrength) {
             1 {
                 Write-Output " No: Skipping Tier $tier Authentication Strengths creation / updates."
             }
-            2 {
+            * {
                 Write-Output " Cancel: Aborting command."
                 exit
             }
@@ -386,9 +386,9 @@ if ($UpdateRoleRules) {
         }
 
         $roleList = $roleList | Sort-Object -Property displayName
-        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, IsBuiltIn, TemplateId
+        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName,isBuiltIn,templateId
         $totalCount = $roleList.Count
-        $totalCountLen = ($totalCount | Measure-Object -Character).Characters
+        $totalCountChars = ($totalCount | Measure-Object -Character).Characters
 
         $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
         $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
@@ -409,7 +409,7 @@ if ($UpdateRoleRules) {
                     if (-Not $roleDefinition) {
                         Write-Warning (
                             "`n[Tier $tier] " +
-                            ('{0:d' + $totalCountLen + '}') -f $i +
+                            ('{0:d' + $totalCountChars + '}') -f $i +
                             "/${totalCount}: " +
                             "SKIPPED " +
                             ($role.IsBuiltIn ? "Built-in" : "Custom") +
@@ -426,7 +426,7 @@ if ($UpdateRoleRules) {
                     if (-Not $policyAssignment) {
                         Write-Warning (
                             "`n[Tier $tier] " +
-                            ('{0:d' + $totalCountLen + '}') -f $i +
+                            ('{0:d' + $totalCountChars + '}') -f $i +
                             "/${totalCount}: " +
                             "SKIPPED " +
                             ($role.IsBuiltIn ? "Built-in" : "Custom") +
@@ -440,7 +440,7 @@ if ($UpdateRoleRules) {
 
                     Write-Output (
                         "`n[Tier $tier] " +
-                        ('{0:d' + $totalCountLen + '}') -f $i +
+                        ('{0:d' + $totalCountChars + '}') -f $i +
                         "/${totalCount}: " +
                         "Updating management policy rules for " +
                         ($role.IsBuiltIn ? "built-in" : "custom") +
@@ -477,7 +477,7 @@ if ($UpdateRoleRules) {
             1 {
                 Write-Output " No: Skipping management policy rules update for Tier $tier Azure AD Roles."
             }
-            2 {
+            * {
                 Write-Output " Cancel: Aborting command."
                 exit
             }

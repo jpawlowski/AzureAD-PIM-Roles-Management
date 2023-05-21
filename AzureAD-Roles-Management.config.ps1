@@ -374,11 +374,6 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName = "Insights Analyst"
-            templateId  = "25df335f-86eb-4119-b717-0ff02de207e9"
-            isBuiltIn   = $true
-        }
-        @{
             displayName = "Kaizala Administrator"
             templateId  = "74ef975b-6605-40af-a5d2-b9539d836353"
             isBuiltIn   = $true
@@ -613,6 +608,11 @@ $AADRoleClassifications = @(
             AuthenticationContext_EndUser_Assignment = @{
                 isEnabled = $false
             }
+        }
+        @{
+            displayName = "Insights Analyst"
+            templateId  = "25df335f-86eb-4119-b717-0ff02de207e9"
+            isBuiltIn   = $true
         }
         @{
             displayName = "Insights Business Leader"
