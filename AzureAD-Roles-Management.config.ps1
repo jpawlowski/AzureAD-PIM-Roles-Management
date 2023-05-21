@@ -478,11 +478,6 @@ $AADRoleClassifications = @(
             }
         }
         @{
-            displayName = "Printer Technician"
-            templateId  = "e8cef6f1-e4bd-4ea8-bc07-4b8d950f4477"
-            isBuiltIn   = $true
-        }
-        @{
             displayName = "Search Administrator"
             templateId  = "0964bb5e-9bdb-4d7b-ac29-58e794862a40"
             isBuiltIn   = $true
@@ -661,6 +656,11 @@ $AADRoleClassifications = @(
         @{
             displayName = "Organizational Messages Writer"
             templateId  = "507f53e4-4e52-4077-abd3-d2e1558b6ea2"
+            isBuiltIn   = $true
+        }
+        @{
+            displayName = "Printer Technician"
+            templateId  = "e8cef6f1-e4bd-4ea8-bc07-4b8d950f4477"
             isBuiltIn   = $true
         }
         @{
