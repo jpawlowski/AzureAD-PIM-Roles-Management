@@ -10,7 +10,6 @@
         - Authentication Strengths
         - Conditional Access Policies
 #>
-
 [CmdletBinding()]
 Param (
     [Parameter(HelpMessage = "Azure AD tenant ID.")]
@@ -36,7 +35,7 @@ if (
     (-Not $MgVersion) -or
     ($MgVersion.Version -lt [System.Version]'2.0')
 ) {
-    Write-Error "This script requies Microsoft Graph PowerShell module to be installed."
+    Write-Error "This script requies Microsoft Graph PowerShell module version 2.0 or higher to be installed."
     exit 1
 }
 
@@ -99,7 +98,10 @@ if (
     ((Get-MgContext).TenantId -ne $TenantId)
 ) {
     Write-Output "Connecting to tenant $TenantId ..."
-    Connect-MgGraph -TenantId $TenantId -Scopes $MgScopes
+    Connect-MgGraph `
+        -ContextScope Process `
+        -TenantId $TenantId `
+        -Scopes $MgScopes
     if (-Not $?) {
         exit
     }
@@ -137,7 +139,7 @@ if ($UpdateAuthContext) {
     if ($Tier2) {
         $AuthContextTiers += 2
     }
-    if (-Not $AuthContextTiers) {
+    if ($AuthContextTiers.Count -eq 0) {
         $AuthContextTiers = @(0, 1, 2)
     }
 
@@ -174,7 +176,7 @@ if ($CreateAuthStrength) {
     if ($Tier2) {
         $AuthStrengthTiers += 2
     }
-    if (-Not $AuthStrengthTiers) {
+    if ($AuthStrengthTiers.Count -eq 0) {
         $AuthStrengthTiers = @(0, 1, 2)
     }
 
@@ -184,17 +186,17 @@ if ($CreateAuthStrength) {
         foreach ($key in $AADCAAuthStrengths[$tier].Keys) {
             foreach ($authStrength in $AADCAAuthStrengths[$tier][$key]) {
                 $updateOnly = $false
-
                 if ($authStrength.id) {
-                    if ($authStrengthPolicies | Where-Object -FilterScript {$_.Id -eq $authStrength.id}) {
+                    if ($authStrengthPolicies | Where-Object -FilterScript { $_.Id -eq $authStrength.id }) {
                         $updateOnly = $true
-                    } else {
-                        Write-Warning "`n[Tier $tier] SKIPPED AuthStrength ID $($authStrength.id) Authentication Strength: No Authentication Strength definition found"
+                    }
+                    else {
+                        Write-Warning "[Tier $tier] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
                         continue
                     }
                 }
                 else {
-                    $obj = $authStrengthPolicies | Where-Object -FilterScript {$_.DisplayName -eq $authStrength.displayName}
+                    $obj = $authStrengthPolicies | Where-Object -FilterScript { $_.DisplayName -eq $authStrength.displayName }
                     if ($obj) {
                         $authStrength.id = $obj.Id
                         $updateOnly = $true
@@ -202,18 +204,67 @@ if ($CreateAuthStrength) {
                 }
 
                 if ($updateOnly) {
-                    Write-Output "`n[Tier $tier] Updating authentication strength policy"
-                    Update-MgPolicyAuthenticationStrengthPolicy `
-                        -AuthenticationStrengthPolicyId  $authStrength.id `
-                        -DisplayName $authStrength.displayName `
-                        -Description $authStrength.description
-                    # Update-MgPolicyAuthenticationStrengthPolicyAllowedCombination
-                } else {
-                    Write-Output "`n[Tier $tier] Creating authentication strength policy"
-                    New-MgPolicyAuthenticationStrengthPolicy `
-                        -DisplayName $authStrength.displayName `
-                        -Description $authStrength.description
+                    Write-Output "`n[Tier $tier] Updating authentication strength policy $($authStrength.id) ($($authStrength.displayName))"
+                    try {
+                        $null = Update-MgPolicyAuthenticationStrengthPolicy `
+                            -AuthenticationStrengthPolicyId $authStrength.id `
+                            -DisplayName $authStrength.displayName `
+                            -Description $authStrength.description
+                        $null = Update-MgPolicyAuthenticationStrengthPolicyAllowedCombination `
+                            -AuthenticationStrengthPolicyId $authStrength.id `
+                            -AllowedCombinations $authStrength.allowedCombinations
+
+                        if ($authStrength.CombinationConfigurations) {
+                            $combConfs = Get-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                            -AuthenticationStrengthPolicyId $authStrength.id
+
+                            foreach ($key in $authStrength.CombinationConfigurations.Keys) {
+                                $obj = $combConfs | Where-Object -FilterScript { $_.AppliesToCombinations -contains $key }
+                                if ($obj) {
+                                    $null = Update-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                        -AuthenticationCombinationConfigurationId $obj.id `
+                                        -AuthenticationStrengthPolicyId $authStrength.id `
+                                        -AppliesToCombinations $key `
+                                        -AdditionalProperties $authStrength.CombinationConfigurations.$key
+                                } else {
+                                    $null = New-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                        -AuthenticationStrengthPolicyId $authStrength.id `
+                                        -AppliesToCombinations $key `
+                                        -AdditionalProperties $authStrength.CombinationConfigurations.$key
+                                }
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Output $_
+                        break
+                    }
                 }
+                else {
+                    Write-Output "`n[Tier $tier] Creating authentication strength policy '$($authStrength.displayName)'"
+                    try {
+                        $obj = New-MgPolicyAuthenticationStrengthPolicy `
+                            -DisplayName $authStrength.displayName `
+                            -Description $authStrength.description `
+                            -AllowedCombinations $authStrength.allowedCombinations
+                        $authStrength.id = $obj.Id
+
+                        if ($authStrength.CombinationConfigurations) {
+                            foreach ($key in $authStrength.CombinationConfigurations.Keys) {
+                                $null = New-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                    -AuthenticationStrengthPolicyId $authStrength.id `
+                                    -AppliesToCombinations $key `
+                                    -AdditionalProperties $authStrength.CombinationConfigurations.$key
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Output $_
+                        break
+                    }
+                }
+
+                Start-Sleep -Seconds 0.5
             }
         }
     }
@@ -276,14 +327,14 @@ foreach ($tier in $PolicyTiers) {
         }
         $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
         if (-Not $roleDefinition) {
-            Write-Warning "`n[Tier $tier] SKIPPED $($role.displayName): No role definition found"
+            Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No role definition found"
             continue
         }
 
         $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
         $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
         if (-Not $policyAssignment) {
-            Write-Warning "`n[Tier $tier] SKIPPED $($role.displayName): No policy assignment found"
+            Write-Warning "[Tier $tier] SKIPPED $($role.displayName): No policy assignment found"
             continue
         }
 
