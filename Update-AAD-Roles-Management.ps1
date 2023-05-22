@@ -236,6 +236,9 @@ if ($CreateAuthStrength) {
                                         $obj = $combConfs | Where-Object -FilterScript { $_.AppliesToCombinations -contains $key }
                                         if ($obj) {
                                             Write-Output "            Updating combination configuration for '$key'"
+                                            if ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs) {
+                                                Write-Output ("               " + ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs -join "`n               "))
+                                            }
                                             $null = Update-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
                                                 -AuthenticationCombinationConfigurationId $obj.id `
                                                 -AuthenticationStrengthPolicyId $authStrength.id `
