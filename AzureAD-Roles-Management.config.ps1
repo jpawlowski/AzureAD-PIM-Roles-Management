@@ -1947,12 +1947,16 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Admin-AuthStr'
             description               = 'Authentication methods for users with active Tier0 Azure AD Roles. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
+                "temporaryAccessPassOneTime"
+                "temporaryAccessPassMultiUse"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -1981,12 +1985,14 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Admin-PIM-AuthStr'
             description               = 'Authentication methods during Azure AD Role enablement for Tier0-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -2015,12 +2021,15 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier0-Scoped-Admin-PIM-AuthStr'
             description               = 'Authentication methods during Azure AD Role enablement for Tier0-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
+                "password,microsoftAuthenticatorPush"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -2058,13 +2067,15 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Admin-AuthStr'
             description               = 'Authentication methods for users with active Tier1 Azure AD Roles. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
                 "password,microsoftAuthenticatorPush"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -2093,13 +2104,15 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Admin-PIM-AuthStr'
             description               = 'Authentication methods during Azure AD Role enablement for Tier1-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
                 "password,microsoftAuthenticatorPush"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -2128,13 +2141,15 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = 'Tier1-Scoped-Admin-PIM-AuthStr'
             description               = 'Authentication methods during Azure AD Role enablement for Tier1-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
                 "password,microsoftAuthenticatorPush"
             )
+
             combinationConfigurations = @{
                 fido2 = @{
                     "@odata.type"  = "#microsoft.graph.fido2CombinationConfiguration"
@@ -2172,10 +2187,11 @@ $AADCAAuthStrengths = @(
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName         = 'Tier2-Admin-PIM-AuthStr'
             description         = 'Authentication methods during Azure AD Role enablement for Tier2-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
+
+            # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "x509CertificateMultiFactor"
                 "deviceBasedPush"
                 "password,microsoftAuthenticatorPush"
             )
