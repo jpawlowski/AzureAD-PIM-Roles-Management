@@ -1954,7 +1954,6 @@ $AADCAAuthStrengths = @(
                 "fido2"
                 "deviceBasedPush"
                 "temporaryAccessPassOneTime"
-                "temporaryAccessPassMultiUse"
             )
 
             combinationConfigurations = @{
@@ -2073,6 +2072,7 @@ $AADCAAuthStrengths = @(
                 "windowsHelloForBusiness"
                 "fido2"
                 "deviceBasedPush"
+                "temporaryAccessPassOneTime"
                 "password,microsoftAuthenticatorPush"
             )
 
