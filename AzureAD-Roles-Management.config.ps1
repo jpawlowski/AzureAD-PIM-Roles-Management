@@ -84,11 +84,6 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName = "Azure Information Protection Administrator"
-            templateId  = "7495fdc4-34c4-4d15-a289-98788ce399fd"
-            isBuiltIn   = $true
-        }
-        @{
             displayName                              = "Cloud Device Administrator"
             templateId                               = "7698a772-787b-4ac8-901f-60d6b08affd2"
             isBuiltIn                                = $true
@@ -96,11 +91,6 @@ $AADRoleClassifications = @(
             AuthenticationContext_EndUser_Assignment = @{
                 claimValue = $AADCAAuthContexts[0].scopable.Id
             }
-        }
-        @{
-            displayName = "Compliance Administrator"
-            templateId  = "17315797-102d-40b4-93e0-432062caca18"
-            isBuiltIn   = $true
         }
         @{
             displayName = "Conditional Access Administrator"
@@ -248,6 +238,11 @@ $AADRoleClassifications = @(
             }
         }
         @{
+            displayName = "Azure Information Protection Administrator"
+            templateId  = "7495fdc4-34c4-4d15-a289-98788ce399fd"
+            isBuiltIn   = $true
+        }
+        @{
             displayName = "B2C IEF Keyset Administrator"
             templateId  = "aaf43236-0c0d-4d5f-883a-6955382ac081"
             isBuiltIn   = $true
@@ -283,6 +278,11 @@ $AADRoleClassifications = @(
         @{
             displayName = "Cloud Application Administrator"
             templateId  = "158c047a-c907-4556-b7ef-446551a6b5f7"
+            isBuiltIn   = $true
+        }
+        @{
+            displayName = "Compliance Administrator"
+            templateId  = "17315797-102d-40b4-93e0-432062caca18"
             isBuiltIn   = $true
         }
         @{
