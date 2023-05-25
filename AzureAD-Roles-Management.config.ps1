@@ -241,6 +241,14 @@ $AADRoleClassifications = @(
             displayName = "Azure Information Protection Administrator"
             templateId  = "7495fdc4-34c4-4d15-a289-98788ce399fd"
             isBuiltIn   = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = "PT4H"
+            }
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    "Justification"
+                )
+            }
         }
         @{
             displayName = "B2C IEF Keyset Administrator"
@@ -284,6 +292,14 @@ $AADRoleClassifications = @(
             displayName = "Compliance Administrator"
             templateId  = "17315797-102d-40b4-93e0-432062caca18"
             isBuiltIn   = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = "PT4H"
+            }
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    "Justification"
+                )
+            }
         }
         @{
             displayName = "Compliance Data Administrator"
