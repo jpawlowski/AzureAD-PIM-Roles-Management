@@ -1961,15 +1961,13 @@ $AADCAAuthStrengths = @(
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = 'Tier0-Admin-AuthStr'
+            displayName               = 'Tier0-Admin-Role-AuthStr'
             description               = 'Authentication methods for users with active Tier0 Azure AD Roles. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "deviceBasedPush"
-                "temporaryAccessPassOneTime"
             )
 
             combinationConfigurations = @{
@@ -2005,7 +2003,6 @@ $AADCAAuthStrengths = @(
             allowedCombinations       = @(
                 "windowsHelloForBusiness"
                 "fido2"
-                "deviceBasedPush"
             )
 
             combinationConfigurations = @{
@@ -2042,7 +2039,6 @@ $AADCAAuthStrengths = @(
                 "windowsHelloForBusiness"
                 "fido2"
                 "deviceBasedPush"
-                "password,microsoftAuthenticatorPush"
             )
 
             combinationConfigurations = @{
@@ -2080,7 +2076,7 @@ $AADCAAuthStrengths = @(
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = 'Tier1-Admin-AuthStr'
+            displayName               = 'Tier1-Admin-Role-AuthStr'
             description               = 'Authentication methods for users with active Tier1 Azure AD Roles. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -2088,8 +2084,6 @@ $AADCAAuthStrengths = @(
                 "windowsHelloForBusiness"
                 "fido2"
                 "deviceBasedPush"
-                "temporaryAccessPassOneTime"
-                "password,microsoftAuthenticatorPush"
             )
 
             combinationConfigurations = @{
@@ -2163,7 +2157,6 @@ $AADCAAuthStrengths = @(
                 "windowsHelloForBusiness"
                 "fido2"
                 "deviceBasedPush"
-                "password,microsoftAuthenticatorPush"
             )
 
             combinationConfigurations = @{
@@ -2209,7 +2202,6 @@ $AADCAAuthStrengths = @(
                 "windowsHelloForBusiness"
                 "fido2"
                 "deviceBasedPush"
-                "password,microsoftAuthenticatorPush"
             )
         }
     }
