@@ -1,4 +1,4 @@
-$AADCAAuthStrengthDisplayNamePrefix = $null
+$AADCAAuthStrengthDisplayNamePrefix = $DisplayNamePrefix
 
 $AADCAAuthStrengths = @(
     #:-------------------------------------------------------------------------

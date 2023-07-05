@@ -1,4 +1,4 @@
-$AADCANamedLocationDisplayNamePrefix = $null
+$AADCANamedLocationDisplayNamePrefix = $DisplayNamePrefix
 
 $AADCANamedLocations = @(
     #:-------------------------------------------------------------------------

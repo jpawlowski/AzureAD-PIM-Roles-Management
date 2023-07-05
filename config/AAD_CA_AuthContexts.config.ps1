@@ -1,4 +1,4 @@
-$AADCAAuthContextDisplayNamePrefix = $null
+$AADCAAuthContextDisplayNamePrefix = $DisplayNamePrefix
 
 $AADCAAuthContexts = @(
     #:-------------------------------------------------------------------------
