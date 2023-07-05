@@ -1,4 +1,4 @@
-$AADCAAuthStrengthDisplayNameSuffix = ''
+$AADCAAuthStrengthDisplayNamePrefix = $null
 
 $AADCAAuthStrengths = @(
     #:-------------------------------------------------------------------------
@@ -10,7 +10,7 @@ $AADCAAuthStrengths = @(
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier0-Admin-Role-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier0-Admin-Role-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods for users with active Tier0 Azure AD Roles. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -45,7 +45,7 @@ $AADCAAuthStrengths = @(
         }
         roleEnablement         = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier0-Admin-PIM-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier0-Admin-PIM-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods during Azure AD Role enablement for Tier0-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -80,7 +80,7 @@ $AADCAAuthStrengths = @(
         }
         scopableRoleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier0-Scoped-Admin-PIM-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier0-Scoped-Admin-PIM-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods during Azure AD Role enablement for Tier0-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -125,7 +125,7 @@ $AADCAAuthStrengths = @(
     @{
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier1-Admin-Role-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier1-Admin-Role-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods for users with active Tier1 Azure AD Roles. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -161,7 +161,7 @@ $AADCAAuthStrengths = @(
         }
         roleEnablement         = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier1-Admin-PIM-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier1-Admin-PIM-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods during Azure AD Role enablement for Tier1-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -198,7 +198,7 @@ $AADCAAuthStrengths = @(
         }
         scopableRoleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName               = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier1-Scoped-Admin-PIM-AuthStr') | Join-String -Separator '-'
+            displayName               = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier1-Scoped-Admin-PIM-AuthStr') | Join-String -Separator '-'
             description               = 'Authentication methods during Azure AD Role enablement for Tier1-Scoped-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
@@ -243,7 +243,7 @@ $AADCAAuthStrengths = @(
     @{
         roleEnablement = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName         = @($AADCAAuthStrengthDisplayNameSuffix, 'Tier2-Admin-PIM-AuthStr') | Join-String -Separator '-'
+            displayName         = @($AADCAAuthStrengthDisplayNamePrefix, 'Tier2-Admin-PIM-AuthStr') | Join-String -Separator '-'
             description         = 'Authentication methods during Azure AD Role enablement for Tier2-Admin-AuthCon. DO NOT CHANGE MANUALLY!'
 
             # List: https://learn.microsoft.com/en-us/graph/api/authenticationstrengthroot-list-authenticationmethodmodes?tabs=http#response-1
