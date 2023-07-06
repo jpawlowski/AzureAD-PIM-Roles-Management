@@ -18,6 +18,7 @@ $ConfigFiles = @(
     'AAD_CA_AuthStrengths.config.ps1'
     'AAD_CA_Policies.config.ps1'
     'AAD_Role_Classifications.config.ps1'
+    'AAD_Role_ManagementRulesDefaults.config.ps1'
 )
 
 try {
@@ -26,7 +27,8 @@ try {
         . $FilePath
         if (Test-Path -Path $FilePath -PathType Leaf) {
             . $FilePath
-        } else {
+        }
+        else {
             Throw $FilePath
         }
     }

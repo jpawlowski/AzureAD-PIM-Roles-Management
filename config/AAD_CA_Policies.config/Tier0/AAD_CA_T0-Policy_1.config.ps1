@@ -1,6 +1,6 @@
 @(
     @{
-        displayName   = @($AADCAPolicyDisplayNameSuffix, 'CA Name1') | Join-String -Separator '-'
+        displayName   = @($AADCAPolicyDisplayNameSuffix, 'CA Name1') | Join-String -Separator $DisplayNameElementSeparator
         description   = ''
         state         = 'enabledForReportingButNotEnforced'
         conditions    = @{

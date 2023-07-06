@@ -44,10 +44,10 @@ function CreateNamedLocations {
                     }
                     else {
                         $obj = $namedLocations |
-                                Where-Object -FilterScript {
-                                    $_.AdditionalProperties.'@odata.type' -eq $namedLocation.'@odata.type' -and
-                                    $_.DisplayName -eq $namedLocation.displayName
-                                }
+                        Where-Object -FilterScript {
+                            $_.AdditionalProperties.'@odata.type' -eq $namedLocation.'@odata.type' -and
+                            $_.DisplayName -eq $namedLocation.displayName
+                        }
                         if ($obj) {
                             $namedLocation.id = $obj.Id
                             $updateOnly = $true

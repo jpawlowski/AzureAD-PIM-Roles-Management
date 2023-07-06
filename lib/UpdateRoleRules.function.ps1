@@ -98,7 +98,7 @@ function UpdateRoleRules {
         }
 
         $roleList = $roleList | Sort-Object -Property displayName
-        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName,isBuiltIn,templateId,id
+        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, isBuiltIn, templateId, id
         $totalCount = $roleList.Count
         $totalCountChars = ($totalCount | Measure-Object -Character).Characters
 
@@ -177,13 +177,13 @@ function UpdateRoleRules {
                         $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
 
                         if ($role.ContainsKey($rolePolicyRule.Id)) {
-                            Write-Output "                [Deviating] $($rolePolicyRule.Id)"
+                            Write-Output "                [Individual role setting]       $($rolePolicyRule.Id)"
                             foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
                                 $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
                             }
                         }
                         else {
-                            Write-Output "                [Default]   $($rolePolicyRule.Id)"
+                            Write-Output "                [Inherited from Tier Default]   $($rolePolicyRule.Id)"
                         }
 
                         try {
@@ -207,21 +207,21 @@ function UpdateRoleRules {
                 exit
             }
         }
-    }    
+    }
 }
 
 $UpdateRoleRules = $false
 $RoleTemplateIDsWhitelist = @();
 $RoleNamesWhitelist = @();
 if (
-    ($Roles.Count -eq 1) -and
-    ($roles[0].GetType().Name -eq 'String') -and
-    ($roles[0] -eq 'All')
+    ($UpdateRoles.Count -eq 1) -and
+    ($UpdateRoles[0].GetType().Name -eq 'String') -and
+    ($UpdateRoles[0] -eq 'All')
 ) {
     $UpdateRoleRules = $true
 }
 else {
-    foreach ($role in $Roles) {
+    foreach ($role in $UpdateRoles) {
         if ($role.GetType().Name -eq 'String') {
             if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
                 $RoleTemplateIDsWhitelist += $role

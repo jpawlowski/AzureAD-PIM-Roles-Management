@@ -17,7 +17,7 @@ Param (
     [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
     [string]$ConfigPath,
     [Parameter(HelpMessage = "Update all or only a specified list of Azure AD roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.")]
-    [array]$Roles,
+    [array]$UpdateRoles,
     [Parameter(HelpMessage = "Update Azure AD Authentication Contexts")]
     [switch]$UpdateAuthContext,
     [Parameter(HelpMessage = "Create or update Azure AD Authentication Strengths")]
@@ -34,6 +34,8 @@ Param (
     [switch]$Tier2
 )
 
+$InformationPreference = 'Continue'
+$WarningPreference = 'Continue'
 $ErrorActionPreference = 'Stop'
 
 try {
@@ -45,16 +47,15 @@ catch {
 }
 
 if (
-    (-Not $Roles) -and
+    (-Not $UpdateRoles) -and
     (-Not $CreateNamedLocations) -and
     (-Not $UpdateAuthContext) -and
     (-Not $CreateAuthStrength) -and
     (-Not $CreateCAPolicies)
 ) {
-    Write-Error "Missing parameter: What would you like to update and/or create? -Roles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateCAPolicies"
+    Write-Error "Missing parameter: What would you like to update and/or create? -UpdateRoles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateCAPolicies"
 }
 
-# Explicit list of files to load to avoid unwanted files
 $LibFiles = @(
     'LoadConfiguration.ps1'
     'ConnectMgGraph.function.ps1'
@@ -62,6 +63,7 @@ $LibFiles = @(
     'CreateAuthStrength.function.ps1'
     'UpdateAuthContext.function.ps1'
     'UpdateRoleRules.function.ps1'
+    'ValidateBreakGlass.function.ps1'
 )
 try {
     foreach ($FileName in $LibFiles) {
@@ -69,7 +71,8 @@ try {
         . $FilePath
         if (Test-Path -Path $FilePath -PathType Leaf) {
             . $FilePath
-        } else {
+        }
+        else {
             Throw $FilePath
         }
     }
@@ -83,3 +86,4 @@ CreateNamedLocations
 CreateAuthStrength
 UpdateAuthContext
 UpdateRoleRules
+ValidateBreakGlass

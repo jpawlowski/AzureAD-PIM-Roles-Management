@@ -1,4 +1,4 @@
-$AADCANamedLocationDisplayNamePrefix = $DisplayNamePrefix
+$AADCANamedLocationDisplayNamePrefix = $null
 
 $AADCANamedLocations = @(
     #:-------------------------------------------------------------------------
@@ -8,7 +8,7 @@ $AADCANamedLocations = @(
         #:--- Countries
         @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName = @($AADCANamedLocationDisplayNamePrefix, 'T0-Allowed-Country-IP-Locations') | Join-String -Separator '-'
+            displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier0-Admin-Allowed-Country-IP-Locations') | Join-String -Separator $DisplayNameElementSeparator
             '@odata.type' = '#microsoft.graph.countryNamedLocation'
 
             # Country codes, based on ISO 3166-1
@@ -97,7 +97,7 @@ $AADCANamedLocations = @(
         #:--- Corporate IPs
         # @{
         #     # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'T0-Allowed-Corporate-IPs') | Join-String -Separator '-'
+        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier0-Admin-Allowed-Corporate-IPs') | Join-String -Separator $DisplayNameElementSeparator
         #     '@odata.type' = '#microsoft.graph.ipNamedLocation'
 
         #     isTrusted = $false
@@ -121,7 +121,7 @@ $AADCANamedLocations = @(
         #:--- Countries
         @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName = @($AADCANamedLocationDisplayNamePrefix, 'T1-Allowed-Country-IP-Locations') | Join-String -Separator '-'
+            displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier1-Admin-Allowed-Country-IP-Locations') | Join-String -Separator $DisplayNameElementSeparator
             '@odata.type' = '#microsoft.graph.countryNamedLocation'
 
             # Country codes, based on ISO 3166-1
@@ -210,7 +210,7 @@ $AADCANamedLocations = @(
         #:--- Corporate IPs
         # @{
         #     # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'T1-Allowed-Corporate-IPs') | Join-String -Separator '-'
+        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier1-Admin-Allowed-Corporate-IPs') | Join-String -Separator $DisplayNameElementSeparator
         #     '@odata.type' = '#microsoft.graph.ipNamedLocation'
 
         #     isTrusted = $false
@@ -234,7 +234,7 @@ $AADCANamedLocations = @(
         #:--- Countries
         @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-            displayName = @($AADCANamedLocationDisplayNamePrefix, 'T2-Allowed-Country-IP-Locations') | Join-String -Separator '-'
+            displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier2-Admin-Allowed-Country-IP-Locations') | Join-String -Separator $DisplayNameElementSeparator
             '@odata.type' = '#microsoft.graph.countryNamedLocation'
 
             # Country codes, based on ISO 3166-1
@@ -323,7 +323,7 @@ $AADCANamedLocations = @(
         #:--- Corporate IPs
         # @{
         #     # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
-        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'T2-Allowed-Corporate-IPs') | Join-String -Separator '-'
+        #     displayName = @($AADCANamedLocationDisplayNamePrefix, 'Tier2-Admin-Allowed-Corporate-IPs') | Join-String -Separator $DisplayNameElementSeparator
         #     '@odata.type' = '#microsoft.graph.ipNamedLocation'
 
         #     isTrusted = $false
