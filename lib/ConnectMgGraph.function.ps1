@@ -14,8 +14,6 @@ function ConnectMgGraph {
         }
     }
 
-    # Connect to Microsoft Graph API
-    #
     $MgScopes = @()
     if ($UpdateRoles) {
         $MgScopes += 'RoleManagement.Read.Directory'
@@ -30,7 +28,7 @@ function ConnectMgGraph {
         $MgScopes += 'Policy.ReadWrite.ConditionalAccess'
         $MgScopes += 'Application.Read.All'
     }
-    if ($CreateCAPolicies) {
+    if ($CreateCAPolicies -or $ValidateBreakGlass) {
         $MgScopes += 'User.Read.All'
         $MgScopes += 'Group.Read.All'
         $MgScopes += 'Group.ReadWrite.All'
