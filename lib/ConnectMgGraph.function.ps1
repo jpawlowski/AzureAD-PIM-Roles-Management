@@ -18,8 +18,8 @@ function ConnectMgGraph {
     #
     $MgScopes = @()
     if ($UpdateRoles) {
-        $MgScopes += "RoleManagement.Read.Directory"
-        $MgScopes += "RoleManagement.ReadWrite.Directory"
+        $MgScopes += 'RoleManagement.Read.Directory'
+        $MgScopes += 'RoleManagement.ReadWrite.Directory'
     }
     if ($UpdateAuthContext) {
         $MgScopes += "AuthenticationContext.Read.All"
@@ -34,7 +34,8 @@ function ConnectMgGraph {
         $MgScopes += 'User.Read.All'
         $MgScopes += 'Group.Read.All'
         $MgScopes += 'Group.ReadWrite.All'
-        $MgScopes += "RoleManagement.Read.Directory"
+        $MgScopes += 'RoleManagement.Read.Directory'
+        $MgScopes += 'UserAuthenticationMethod.Read.All'
     }
 
     $reauth = $false

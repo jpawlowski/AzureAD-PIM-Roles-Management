@@ -1,3 +1,5 @@
+$AADCABreakGlassGroupDisplayNamePrefix = $AADGroupDisplayNamePrefix
+
 $AADCABreakGlass = @{
     accounts = @(
         #:-------------------------------------------------------------------------
@@ -13,13 +15,18 @@ $AADCABreakGlass = @{
         # See https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
         #
         # It is highly recommended to have a dedicated CA policy targeted to this account
-        # to have specific MFA methods applied.
+        # to have specific authentication methods applied.
         # The backup break glass admin account MUST be excluded from that policy.
         #
         @{
-            id                = '00000000-0000-0000-0000-000000000000'
-            displayName       = 'COMPANY Emergency Admin (Primary)'
-            userPrincipalName = 'admc-emergency911@vxdc2.onmicrosoft.com'
+            id                    = '00000000-0000-0000-0000-000000000000'
+            displayName           = "$CompanyName Emergency Admin (Primary)"
+            userPrincipalName     = 'admc-emergency911@vxdc2.onmicrosoft.com'
+            authenticationMethods = @(
+                '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today, and required to use TOTP
+                # '#microsoft.graph.fido2AuthenticationMethod'          # Replace softwareOathAuthenticationMethod with FIDO2 for phishing resistant authentication without password
+                '#microsoft.graph.softwareOathAuthenticationMethod'     # Allows a shared secret, e.g. using a password manager with TOTP support, or printout for temporal setup of a TOTP generator app
+            )
         }
 
         #:-------------------------------------------------------------------------
@@ -36,12 +43,18 @@ $AADCABreakGlass = @{
         #
         # This backup break glass admin account MUST be excluded from _ALL_ Conditional Access policies,
         # including the CA policy that is protecting the primary break glass admin account from above.
-        # Multi-Factor Authentication methods for this account are not used, but SHOULD be set nevertheless.
+        # Authentication methods for this account are not enforced via CA, but SHOULD be set nevertheless.
         #
         @{
-            id                = '00000000-0000-0000-0000-000000000000'
-            displayName       = 'COMPANY Emergency Admin (Backup)'
-            userPrincipalName = 'admc-emergency912@vxdc2.onmicrosoft.com'
+            id                                      = '00000000-0000-0000-0000-000000000000'
+            displayName                             = "$CompanyName Emergency Admin (Backup)"
+            userPrincipalName                       = 'admc-emergency912@vxdc2.onmicrosoft.com'
+            authenticationMethods                   = @(
+                '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
+                '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
+                # '#microsoft.graph.softwareOathAuthenticationMethod'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
+            )
+            excludeFromBreakGlassConditionalAccessPolicy = $true
         }
     )
 
@@ -56,8 +69,8 @@ $AADCABreakGlass = @{
     #
     group    = @{
         id                 = '84218b7e-344e-4a3f-a4e2-049bfb1f3059'
-        displayName        = 'COMPANY-T0-S-Break-Glass-Admins'
-        description        = 'Global group for emergency break glass accounts'
+        displayName        = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
+        description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
         isAssignableToRole = $true
     }
 }

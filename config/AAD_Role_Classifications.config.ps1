@@ -529,7 +529,7 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         # @{
-        #     displayName = 'COMPANY Example Custom Tier1 Administrator'
+        #     displayName = "$CompanyName Example Custom Tier1 Administrator"
         #     Id          = '00000000-0000-0000-0000-000000000000'
         #     isBuiltIn   = $false
         # }
@@ -705,7 +705,7 @@ $AADRoleClassifications = @(
             isBuiltIn   = $true
         }
         # @{
-        #     displayName = 'COMPANY Example Custom Tier2 Administrator'
+        #     displayName = "$CompanyName Example Custom Tier2 Administrator"
         #     Id          = '00000000-0000-0000-0000-000000000000'
         #     isBuiltIn   = $false
         # }

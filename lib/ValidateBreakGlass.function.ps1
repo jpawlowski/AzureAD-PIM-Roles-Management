@@ -10,7 +10,8 @@ function ValidateBreakGlass {
         ($AADCABreakGlass.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
         $groupObj = Get-MgGroup -GroupId $AADCABreakGlass.group.id -ErrorAction SilentlyContinue
-    } else {
+    }
+    else {
         Write-Error 'Defined Break Glass Group is incomplete'
         return
     }
@@ -23,7 +24,7 @@ function ValidateBreakGlass {
         ($AADCABreakGlass.group.isAssignableToRole -eq $true) -and
         ($groupObj.IsAssignableToRole -ne $true)
     ) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id) must be re-created with role-assignment capability enabled"
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Must be re-created with role-assignment capability enabled"
         return
     }
     if (
@@ -42,6 +43,7 @@ function ValidateBreakGlass {
         Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
         $groupObj.Description = $AADCABreakGlass.group.description
     }
+    #TODO: Block groups that were onboarded to PIM
     Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
 
     $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id
@@ -55,96 +57,120 @@ function ValidateBreakGlass {
             ($account.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
         ) {
             $userId = $account.id
-        } elseif (
+        }
+        elseif (
             ($null -ne $account.userPrincipalName) -and
             ($account.userPrincipalName -match "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
         ) {
-            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account: $($account.userPrincipalName) SHOULD use explicit object ID in configuration"
+            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($account.userPrincipalName): SHOULD use explicit object ID in configuration"
             $userId = $account.userPrincipalName
-        } else {
+        }
+        else {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account is incomplete"
             return
         }
-        $userObj = Get-MgUser -UserId $userId -Property Id,UserPrincipalName,IsResourceAccount,UserType,ExternalUserState,OnPremisesSyncEnabled,CreatedDateTime,DeletedDateTime,AccountEnabled,LastPasswordChangeDateTime,Authentication,DisplayName -ErrorAction SilentlyContinue
+        $userObj = Get-MgUser -UserId $userId -Property Id, UserPrincipalName, IsResourceAccount, UserType, ExternalUserState, OnPremisesSyncEnabled, CreatedDateTime, DeletedDateTime, AccountEnabled, PasswordProfile, LastPasswordChangeDateTime, Authentication, DisplayName -ErrorAction SilentlyContinue
 
         if ($null -eq $userObj) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $userId does not exist"
             return
         }
         if ($userObj.userPrincipalName -ne $account.userPrincipalName) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) User Principal Name does not match expected value '$($account.userPrincipalName)'"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): User Principal Name does not match expected value '$($account.userPrincipalName)'"
             return
         }
         if ($userObj.userPrincipalName -notmatch '^.+\.onmicrosoft\.com$') {
-            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) User Principal Name SHOULD use .onmicrosoft.com subdomain"
+            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): User Principal Name SHOULD use .onmicrosoft.com subdomain"
         }
         if ($null -ne $userObj.IsResourceAccount) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) can not be of type Resource Account"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can not be of type Resource Account"
             return
         }
         if ($userObj.UserType -ne 'Member') {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) must be of user type 'Member'"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be of user type 'Member'"
             return
         }
         if ($null -ne $userObj.ExternalUserState) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) can not be external"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can not be external"
             return
         }
         if ($null -ne $userObj.OnPremisesSyncEnabled) {
             if ($userObj.OnPremisesSyncEnabled -eq $true) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) must be cloud-only"
-            } else {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) can never have synced with on-premises before and must be cloud-only right from the beginning"
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be cloud-only"
+            }
+            else {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can never have synced with on-premises before and must be cloud-only right from the beginning"
             }
             return
         }
         if ($null -ne $userObj.DeletedDateTime) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) was deleted and can not be used as Break Glass Account"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Was deleted and can not be used as Break Glass Account"
             return
         }
         if ($userObj.AccountEnabled -ne $true) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) must be enabled for login"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be enabled for login"
             return
         }
         if ($userObj.LastPasswordChangeDateTime -le $userObj.CreatedDateTime) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)) password must be changed after initial creation"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Password must be changed after initial creation"
+            return
+        }
+        if (
+            ($null -ne $userObj.PasswordProfile.ForceChangePasswordNextSignIn) -or
+            ($null -ne $userObj.PasswordProfile.ForceChangePasswordNextSignInWithMfa)
+        ) {
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Temporary password must be changed to permanent password first"
             return
         }
         if (
             ($null -ne $account.displayName) -and
             ($userObj.DisplayName -ne $account.displayName)
         ) {
-            Write-Information "$($validBreakGlassCount + 1). Break Glass Account: Updating display name for $($userObj.Id) ($($userObj.DisplayName))"
+            Write-Information "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)): Updating display name"
             Update-MgUser -UserID $userObj.Id -DisplayName $account.displayName
             $userObj.DisplayName = $account.displayName
         }
 
+        $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id
+        foreach ($authMethod in $authMethods) {
+            if ($authMethod.AdditionalProperties.'@odata.type' -notin $account.authenticationMethods) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
+                return
+            }
+        }
+        foreach ($authMethod in $account.authenticationMethods) {
+            if ($authMethod -notin $authMethods.AdditionalProperties.'@odata.type') {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethod"
+                return
+            }
+        }
+
         $roleAssignment = Get-MgRoleManagementDirectoryRoleAssignmentSchedule -Filter "(RoleDefinitionId eq '62e90394-69f5-4237-9190-012177145e10') and (PrincipalId eq '$($userObj.Id)')"
         if ($userObj.Id -ne $roleAssignment.PrincipalId) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) must be assigned Global Administrator role"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be assigned Global Administrator role"
             return
         }
         if ('Direct' -ne $roleAssignment.MemberType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) Global Administrator role MUST NOT use transitive role assignment via group"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role MUST NOT use transitive role assignment via group"
             return
         }
         if ('Assigned' -ne $roleAssignment.AssignmentType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) Global Administrator role assignment must be active"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment must be active"
             return
         }
         if ('noExpiration' -ne $roleAssignment.ScheduleInfo.Expiration.Type) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) Global Administrator role assignment must never expire"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment must never expire"
             return
         }
         if ('Provisioned' -ne $roleAssignment.Status) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) Global Administrator role assignment was not fully provisioned yet"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment was not fully provisioned yet"
             return
         }
 
         $groupMemberOf = Get-MgUserMemberGroup -UserId $userObj.Id -SecurityEnabledOnly:$true
         if ($groupObj.Id -notin $groupMemberOf) {
             New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id
-            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.userPrincipalName)) was added to Break Glass Group $($groupObj.DisplayName)"
+            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
         }
 
         Write-Information "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.DisplayName)) VALIDATED"
@@ -157,6 +183,9 @@ function ValidateBreakGlass {
     }
 
     $validBreakGlass = $true
+
+    #TODO: remove other members from break glass group
+    #TODO: remove all owners from break glass group
 }
 
 $validBreakGlass = $false
