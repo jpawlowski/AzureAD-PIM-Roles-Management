@@ -26,6 +26,10 @@ Param (
     [switch]$CreateNamedLocations,
     [Parameter(HelpMessage = "Create or update Azure AD Conditional Access policies")]
     [switch]$CreateCAPolicies,
+    [Parameter(HelpMessage = "Validate Break Glass Accounts (takes precedence to -NoBreakGlassValidation)")]
+    [switch]$ValidateBreakGlass,
+    [Parameter(HelpMessage = "Skip Break Glass Account validation")]
+    [switch]$SkipBreakGlassValidation = $false,
     [Parameter(HelpMessage = "Perform changes to Tier0.")]
     [switch]$Tier0,
     [Parameter(HelpMessage = "Perform changes to Tier1.")]
@@ -51,9 +55,10 @@ if (
     (-Not $CreateNamedLocations) -and
     (-Not $UpdateAuthContext) -and
     (-Not $CreateAuthStrength) -and
+    (-Not $ValidateBreakGlass) -and
     (-Not $CreateCAPolicies)
 ) {
-    Write-Error "Missing parameter: What would you like to update and/or create? -UpdateRoles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateCAPolicies"
+    Write-Error "Missing parameter: What would you like to update and/or create? -UpdateRoles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateCAPolicies, -ValidateBreakGlass"
 }
 
 $LibFiles = @(
@@ -87,3 +92,7 @@ CreateAuthStrength
 UpdateAuthContext
 UpdateRoleRules
 ValidateBreakGlass
+
+if ($validBreakGlass) {
+    CreateCAPolicies
+}

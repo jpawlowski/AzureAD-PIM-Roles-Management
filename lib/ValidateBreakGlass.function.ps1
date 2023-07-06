@@ -1,5 +1,11 @@
 function ValidateBreakGlass {
-    if (!$CreateCAPolicies) { return }
+    if (!$CreateCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
+
+    if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
+        Write-Warning "Break Glass Account validation SKIPPED"
+        $validBreakGlass = $true
+        return
+    }
 
     $validBreakGlassCount = 0
     $groupObj = $null

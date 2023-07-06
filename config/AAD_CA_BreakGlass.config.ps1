@@ -1,6 +1,9 @@
 $AADCABreakGlassGroupDisplayNamePrefix = $AADGroupDisplayNamePrefix
 
 $AADCABreakGlass = @{
+
+    # Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
+    #
     accounts = @(
         #:-------------------------------------------------------------------------
         # Primary Break Glass Account to exclude from MOST Conditional Access Policies
@@ -11,8 +14,6 @@ $AADCABreakGlass = @{
         # The account CAN NOT use transitive role assignment via group.
         # The account MUST be cloud-only, NOT a synced/federated account.
         # The account MUST have configured methods for Multi-Factor Authentication.
-        #
-        # See https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
         #
         # It is highly recommended to have a dedicated CA policy targeted to this account
         # to have specific authentication methods applied.
@@ -39,17 +40,15 @@ $AADCABreakGlass = @{
         # The account MUST be cloud-only, NOT a synced/federated account.
         # The account SHOULD have configured methods for Multi-Factor Authentication.
         #
-        # See https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
-        #
         # This backup break glass admin account MUST be excluded from _ALL_ Conditional Access policies,
         # including the CA policy that is protecting the primary break glass admin account from above.
         # Authentication methods for this account are not enforced via CA, but SHOULD be set nevertheless.
         #
         @{
-            id                                      = '00000000-0000-0000-0000-000000000000'
-            displayName                             = "$CompanyName Emergency Admin (Backup)"
-            userPrincipalName                       = 'admc-emergency912@vxdc2.onmicrosoft.com'
-            authenticationMethods                   = @(
+            id                                           = '00000000-0000-0000-0000-000000000000'
+            displayName                                  = "$CompanyName Emergency Admin (Backup)"
+            userPrincipalName                            = 'admc-emergency912@vxdc2.onmicrosoft.com'
+            authenticationMethods                        = @(
                 '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
                 '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
                 # '#microsoft.graph.softwareOathAuthenticationMethod'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
