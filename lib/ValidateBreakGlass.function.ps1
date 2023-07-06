@@ -52,8 +52,7 @@ function ValidateBreakGlass {
     #TODO: Block groups that were onboarded to PIM
     Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
 
-    $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id
-    $groupMembers = Get-MgGroupMember -GroupId $groupObj.Id
+    $breakGlassAccountIds = @()
 
     foreach ($account in $AADCABreakGlass.accounts) {
         $userId = $null
@@ -181,6 +180,7 @@ function ValidateBreakGlass {
 
         Write-Information "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.DisplayName)) VALIDATED"
         $validBreakGlassCount++
+        $breakGlassAccountIds += $userObj.Id
     }
 
     if ($validBreakGlassCount -lt 2) {
@@ -190,8 +190,19 @@ function ValidateBreakGlass {
 
     $validBreakGlass = $true
 
-    #TODO: remove other members from break glass group
-    #TODO: remove all owners from break glass group
+    $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id
+    foreach ($groupOwner in $groupOwners) {
+        Remove-MgGroupOwnerByRef -GroupId $AADCABreakGlass.group.id -DirectoryObjectId $groupOwner.Id
+        Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed suspicious group owner $($groupOwner.Id)"
+    }
+
+    $groupMembers = Get-MgGroupMember -GroupId $groupObj.Id
+    foreach ($groupMember in $groupMembers) {
+        if ($groupMember.Id -notin $breakGlassAccountIds) {
+            Remove-MgGroupMemberByRef -GroupId $AADCABreakGlass.group.id -DirectoryObjectId $groupMember.Id
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
+        }
+    }
 }
 
 $validBreakGlass = $false

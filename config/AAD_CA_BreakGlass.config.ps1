@@ -45,15 +45,15 @@ $AADCABreakGlass = @{
         # Authentication methods for this account are not enforced via CA, but SHOULD be set nevertheless.
         #
         @{
-            id                                           = '00000000-0000-0000-0000-000000000000'
-            displayName                                  = "$CompanyName Emergency Admin (Backup)"
-            userPrincipalName                            = 'admc-emergency912@vxdc2.onmicrosoft.com'
-            authenticationMethods                        = @(
+            id                            = '00000000-0000-0000-0000-000000000000'
+            displayName                   = "$CompanyName Emergency Admin (Backup)"
+            userPrincipalName             = 'admc-emergency912@vxdc2.onmicrosoft.com'
+            authenticationMethods         = @(
                 '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
                 '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
                 # '#microsoft.graph.softwareOathAuthenticationMethod'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
             )
-            excludeFromBreakGlassConditionalAccessPolicy = $true
+            excludeFromBreakGlassCAPolicy = $true
         }
     )
 
