@@ -24,8 +24,10 @@ Param (
     [switch]$CreateAuthStrength,
     [Parameter(HelpMessage = "Create or update Azure AD Named Locations")]
     [switch]$CreateNamedLocations,
-    [Parameter(HelpMessage = "Create or update Azure AD Conditional Access policies")]
-    [switch]$CreateCAPolicies,
+    [Parameter(HelpMessage = "Create or update Azure AD Conditional Access policies for admins in Tier 0-2")]
+    [switch]$CreateAdminCAPolicies,
+    [Parameter(HelpMessage = "Create or update general Azure AD Conditional Access policies, except for admins in Tier 0-2")]
+    [switch]$CreateGeneralCAPolicies,
     [Parameter(HelpMessage = "Validate Break Glass Accounts (takes precedence to -NoBreakGlassValidation)")]
     [switch]$ValidateBreakGlass,
     [Parameter(HelpMessage = "Skip Break Glass Account validation")]
@@ -35,11 +37,11 @@ Param (
     [Parameter(HelpMessage = "Perform changes to Tier1.")]
     [switch]$Tier1,
     [Parameter(HelpMessage = "Perform changes to Tier2.")]
-    [switch]$Tier2
+    [switch]$Tier2,
+    [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited.")]
+    [switch]$NonInteractive
 )
 
-$InformationPreference = 'Continue'
-$WarningPreference = 'Continue'
 $ErrorActionPreference = 'Stop'
 
 try {
@@ -56,9 +58,10 @@ if (
     (-Not $UpdateAuthContext) -and
     (-Not $CreateAuthStrength) -and
     (-Not $ValidateBreakGlass) -and
-    (-Not $CreateCAPolicies)
+    (-Not $CreateAdminCAPolicies) -and
+    (-Not $CreateGeneralCAPolicies)
 ) {
-    Write-Error "Missing parameter: What would you like to update and/or create? -UpdateRoles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateCAPolicies, -ValidateBreakGlass"
+    Write-Error "Missing parameter: What would you like to update and/or create? -UpdateRoles, -CreateNamedLocations, -UpdateAuthContext, -CreateAuthStrength, -CreateNamedLocations, -CreateAdminCAPolicies, -CreateGeneralCAPolicies, -ValidateBreakGlass"
 }
 
 $LibFiles = @(
@@ -70,20 +73,19 @@ $LibFiles = @(
     'UpdateRoleRules.function.ps1'
     'ValidateBreakGlass.function.ps1'
 )
-try {
-    foreach ($FileName in $LibFiles) {
-        $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
-        . $FilePath
-        if (Test-Path -Path $FilePath -PathType Leaf) {
+foreach ($FileName in $LibFiles) {
+    $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
+    if (Test-Path -Path $FilePath -PathType Leaf) {
+        try {
             . $FilePath
         }
-        else {
-            Throw $FilePath
+        catch {
+            Throw "Error loading file: $_"
         }
     }
-}
-catch {
-    Write-Error "Error loading file: $_"
+    else {
+        Throw "File not found: $FilePath"
+    }
 }
 
 ConnectMgGraph

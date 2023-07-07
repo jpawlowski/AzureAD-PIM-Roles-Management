@@ -14,28 +14,6 @@ function ConnectMgGraph {
         }
     }
 
-    $MgScopes = @()
-    if ($UpdateRoles) {
-        $MgScopes += 'RoleManagement.Read.Directory'
-        $MgScopes += 'RoleManagement.ReadWrite.Directory'
-    }
-    if ($UpdateAuthContext) {
-        $MgScopes += "AuthenticationContext.Read.All"
-        $MgScopes += "AuthenticationContext.ReadWrite.All"
-    }
-    if ($CreateNamedLocations -or $CreateAuthStrength -or $CreateCAPolicies) {
-        $MgScopes += 'Policy.Read.All'
-        $MgScopes += 'Policy.ReadWrite.ConditionalAccess'
-        $MgScopes += 'Application.Read.All'
-    }
-    if ($CreateCAPolicies -or $ValidateBreakGlass) {
-        $MgScopes += 'User.Read.All'
-        $MgScopes += 'Group.Read.All'
-        $MgScopes += 'Group.ReadWrite.All'
-        $MgScopes += 'RoleManagement.Read.Directory'
-        $MgScopes += 'UserAuthenticationMethod.Read.All'
-    }
-
     $reauth = $false
     foreach ($MgScope in $MgScopes) {
         if ($MgScope -notin @((Get-MgContext).Scopes)) {
@@ -47,7 +25,7 @@ function ConnectMgGraph {
         $reauth -or
         ((Get-MgContext).TenantId -ne $TenantId)
     ) {
-        Write-Output "Connecting to tenant $TenantId ..."
+        Write-Information "Connecting to tenant $TenantId with scopes: $($MgScopes)"
         Connect-MgGraph `
             -ContextScope Process `
             -TenantId $TenantId `

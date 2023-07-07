@@ -1,5 +1,5 @@
 function ValidateBreakGlass {
-    if (!$CreateCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
+    if (!$CreateAdminCAPolicies -and !$CreateGeneralCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Account validation SKIPPED"
@@ -37,7 +37,7 @@ function ValidateBreakGlass {
         ($null -ne $AADCABreakGlass.group.displayName) -and
         ($groupObj.DisplayName -ne $AADCABreakGlass.group.displayName)
     ) {
-        Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
+        Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
         Update-MgGroup -GroupId $groupObj.Id -DisplayName $AADCABreakGlass.group.displayName
         $groupObj.DisplayName = $AADCABreakGlass.group.displayName
     }
@@ -45,12 +45,12 @@ function ValidateBreakGlass {
         ($null -ne $AADCABreakGlass.group.description) -and
         ($groupObj.Description -ne $AADCABreakGlass.group.description)
     ) {
-        Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
+        Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
         Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
         $groupObj.Description = $AADCABreakGlass.group.description
     }
     #TODO: Block groups that were onboarded to PIM
-    Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
+    Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
 
     $breakGlassAccountIds = @()
 
@@ -152,19 +152,19 @@ function ValidateBreakGlass {
 
         $roleAssignment = Get-MgRoleManagementDirectoryRoleAssignmentSchedule -Filter "(RoleDefinitionId eq '62e90394-69f5-4237-9190-012177145e10') and (PrincipalId eq '$($userObj.Id)')"
         if ($userObj.Id -ne $roleAssignment.PrincipalId) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be assigned Global Administrator role"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): MUST be assigned Global Administrator role"
             return
         }
         if ('Direct' -ne $roleAssignment.MemberType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role MUST NOT use transitive role assignment via group"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST NOT use transitive role assignment via group"
             return
         }
         if ('Assigned' -ne $roleAssignment.AssignmentType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment must be active"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST be active"
             return
         }
         if ('noExpiration' -ne $roleAssignment.ScheduleInfo.Expiration.Type) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment must never expire"
+            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST never expire"
             return
         }
         if ('Provisioned' -ne $roleAssignment.Status) {
@@ -178,7 +178,7 @@ function ValidateBreakGlass {
             Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
         }
 
-        Write-Information "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.DisplayName)) VALIDATED"
+        Write-Output "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.DisplayName)) VALIDATED"
         $validBreakGlassCount++
         $breakGlassAccountIds += $userObj.Id
     }

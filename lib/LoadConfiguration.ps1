@@ -1,3 +1,12 @@
+function Test-NonInteractive {
+    foreach ( $arg in [Environment]::GetCommandLineArgs() ) {
+        if ( $arg -like "-noni*" ) {
+            return $true
+        }
+    }
+    return $false
+}
+
 if (
     ($null -eq $ConfigPath) -or
     ($ConfigPath -eq '')
@@ -12,6 +21,7 @@ $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $c
 
 $ConfigFiles = @(
     'Environment.config.ps1'
+    'MgGraph_Scopes.config.ps1'
     'AAD_CA_BreakGlass.config.ps1'
     'AAD_CA_NamedLocations.config.ps1'
     'AAD_CA_AuthContexts.config.ps1'
@@ -21,18 +31,18 @@ $ConfigFiles = @(
     'AAD_Role_ManagementRulesDefaults.config.ps1'
 )
 
-try {
-    foreach ($ConfigFile in $ConfigFiles) {
-        $FilePath = Join-Path $ConfigPath $ConfigFile
-        . $FilePath
-        if (Test-Path -Path $FilePath -PathType Leaf) {
+foreach ($ConfigFile in $ConfigFiles) {
+    $FilePath = Join-Path $ConfigPath $ConfigFile
+    if (Test-Path -Path $FilePath -PathType Leaf) {
+        try {
             . $FilePath
         }
-        else {
-            Throw $FilePath
+        catch {
+            Throw "Error reading configuration file: $_"
         }
     }
+    else {
+        Throw "Configuration file not found: $FilePath"
+    }
 }
-catch {
-    Write-Error "Error reading configuration file: $_"
-}
+
