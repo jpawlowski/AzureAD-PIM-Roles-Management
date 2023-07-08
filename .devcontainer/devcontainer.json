@@ -1,14 +1,11 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/powershell
 {
 	"name": "Microsoft Graph PowerShell",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/microsoftgraph/powershell:latest",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh": "true",
 			"username": "vscode",
-			"upgradePackages": "false",
+			"upgradePackages": "true",
 			"nonFreePackages": "true"
 		},
 		"ghcr.io/flexwie/devcontainer-features/op:1": {}
