@@ -14,6 +14,8 @@
 Param (
     [Parameter(HelpMessage = "Azure AD tenant ID.")]
     [string]$TenantId,
+    [Parameter(HelpMessage = "Use device code authentication instead of a browser control.")]
+    [string]$UseDeviceCode,
     [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
     [string]$ConfigPath,
     [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited. Note that updates of Tier0 settings always requires manual user interaction.")]

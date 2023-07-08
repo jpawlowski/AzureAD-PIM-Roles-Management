@@ -56,7 +56,7 @@ function New-AAD-Tier0-BreakGlass {
         $groupObj = New-MgGroup -SecurityEnabled `
             -IsAssignableToRole `
             -MailEnabled:$false `
-            -MailNickname 'Break-Glass-Admin-Group' `
+            -MailNickname $((Get-RandomPassword -lowerChars 3 -upperChars 3 -numbers 2 -symbols 0) + '-f') `
             -DisplayName $AADCABreakGlass.group.displayName `
             -Description $AADCABreakGlass.group.description
         Write-Output "Created new Break Glass Group: '$($groupObj.displayName)' ($($groupObj.Id))"
@@ -97,14 +97,13 @@ function New-AAD-Tier0-BreakGlass {
 
         if ($null -eq $userObj) {
             $pos = $account.userPrincipalName.IndexOf('@')
-            $mailNickname = $account.userPrincipalName.Substring(0, $pos)
             $userObj = New-MgUser `
                 -UserPrincipalName $account.userPrincipalName `
                 -DisplayName $account.displayName `
                 -AccountEnabled:$false `
-                -MailNickname $mailNickname `
+                -MailNickname $((Get-RandomPassword -lowerChars 3 -upperChars 3 -numbers 2 -symbols 0) + '-f') `
                 -PasswordProfile @{
-                Password                             = Get-RandomPassword
+                Password                             = Get-RandomPassword -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
                 ForceChangePasswordNextSignIn        = $true
                 ForceChangePasswordNextSignInWithMfa = $true
             }

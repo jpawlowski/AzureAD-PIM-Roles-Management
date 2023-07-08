@@ -26,10 +26,12 @@ function Connect-MyMgGraph {
         ((Get-MgContext).TenantId -ne $TenantId)
     ) {
         Write-Information "Connecting to tenant $TenantId with scopes: $($MgScopes)"
+        if ($null -eq $UseDeviceCode) { $UseDeviceCode = $false }
         Connect-MgGraph `
             -ContextScope Process `
             -TenantId $TenantId `
-            -Scopes $MgScopes
+            -Scopes $MgScopes `
+            -UseDeviceCode:$UseDeviceCode
     }
 }
 
@@ -47,6 +49,7 @@ if (Test-NonInteractive -and $null -eq $Force) {
 }
 
 function Get-RandomCharacter($length, $characters) {
+    if ($length -lt 1) { return '' }
     $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length }
     $private:ofs = ''
     return [String]$characters[$random]
@@ -67,6 +70,6 @@ function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
     $password = Get-RandomCharacter -length $lowerChars -characters 'abcdefghiklmnoprstuvwxyz'
     $password += Get-RandomCharacter -length $upperChars -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
     $password += Get-RandomCharacter -length $numbers -characters '1234567890'
-    $password += Get-RandomCharacter -length $symbols -characters "@#$%^&*-_!+=[]{}|\:',.?/`~`"();<> "
+    $password += Get-RandomCharacter -length $symbols -characters "@#$%^&*-_!+=[]{}|\:',.?/`~`"();<>"
     return Get-ScrambleString $password
 }
