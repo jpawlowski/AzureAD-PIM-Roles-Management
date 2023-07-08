@@ -4,7 +4,7 @@ $AADCABreakGlass = @{
 
     # Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
     #
-    accounts = @(
+    accounts  = @(
         #:-------------------------------------------------------------------------
         # Primary Break Glass Account to exclude from MOST Conditional Access Policies
         #
@@ -66,10 +66,21 @@ $AADCABreakGlass = @{
     # The script will only ensure all break glass accounts are member of this group.
     # The script will also REMOVE any other account from that group.
     #
-    group    = @{
+    group     = @{
         id                 = '00000000-0000-0000-0000-000000000000'
         displayName        = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
         description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
         isAssignableToRole = $true
+    }
+
+    #:-------------------------------------------------------------------------
+    # Administrative Unit to contain the Break Glass objects
+    #
+    adminUnit = @{
+        id                           = '00000000-0000-0000-0000-000000000000'
+        displayName                  = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+        description                  = 'Tier0 objects for Break Glass access. DO NOT CHANGE!'
+        visibility                   = 'HiddenMembership'
+        isMemberManagementRestricted = $true
     }
 }

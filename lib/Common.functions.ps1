@@ -1,4 +1,4 @@
-function ConnectMgGraph {
+function ConnectMgGraph ([switch]$Beta) {
     if (
         ($null -eq $TenantId) -or
         ($TenantId -eq '')
@@ -67,6 +67,6 @@ function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
     $password = Get-RandomCharacter -length $lowerChars -characters 'abcdefghiklmnoprstuvwxyz'
     $password += Get-RandomCharacter -length $upperChars -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
     $password += Get-RandomCharacter -length $numbers -characters '1234567890'
-    $password += Get-RandomCharacter -length $symbols -characters '!"§$%&/()=?}][{@#*+'
+    $password += Get-RandomCharacter -length $symbols -characters "@#$%^&*-_!+=[]{}|\:',.?/`~`"();<> "
     return Get-ScrambleString $password
 }

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Create Break Glass accounts and Break Glass group for Azure AD
 .DESCRIPTION
-    This script creates or updates Break Glass accounts and a Break Glass group.
+    This script creates Break Glass accounts and a Break Glass group.
     These can then be excluded in Azure AD Conditional Access policies to prevent lockout.
 
     Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
@@ -19,13 +19,7 @@ Param (
 
 $ErrorActionPreference = 'Stop'
 
-try {
-    Import-Module -Name "Microsoft.Graph.Identity.SignIns" -MinimumVersion 2.0
-    Import-Module -Name "Microsoft.Graph.Identity.Governance" -MinimumVersion 2.0
-}
-catch {
-    Write-Error "Error loading Microsoft Graph API: $_"
-}
+$CreateBreakGlass = $true
 
 $LibFiles = @(
     'Common.functions.ps1'
@@ -56,6 +50,39 @@ switch ($result) {
 
         ConnectMgGraph
 
+        $adminUnitObj = $null
+        $createAdminUnit = $false
+
+        if (
+            ($null -ne $AADCABreakGlass.adminUnit.id) -and
+            ($AADCABreakGlass.adminUnit.id -notmatch '^00000000-') -and
+            ($AADCABreakGlass.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ) {
+            $createAdminUnit = $true
+            $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $AADCABreakGlass.adminUnit.id -ErrorAction SilentlyContinue
+        }
+        elseif (
+            ($null -ne $AADCABreakGlass.adminUnit.displayName) -and
+            ($AADCABreakGlass.adminUnit.displayName -ne '')
+        ) {
+            $createAdminUnit = $true
+            $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($AADCABreakGlass.adminUnit.displayName)'" -ErrorAction SilentlyContinue
+        }
+
+        if ($null -ne $adminUnitObj) {
+            Write-Output "Found existing Break Glass Administrative Unit :  $($adminUnitObj.displayName)"
+        }
+        elseif ($createAdminUnit) {
+            $params = @{
+                displayName                  = $AADCABreakGlass.adminUnit.displayName
+                description                  = $AADCABreakGlass.adminUnit.description
+                visibility                   = $AADCABreakGlass.adminUnit.visibility
+                isMemberManagementRestricted = $AADCABreakGlass.adminUnit.isMemberManagementRestricted
+            }
+            $adminUnitObj = New-MgBetaDirectoryAdministrativeUnit -BodyParameter $params -ErrorAction Stop
+            Write-Output "Created new Break Glass Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
+        }
+
         $groupObj = $null
 
         if (
@@ -84,9 +111,16 @@ switch ($result) {
                 -DisplayName $AADCABreakGlass.group.displayName `
                 -Description $AADCABreakGlass.group.description
             Write-Output "Created new Break Glass Group: '$($groupObj.displayName)' ($($groupObj.Id))"
+            if ($null -ne $adminUnitObj) {
+                $params = @{
+                    "@odata.id" = "https://graph.microsoft.com/beta/groups/$($groupObj.Id)"
+                }
+                $null = New-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnitObj.Id -BodyParameter $params
+                Write-Output "   Added to Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
+            }
         }
         else {
-            Write-Output "Found Existing Break Glass Group  : $($groupObj.displayName)"
+            Write-Output "Found existing Break Glass Group  :  $($groupObj.displayName)"
         }
 
         $breakGlassAccountIds = @()
@@ -134,6 +168,12 @@ switch ($result) {
                     DirectoryScopeId = '/'
                 }
                 $null = New-MgRoleManagementDirectoryRoleAssignment -BodyParameter $params
+                if ($null -ne $adminUnitObj) {
+                    $params = @{
+                        "@odata.id" = "https://graph.microsoft.com/beta/users/$($userObj.Id)"
+                    }
+                    $null = New-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnitObj.Id -BodyParameter $params
+                }
 
                 Write-Output ''
                 Write-Output "Created new Break Glass Account:"
@@ -143,9 +183,17 @@ switch ($result) {
                 Write-Output "   Directory Role  : Global Administrator of tenant ID $TenantId"
                 Write-Output "   Account Enabled : Disabled; Please activate before use"
                 Write-Output "   Password        : Please reset the password to configure the account"
+                if ($null -ne $adminUnitObj) {
+                    Write-Output "   Admin Unit      : $($adminUnitObj.DisplayName)"
+                    if ($adminUnitObj.IsMemberManagementRestricted) {
+                        Write-Output "                     HINT: Management Restriction requires to temporarially"
+                        Write-Output "                           remove the account from this Admin Unit, e.g. to"
+                        Write-Output "                           enable the account and reset the initial password."
+                    }
+                }
             }
             else {
-                Write-Output "Found Existing Break Glass Account: $($userObj.UserPrincipalName)"
+                Write-Output "Found existing Break Glass Account :  $($userObj.UserPrincipalName)"
             }
         }
     }

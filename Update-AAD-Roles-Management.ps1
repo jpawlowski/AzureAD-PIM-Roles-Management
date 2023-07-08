@@ -44,14 +44,6 @@ Param (
 
 $ErrorActionPreference = 'Stop'
 
-try {
-    Import-Module -Name "Microsoft.Graph.Identity.SignIns" -MinimumVersion 2.0
-    Import-Module -Name "Microsoft.Graph.Identity.Governance" -MinimumVersion 2.0
-}
-catch {
-    Write-Error "Error loading Microsoft Graph API: $_"
-}
-
 if (
     (-Not $UpdateRoles) -and
     (-Not $CreateNamedLocations) -and
