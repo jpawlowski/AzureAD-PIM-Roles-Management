@@ -1,4 +1,4 @@
-function ConnectMgGraph ([switch]$Beta) {
+function ConnectMgGraph {
     if (
         ($null -eq $TenantId) -or
         ($TenantId -eq '')
