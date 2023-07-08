@@ -102,12 +102,17 @@ function UpdateRoleRules {
         $totalCount = $roleList.Count
         $totalCountChars = ($totalCount | Measure-Object -Character).Characters
 
-        $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
-        $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
-        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        $result = 1
+        if ($Force) {
+            $result = 0
+        } else {
+            $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
+            $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
+            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
+        }
         switch ($result) {
             0 {
-                Write-Output " Yes: Continue with update."
+                !$Force ? (Write-Output " Yes: Continue with update.") : $null
                 $i = 0
                 foreach ($role in $roleList) {
                     $i++

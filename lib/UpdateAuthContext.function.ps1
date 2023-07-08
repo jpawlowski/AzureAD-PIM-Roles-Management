@@ -16,12 +16,17 @@ function UpdateAuthContext {
     }
 
     foreach ($tier in $AuthContextTiers) {
-        $title = "!!! WARNING: Update Tier $tier Azure AD Conditional Access Authentication Contexts !!!"
-        $message = "Do you confirm to update a total of $($AADCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
-        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        $result = 1
+        if ($Force) {
+            $result = 0
+        } else {
+            $title = "!!! WARNING: Update Tier $tier Azure AD Conditional Access Authentication Contexts !!!"
+            $message = "Do you confirm to update a total of $($AADCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
+            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
+        }
         switch ($result) {
             0 {
-                Write-Output " Yes: Continue with update."
+                !$Force ? (Write-Output " Yes: Continue with update.") : $null
                 foreach ($key in $AADCAAuthContexts[$tier].Keys) {
                     foreach ($authContext in $AADCAAuthContexts[$tier][$key]) {
                         try {
@@ -40,10 +45,10 @@ function UpdateAuthContext {
                 }
             }
             1 {
-                Write-Output " No: Skipping Tier $tier Authentication Context updates."
+                !$Force ? (Write-Output " No: Skipping Tier $tier Authentication Context updates.") : $null
             }
             * {
-                Write-Output " Cancel: Aborting command."
+                !$Force ? (Write-Output " Cancel: Aborting command.") : $null
                 exit
             }
         }

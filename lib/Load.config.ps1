@@ -1,12 +1,3 @@
-function Test-NonInteractive {
-    foreach ( $arg in [Environment]::GetCommandLineArgs() ) {
-        if ( $arg -like "-noni*" ) {
-            return $true
-        }
-    }
-    return $false
-}
-
 if (
     ($null -eq $ConfigPath) -or
     ($ConfigPath -eq '')
@@ -17,7 +8,7 @@ if (
 $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Description."
 $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Description."
 $cancel = New-Object System.Management.Automation.Host.ChoiceDescription "&Cancel", "Description."
-$options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
+$choices = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
 
 $ConfigFiles = @(
     'Environment.config.ps1'

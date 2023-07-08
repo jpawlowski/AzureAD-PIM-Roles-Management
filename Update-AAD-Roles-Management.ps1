@@ -39,7 +39,7 @@ Param (
     [Parameter(HelpMessage = "Perform changes to Tier2.")]
     [switch]$Tier2,
     [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited.")]
-    [switch]$NonInteractive
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,8 +65,8 @@ if (
 }
 
 $LibFiles = @(
-    'LoadConfiguration.ps1'
-    'ConnectMgGraph.function.ps1'
+    'Common.utils.ps1'
+    'Load.config.ps1'
     'CreateNamedLocations.function.ps1'
     'CreateAuthStrength.function.ps1'
     'UpdateAuthContext.function.ps1'
@@ -86,6 +86,14 @@ foreach ($FileName in $LibFiles) {
     else {
         Throw "File not found: $FilePath"
     }
+}
+
+if ($Force) {
+    Write-Output ''
+    Write-Output 'WARNING: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    Write-Output 'WARNING: ! Processing in unattended mode - BE CAREFUL !'
+    Write-Output 'WARNING: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    Write-Output ''
 }
 
 ConnectMgGraph

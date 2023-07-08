@@ -18,12 +18,17 @@ function CreateAuthStrength {
     $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'"
 
     foreach ($tier in $AuthStrengthTiers) {
-        $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Authentication Strengths !!!"
-        $message = "Do you confirm to create new or update a total of $($AADCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
-        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        $result = 1
+        if ($Force) {
+            $result = 0
+        } else {
+            $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Authentication Strengths !!!"
+            $message = "Do you confirm to create new or update a total of $($AADCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
+            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
+        }
         switch ($result) {
             0 {
-                Write-Output " Yes: Continue with creation or update."
+                !$Force ? (Write-Output " Yes: Continue with creation or update.") : $null
                 foreach ($key in $AADCAAuthStrengths[$tier].Keys) {
                     foreach ($authStrength in $AADCAAuthStrengths[$tier][$key]) {
                         $updateOnly = $false
@@ -117,10 +122,10 @@ function CreateAuthStrength {
                 }
             }
             1 {
-                Write-Output " No: Skipping Tier $tier Authentication Strengths creation / updates."
+                !$Force ? (Write-Output " No: Skipping Tier $tier Authentication Strengths creation / updates.") : $null
             }
             * {
-                Write-Output " Cancel: Aborting command."
+                !$Force ? (Write-Output " Cancel: Aborting command.") : $null
                 exit
             }
         }

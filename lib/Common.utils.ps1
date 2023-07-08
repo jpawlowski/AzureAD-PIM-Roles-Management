@@ -32,3 +32,16 @@ function ConnectMgGraph {
             -Scopes $MgScopes
     }
 }
+
+function Test-NonInteractive {
+    foreach ( $arg in [Environment]::GetCommandLineArgs() ) {
+        if ( $arg -like "-noni*" ) {
+            return $true
+        }
+    }
+    return $false
+}
+
+if (Test-NonInteractive -and $null -eq $Force) {
+    $Force = $true
+}

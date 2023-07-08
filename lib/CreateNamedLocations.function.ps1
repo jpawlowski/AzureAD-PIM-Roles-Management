@@ -18,12 +18,17 @@ function CreateNamedLocations {
     $namedLocations = Get-MgIdentityConditionalAccessNamedLocation
 
     foreach ($tier in $NamedLocationsTiers) {
-        $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Named Locations !!!"
-        $message = "Do you confirm to create new or update a total of $($AADCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
-        $result = $host.ui.PromptForChoice($title, $message, $options, 1)
+        $result = 1
+        if ($Force) {
+            $result = 0
+        } else {
+            $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Named Locations !!!"
+            $message = "Do you confirm to create new or update a total of $($AADCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
+            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
+        }
         switch ($result) {
             0 {
-                Write-Output " Yes: Continue with creation or update."
+                !$Force ? (Write-Output " Yes: Continue with creation or update.") : $null
                 foreach ($namedLocation in $AADCANamedLocations[$tier]) {
                     $updateOnly = $false
                     if ($namedLocation.id) {
@@ -82,10 +87,10 @@ function CreateNamedLocations {
                 }
             }
             1 {
-                Write-Output " No: Skipping Tier $tier Named Location creation / updates."
+                !$Force ? (Write-Output " No: Skipping Tier $tier Named Location creation / updates.") : $null
             }
             * {
-                Write-Output " Cancel: Aborting command."
+                !$Force ? (Write-Output " Cancel: Aborting command.") : $null
                 exit
             }
         }
