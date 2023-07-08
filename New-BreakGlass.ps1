@@ -19,8 +19,6 @@ Param (
 
 $ErrorActionPreference = 'Stop'
 
-$CreateBreakGlass = $true
-
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
@@ -47,6 +45,12 @@ switch ($result) {
     0 {
         Write-Output ' Yes: Starting Break Glass creation now'
         Write-Output ''
+
+        $MgScopes += 'User.ReadWrite.All'
+        $MgScopes += 'Group.ReadWrite.All'
+        $MgScopes += 'AdministrativeUnit.ReadWrite.All'
+        $MgScopes += 'Directory.Write.Restricted'
+        $MgScopes += 'RoleManagement.ReadWrite.Directory'
 
         ConnectMgGraph
 
@@ -186,7 +190,7 @@ switch ($result) {
                 if ($null -ne $adminUnitObj) {
                     Write-Output "   Admin Unit      : $($adminUnitObj.DisplayName)"
                     if ($adminUnitObj.IsMemberManagementRestricted) {
-                        Write-Output "                     HINT: Management Restriction requires to temporarially"
+                        Write-Output "                     HINT: Management Restriction requires to temporarily"
                         Write-Output "                           remove the account from this Admin Unit, e.g. to"
                         Write-Output "                           enable the account and reset the initial password."
                     }

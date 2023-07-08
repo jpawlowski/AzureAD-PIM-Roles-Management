@@ -10,9 +10,10 @@ $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Des
 $cancel = New-Object System.Management.Automation.Host.ChoiceDescription "&Cancel", "Description."
 $choices = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
 
+$MgScopes = @()
+
 $ConfigFiles = @(
     'Environment.config.ps1'
-    'MgGraph_Scopes.config.ps1'
     'AAD_CA_BreakGlass.config.ps1'
     'AAD_CA_NamedLocations.config.ps1'
     'AAD_CA_AuthContexts.config.ps1'
