@@ -22,7 +22,7 @@ $AADCABreakGlass = @{
         @{
             id                    = '00000000-0000-0000-0000-000000000000'
             displayName           = "$CompanyName Emergency Admin (Primary)"
-            userPrincipalName     = 'admc-emergency911@vxdc2.onmicrosoft.com'
+            userPrincipalName     = 'admc-emergency911@tenant.onmicrosoft.com'
             authenticationMethods = @(
                 '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today, and required to use TOTP
                 # '#microsoft.graph.fido2AuthenticationMethod'          # Replace softwareOathAuthenticationMethod with FIDO2 for phishing resistant authentication without password
@@ -47,7 +47,7 @@ $AADCABreakGlass = @{
         @{
             id                            = '00000000-0000-0000-0000-000000000000'
             displayName                   = "$CompanyName Emergency Admin (Backup)"
-            userPrincipalName             = 'admc-emergency912@vxdc2.onmicrosoft.com'
+            userPrincipalName             = 'admc-emergency912@tenant.onmicrosoft.com'
             authenticationMethods         = @(
                 '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
                 '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
