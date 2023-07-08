@@ -20,7 +20,7 @@ $AADCABreakGlass = @{
         # The backup break glass admin account MUST be excluded from that policy.
         #
         @{
-            id                    = '00000000-0000-0000-1000-000000000001'
+            id                    = '00000000-0000-0000-0000-000000000000'
             displayName           = "$CompanyName Emergency Admin (Primary)"
             userPrincipalName     = 'admc-emergency911@vxdc2.onmicrosoft.com'
             authenticationMethods = @(
@@ -75,6 +75,10 @@ $AADCABreakGlass = @{
 
     #:-------------------------------------------------------------------------
     # Administrative Unit to contain the Break Glass objects
+    #
+    # The admin unit SHOULD have hidden membership configured.
+    # The admin unit SHOULD have Management Restrictions enabled.
+    # The script has limitations to automatically fix things with Management Restrictions.
     #
     adminUnit = @{
         id                           = '00000000-0000-0000-0000-000000000000'
