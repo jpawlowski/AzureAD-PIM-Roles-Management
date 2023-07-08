@@ -36,4 +36,3 @@ foreach ($ConfigFile in $ConfigFiles) {
         Throw "Configuration file not found: $FilePath"
     }
 }
-

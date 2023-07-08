@@ -12,7 +12,7 @@ function ValidateBreakGlass {
 
     if (
         ($null -ne $AADCABreakGlass.group.id) -and
-        ($AADCABreakGlass.group.id -ne '00000000-0000-0000-0000-000000000000') -and
+        ($AADCABreakGlass.group.id -notmatch '^00000000-') -and
         ($AADCABreakGlass.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
         $groupObj = Get-MgGroup -GroupId $AADCABreakGlass.group.id -ErrorAction SilentlyContinue
@@ -24,6 +24,25 @@ function ValidateBreakGlass {
 
     if ($null -eq $groupObj) {
         Write-Error "Defined Break Glass Group $($AADCABreakGlass.group.id) does not exist"
+        return
+    }
+    if ($groupObj.SecurityEnabled -ne $true) {
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Must be a security group"
+        return
+    }
+    if ($groupObj.MailEnabled -ne $false) {
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not be mail-enabled"
+        return
+    }
+    if ($groupObj.GroupTypes.Count -ne 0) {
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not have any specific group type"
+        return
+    }
+    if (
+        ($null -ne $groupObj.MembershipRuleProcessingState) -or
+        ($null -ne $groupObj.MembershipRule)
+    ) {
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not have dynamic membership rules"
         return
     }
     if (
@@ -58,7 +77,7 @@ function ValidateBreakGlass {
         $userId = $null
         if (
             ($null -ne $account.id) -and
-            ($account.id -ne '00000000-0000-0000-0000-000000000000') -and
+            ($account.id -notmatch '^00000000-') -and
             ($account.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
         ) {
             $userId = $account.id

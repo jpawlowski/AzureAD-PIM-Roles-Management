@@ -1,4 +1,5 @@
 $MgScopes = @()
+
 if ($UpdateRoles) {
     $MgScopes += 'RoleManagement.Read.Directory'
     $MgScopes += 'RoleManagement.ReadWrite.Directory'
@@ -17,5 +18,13 @@ if ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies -or $ValidateBreakGlass)
     $MgScopes += 'Group.Read.All'
     $MgScopes += 'Group.ReadWrite.All'
     $MgScopes += 'RoleManagement.Read.Directory'
+    $MgScopes += 'UserAuthenticationMethod.Read.All'
+}
+if ($CreateBreakGlass) {
+    $MgScopes += 'User.Read.All'
+    $MgScopes += 'User.ReadWrite.All'
+    $MgScopes += 'Group.Read.All'
+    $MgScopes += 'Group.ReadWrite.All'
+    $MgScopes += 'RoleManagement.ReadWrite.Directory'
     $MgScopes += 'UserAuthenticationMethod.Read.All'
 }

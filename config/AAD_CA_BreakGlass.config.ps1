@@ -20,7 +20,7 @@ $AADCABreakGlass = @{
         # The backup break glass admin account MUST be excluded from that policy.
         #
         @{
-            id                    = '00000000-0000-0000-0000-000000000000'
+            id                    = '00000000-0000-0000-1000-000000000001'
             displayName           = "$CompanyName Emergency Admin (Primary)"
             userPrincipalName     = 'admc-emergency911@vxdc2.onmicrosoft.com'
             authenticationMethods = @(
@@ -67,7 +67,7 @@ $AADCABreakGlass = @{
     # The script will also REMOVE any other account from that group.
     #
     group    = @{
-        id                 = '84218b7e-344e-4a3f-a4e2-049bfb1f3059'
+        id                 = '00000000-0000-0000-0000-000000000000'
         displayName        = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
         description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
         isAssignableToRole = $true

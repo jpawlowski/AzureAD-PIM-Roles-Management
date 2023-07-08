@@ -16,6 +16,8 @@ Param (
     [string]$TenantId,
     [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
     [string]$ConfigPath,
+    [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited. Note that updates of Tier0 settings always requires manual user interaction.")]
+    [switch]$Force,
     [Parameter(HelpMessage = "Update all or only a specified list of Azure AD roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.")]
     [array]$UpdateRoles,
     [Parameter(HelpMessage = "Update Azure AD Authentication Contexts")]
@@ -37,9 +39,7 @@ Param (
     [Parameter(HelpMessage = "Perform changes to Tier1.")]
     [switch]$Tier1,
     [Parameter(HelpMessage = "Perform changes to Tier2.")]
-    [switch]$Tier2,
-    [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited.")]
-    [switch]$Force
+    [switch]$Tier2
 )
 
 $ErrorActionPreference = 'Stop'

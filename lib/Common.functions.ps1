@@ -45,3 +45,28 @@ function Test-NonInteractive {
 if (Test-NonInteractive -and $null -eq $Force) {
     $Force = $true
 }
+
+function Get-RandomCharacter($length, $characters) {
+    $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length }
+    $private:ofs = ''
+    return [String]$characters[$random]
+}
+
+function Get-ScrambleString([string]$inputString) {
+    $characterArray = $inputString.ToCharArray()
+    $scrambledStringArray = $characterArray | Get-Random -Count $characterArray.Length
+    $outputString = -join $scrambledStringArray
+    return $outputString
+}
+
+function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
+    if ($null -eq $lowerChars) { $lowerChars = 8 }
+    if ($null -eq $upperChars) { $upperChars = 8 }
+    if ($null -eq $numbers) { $numbers = 8 }
+    if ($null -eq $symbols) { $symbols = 8 }
+    $password = Get-RandomCharacter -length $lowerChars -characters 'abcdefghiklmnoprstuvwxyz'
+    $password += Get-RandomCharacter -length $upperChars -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
+    $password += Get-RandomCharacter -length $numbers -characters '1234567890'
+    $password += Get-RandomCharacter -length $symbols -characters '!"§$%&/()=?}][{@#*+'
+    return Get-ScrambleString $password
+}
