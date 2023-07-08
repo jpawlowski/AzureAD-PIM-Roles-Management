@@ -5,4 +5,5 @@ RUN pwsh \
   -Command " \
   \$ErrorActionPreference = 'Stop' ; \
   \$ProgressPreference = 'SilentlyContinue' ; \
-  Install-Module Microsoft.Graph -MinimumVersion 2.0"
+  Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted ; \
+  Install-Module Microsoft.Graph -Verbose -MinimumVersion 2.0"
