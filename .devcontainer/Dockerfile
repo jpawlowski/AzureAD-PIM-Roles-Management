@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/powershell:latest
+FROM mcr.microsoft.com/powershell:latest
 RUN pwsh \
   -NoLogo \
   -NoProfile \
