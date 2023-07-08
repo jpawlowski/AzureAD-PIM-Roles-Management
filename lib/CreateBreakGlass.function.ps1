@@ -130,14 +130,14 @@ function CreateBreakGlass {
             Write-Output "   Object ID       :  $($userObj.Id)"
             Write-Output "   Display Name    :  $($userObj.DisplayName)"
             Write-Output "   Directory Role  :  Global Administrator of tenant ID $TenantId"
-            Write-Output "   Account Enabled :  Disabled; Please activate before use"
-            Write-Output "   Password        :  Please reset the password to configure the account"
+            Write-Output "   Account Enabled :  Disabled. Please activate before use."
+            Write-Output "   Password        :  Please reset the password to configure the account."
             if ($null -ne $adminUnitObj) {
                 Write-Output "   Admin Unit      :  $($adminUnitObj.DisplayName)"
                 if ($adminUnitObj.IsMemberManagementRestricted) {
-                    Write-Output "                      HINT: Management Restriction requires to temporarily"
-                    Write-Output "                            remove the account from this Admin Unit, e.g. to"
-                    Write-Output "                            enable the account and reset the initial password."
+                    Write-Output "                      HINT: Management Restriction requires temporary removal"
+                    Write-Output "                            of the account from this administrative unit, for example,"
+                    Write-Output "                            to activate the account and reset the original password."
                 }
             }
         }
