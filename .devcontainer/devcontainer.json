@@ -1,6 +1,10 @@
 {
 	"name": "Microsoft Graph PowerShell",
-	"image": "mcr.microsoft.com/microsoftgraph/powershell:latest",
+	// "image": "mcr.microsoft.com/microsoftgraph/powershell:latest",
+	"build": {
+        // Path is relataive to the devcontainer.json file.
+        "dockerfile": "Dockerfile"
+    },
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh": "true",
