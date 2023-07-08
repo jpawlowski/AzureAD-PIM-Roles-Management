@@ -14,7 +14,7 @@ $MgScopes = @()
 
 $ConfigFiles = @(
     'Environment.config.ps1'
-    'AAD_CA_BreakGlass.config.ps1'
+    'AAD_Tier0_BreakGlass.config.ps1'
     'AAD_CA_NamedLocations.config.ps1'
     'AAD_CA_AuthContexts.config.ps1'
     'AAD_CA_AuthStrengths.config.ps1'

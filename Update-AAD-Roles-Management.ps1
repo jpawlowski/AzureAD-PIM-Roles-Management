@@ -64,6 +64,7 @@ $LibFiles = @(
     'UpdateAuthContext.function.ps1'
     'UpdateRoleRules.function.ps1'
     'ValidateBreakGlass.function.ps1'
+    'CreateCAPolicies.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName

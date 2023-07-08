@@ -17,6 +17,13 @@ function ValidateBreakGlass {
     ) {
         $groupObj = Get-MgGroup -GroupId $AADCABreakGlass.group.id -ErrorAction SilentlyContinue
     }
+    elseif (
+        ($null -ne $AADCABreakGlass.group.displayName) -and
+        ($AADCABreakGlass.group.displayName -ne '')
+    ) {
+        $groupObj = Get-MgGroup -All -Filter "displayName eq '$($AADCABreakGlass.group.displayName)'" -ErrorAction SilentlyContinue
+        Write-Warning "Break Glass Group $($groupObj.displayName): Should use explicit object ID $($groupObj.Id) in configuration"
+    }
     else {
         Write-Error 'Defined Break Glass Group is incomplete'
         return
