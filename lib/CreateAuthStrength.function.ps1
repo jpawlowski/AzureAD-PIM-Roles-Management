@@ -21,7 +21,8 @@ function CreateAuthStrength {
         $result = 1
         if ($Force) {
             $result = 0
-        } else {
+        }
+        else {
             $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Authentication Strengths !!!"
             $message = "Do you confirm to create new or update a total of $($AADCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)

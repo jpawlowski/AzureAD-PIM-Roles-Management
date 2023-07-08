@@ -105,7 +105,8 @@ function UpdateRoleRules {
         $result = 1
         if ($Force) {
             $result = 0
-        } else {
+        }
+        else {
             $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
             $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)

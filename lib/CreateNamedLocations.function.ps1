@@ -21,7 +21,8 @@ function CreateNamedLocations {
         $result = 1
         if ($Force) {
             $result = 0
-        } else {
+        }
+        else {
             $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Named Locations !!!"
             $message = "Do you confirm to create new or update a total of $($AADCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)

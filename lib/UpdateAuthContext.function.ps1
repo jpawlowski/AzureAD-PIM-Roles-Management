@@ -19,7 +19,8 @@ function UpdateAuthContext {
         $result = 1
         if ($Force) {
             $result = 0
-        } else {
+        }
+        else {
             $title = "!!! WARNING: Update Tier $tier Azure AD Conditional Access Authentication Contexts !!!"
             $message = "Do you confirm to update a total of $($AADCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)

@@ -65,7 +65,7 @@ if (
 }
 
 $LibFiles = @(
-    'Common.utils.ps1'
+    'Common.functions.ps1'
     'Load.config.ps1'
     'CreateNamedLocations.function.ps1'
     'CreateAuthStrength.function.ps1'
