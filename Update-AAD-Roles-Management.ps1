@@ -108,7 +108,6 @@ if ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies -or $ValidateBreakGlass)
     $MgScopes += 'UserAuthenticationMethod.Read.All'
 }
 if ($CreateAdminUnits) {
-    $MgScopes += 'AdministrativeUnit.Read.All'
     $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 }
 

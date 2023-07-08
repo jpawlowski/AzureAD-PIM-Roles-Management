@@ -5,6 +5,10 @@ if (
     $ConfigPath = Join-Path (Get-Item $PSScriptRoot).Parent 'config'
 }
 
+if (!(Test-Path -Path $ConfigPath -PathType Container)) {
+    Throw "Configuration folder $ConfigPath does not exist. Make a copy of the 'template.config' folder to begin, or use the -ConfigPath parameter."
+}
+
 $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Description."
 $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Description."
 $cancel = New-Object System.Management.Automation.Host.ChoiceDescription "&Cancel", "Description."
