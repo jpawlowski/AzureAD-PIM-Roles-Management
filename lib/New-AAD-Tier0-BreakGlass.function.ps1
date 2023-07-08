@@ -1,4 +1,4 @@
-function CreateBreakGlass {
+function New-AAD-Tier0-BreakGlass {
     $adminUnitObj = $null
     $createAdminUnit = $false
 

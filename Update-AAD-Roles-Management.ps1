@@ -59,12 +59,12 @@ if (
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    'CreateNamedLocations.function.ps1'
-    'CreateAuthStrength.function.ps1'
-    'UpdateAuthContext.function.ps1'
-    'UpdateRoleRules.function.ps1'
-    'ValidateBreakGlass.function.ps1'
-    'CreateCAPolicies.function.ps1'
+    'Test-AAD-Tier0-BreakGlass.function.ps1'
+    'Update-AAD-RoleRules.function.ps1'
+    'Update-AAD-CA-AuthContext.function.ps1'
+    'Update-AAD-CA-AuthStrength.function.ps1'
+    'Update-AAD-CA-NamedLocations.function.ps1'
+    'Update-AAD-CA-Policies.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
@@ -111,13 +111,13 @@ if ($CreateAdminUnits) {
     $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 }
 
-ConnectMgGraph
-CreateNamedLocations
-CreateAuthStrength
-UpdateAuthContext
-UpdateRoleRules
-ValidateBreakGlass
+Connect-MyMgGraph
+Update-AAD-CA-NamedLocations
+Update-AAD-CA-AuthStrength
+Update-AAD-CA-AuthContext
+Update-AAD-RoleRules
+Test-AAD-Tier0-BreakGlass
 
 if ($validBreakGlass) {
-    CreateCAPolicies
+    Update-AAD-CA-Policies
 }

@@ -1,4 +1,4 @@
-function ValidateBreakGlass {
+function Test-AAD-Tier0-BreakGlass {
     if (!$CreateAdminCAPolicies -and !$CreateGeneralCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {

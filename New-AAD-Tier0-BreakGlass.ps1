@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    'CreateBreakGlass.function.ps1'
+    'New-AAD-Tier0-BreakGlass.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
@@ -53,8 +53,8 @@ switch ($result) {
         $MgScopes += 'Directory.Write.Restricted'
         $MgScopes += 'RoleManagement.ReadWrite.Directory'
 
-        ConnectMgGraph
-        CreateBreakGlass
+        Connect-MyMgGraph
+        New-AAD-Tier0-BreakGlass
     }
     * {
         Write-Output ' Aborting command.'

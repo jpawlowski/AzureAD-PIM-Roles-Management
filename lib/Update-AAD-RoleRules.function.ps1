@@ -1,4 +1,4 @@
-function UpdateRoleRules {
+function Update-AAD-RoleRules {
     if (!$UpdateRoleRules) { return }
 
     $PolicyTiers = @();

@@ -1,4 +1,4 @@
-function UpdateAuthContext {
+function Update-AAD-CA-AuthContext {
     if (!$UpdateAuthContext) { return }
 
     $AuthContextTiers = @();

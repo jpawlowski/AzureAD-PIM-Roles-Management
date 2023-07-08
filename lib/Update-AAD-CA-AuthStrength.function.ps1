@@ -1,4 +1,4 @@
-function CreateAuthStrength {
+function Update-AAD-CA-AuthStrength {
     if (!$CreateAuthStrength) { return }
 
     $AuthStrengthTiers = @();

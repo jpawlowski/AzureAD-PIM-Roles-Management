@@ -1,4 +1,4 @@
-function CreateNamedLocations {
+function Update-AAD-CA-NamedLocations {
     if (!$CreateNamedLocations) { return }
 
     $NamedLocationsTiers = @();
