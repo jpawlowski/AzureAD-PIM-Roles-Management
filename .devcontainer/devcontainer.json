@@ -3,16 +3,13 @@
 {
 	"name": "PowerShell",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/powershell:lts-debian-11",
+	"image": "mcr.microsoft.com/microsoftgraph/powershell:latest",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh": "true",
 			"username": "vscode",
 			"upgradePackages": "false",
 			"nonFreePackages": "true"
-		},
-		"ghcr.io/devcontainers-contrib/features/powershell:1": {
-			"version": "latest"
 		},
 		"ghcr.io/flexwie/devcontainer-features/op:1": {}
 	},
