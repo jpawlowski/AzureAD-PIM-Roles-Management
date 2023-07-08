@@ -1,2 +1,2 @@
 $AADCAPolicyDisplayNamePrefix = $DisplayNamePrefix
-$AADCAPoliciesSubfolder = 'AAD_CA_Policies.config'
+$AADCAPoliciesSubfolder = 'AAD-CA-Policies.config'

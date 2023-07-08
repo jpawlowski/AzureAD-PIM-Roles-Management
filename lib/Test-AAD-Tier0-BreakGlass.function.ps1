@@ -30,7 +30,7 @@ function Test-AAD-Tier0-BreakGlass {
     }
 
     if ($null -eq $groupObj) {
-        Write-Error "Defined Break Glass Group $($AADCABreakGlass.group.id) does not exist"
+        Write-Error "Defined Break Glass Group $($AADCABreakGlass.group.id) ($($AADCABreakGlass.group.displayName)) does not exist"
         return
     }
     if ($groupObj.SecurityEnabled -ne $true) {
