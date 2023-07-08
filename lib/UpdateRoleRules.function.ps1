@@ -103,11 +103,15 @@ function UpdateRoleRules {
         $totalCountChars = ($totalCount | Measure-Object -Character).Characters
 
         $result = 1
-        if ($Force) {
+        if ($tier -eq 0 -and $Force) {
+            Write-Output ''
+            Write-Warning "[Tier $tier] Privileged Identity Management policies can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+        }
+        if ($tier -ne 0 -and $Force) {
             $result = 0
         }
         else {
-            $title = "!!! WARNING: Update Tier $tier Privileged Identity Management policies !!!"
+            $title = "!!! WARNING: Update [Tier $tier] Privileged Identity Management policies !!!"
             $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }

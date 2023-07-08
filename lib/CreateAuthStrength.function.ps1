@@ -19,11 +19,15 @@ function CreateAuthStrength {
 
     foreach ($tier in $AuthStrengthTiers) {
         $result = 1
-        if ($Force) {
+        if ($tier -eq 0 -and $Force) {
+            Write-Output ''
+            Write-Warning "[Tier $tier] Azure AD Conditional Access Authentication Strengths can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+        }
+        if ($tier -ne 0 -and $Force) {
             $result = 0
         }
         else {
-            $title = "!!! WARNING: Create and/or update Tier $tier Azure AD Conditional Access Authentication Strengths !!!"
+            $title = "!!! WARNING: Create and/or update [Tier $tier] Azure AD Conditional Access Authentication Strengths !!!"
             $message = "Do you confirm to create new or update a total of $($AADCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }
