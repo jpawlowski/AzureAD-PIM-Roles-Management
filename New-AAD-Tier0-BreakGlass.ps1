@@ -12,8 +12,10 @@
 Param (
     [Parameter(HelpMessage = "Azure AD tenant ID.")]
     [string]$TenantId,
+
     [Parameter(HelpMessage = "Use device code authentication instead of a browser control.")]
     [switch]$UseDeviceCode,
+
     [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
     [string]$ConfigPath
 )
