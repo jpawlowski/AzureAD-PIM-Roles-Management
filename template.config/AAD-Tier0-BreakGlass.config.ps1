@@ -99,9 +99,6 @@ $AADCABreakGlass = @{
     }
 
     #:-------------------------------------------------------------------------
-    # Conditional Access Policy to protect Break Glass accounts
-    #
-    #:-------------------------------------------------------------------------
     # Conditional Access Policies to protect Break Glass Group and Break Glass Backup Account
     #
     caPolicies = @(
