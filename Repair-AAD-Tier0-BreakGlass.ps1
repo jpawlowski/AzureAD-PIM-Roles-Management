@@ -29,6 +29,7 @@ $LibFiles = @(
     'Test-AAD-Tier0-BreakGlass.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
+    if ($null -eq $FileName -or $FileName -eq '') { continue }
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
     if (Test-Path -Path $FilePath -PathType Leaf) {
         try {

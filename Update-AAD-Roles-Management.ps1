@@ -62,14 +62,15 @@ if (
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    'Test-AAD-Tier0-BreakGlass.function.ps1'
-    'Update-AAD-RoleRules.function.ps1'
-    'Update-AAD-CA-AuthContext.function.ps1'
-    'Update-AAD-CA-AuthStrength.function.ps1'
-    'Update-AAD-CA-NamedLocations.function.ps1'
-    'Update-AAD-CA-Policies.function.ps1'
+    ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies -or $ValidateBreakGlass ? 'Test-AAD-Tier0-BreakGlass.function.ps1' : $null)
+    ($UpdateRoleRules ? 'Update-AAD-RoleRules.function.ps1' : $null)
+    ($UpdateAuthContext ? 'Update-AAD-CA-AuthContext.function.ps1' : $null)
+    ($CreateAuthStrength ? 'Update-AAD-CA-AuthStrength.function.ps1' : $null)
+    ($CreateNamedLocations ? 'Update-AAD-CA-NamedLocations.function.ps1' : $null)
+    ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies ? 'Update-AAD-CA-Policies.function.ps1' : $null)
 )
 foreach ($FileName in $LibFiles) {
+    if ($null -eq $FileName -or $FileName -eq '') { continue }
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
     if (Test-Path -Path $FilePath -PathType Leaf) {
         try {
@@ -115,12 +116,25 @@ if ($CreateAdminUnits) {
 }
 
 Connect-MyMgGraph
-Update-AAD-CA-NamedLocations
-Update-AAD-CA-AuthStrength
-Update-AAD-CA-AuthContext
-Update-AAD-RoleRules
-Test-AAD-Tier0-BreakGlass
+
+if ($CreateNamedLocations) {
+    Update-AAD-CA-NamedLocations
+}
+if ($CreateAuthStrength) {
+    Update-AAD-CA-AuthStrength
+}
+if ($UpdateAuthContext) {
+    Update-AAD-CA-AuthContext
+}
+if ($UpdateRoleRules) {
+    Update-AAD-RoleRules
+}
+if ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies -or $ValidateBreakGlass) {
+    Test-AAD-Tier0-BreakGlass
+}
 
 if ($validBreakGlass) {
-    Update-AAD-CA-Policies
+    if ($CreateAdminCAPolicies -or $CreateGeneralCAPolicies) {
+        Update-AAD-CA-Policies
+    }
 }

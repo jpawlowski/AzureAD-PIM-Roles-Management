@@ -2,8 +2,6 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 function Update-AAD-RoleRules {
-    if (!$UpdateRoleRules) { return }
-
     $PolicyTiers = @();
     if ($Tier0) {
         $PolicyTiers += 0

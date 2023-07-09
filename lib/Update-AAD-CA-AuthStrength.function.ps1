@@ -1,8 +1,6 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 function Update-AAD-CA-AuthStrength {
-    if (!$CreateAuthStrength) { return }
-
     $AuthStrengthTiers = @();
     if ($Tier0) {
         $AuthStrengthTiers += 0

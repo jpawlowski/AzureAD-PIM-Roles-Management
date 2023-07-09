@@ -1,8 +1,6 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 function Update-AAD-CA-NamedLocations {
-    if (!$CreateNamedLocations) { return }
-
     $NamedLocationsTiers = @();
     if ($Tier0) {
         $NamedLocationsTiers += 0

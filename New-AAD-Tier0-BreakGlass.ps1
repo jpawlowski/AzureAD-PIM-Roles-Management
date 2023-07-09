@@ -26,6 +26,7 @@ $LibFiles = @(
     'New-AAD-Tier0-BreakGlass.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
+    if ($null -eq $FileName -or $FileName -eq '') { continue }
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
     if (Test-Path -Path $FilePath -PathType Leaf) {
         try {
@@ -40,8 +41,8 @@ foreach ($FileName in $LibFiles) {
     }
 }
 
-$title = 'Break Glass Account + Break Glass Group creation'
-$message = 'Do you confirm to create new Break Glass Accounts and Break Glass Group if they are not existing?'
+$title = 'Break Glass Account + Break Glass Group + Break Glass Administrative Unit creation'
+$message = 'Do you confirm to create the defined Break Glass Accounts, Break Glass Group, and Break Glass Administrative Unit if they are not existing?'
 $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
 switch ($result) {
     0 {
