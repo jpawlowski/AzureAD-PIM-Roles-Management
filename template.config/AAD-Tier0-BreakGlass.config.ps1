@@ -113,7 +113,7 @@ $AADCABreakGlass = @{
                     Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
                 }
             }
-            breakGlassIncludeUsers = @( 'group' )
+            breakGlassIncludeUsers = @( 'group', 'primary' )
             breakGlassExcludeUsers = @( 'backup' )
         }
         @{
