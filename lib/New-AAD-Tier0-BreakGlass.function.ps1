@@ -164,14 +164,14 @@ function New-AAD-Tier0-BreakGlass($AADCABreakGlass) {
         ($AADCABreakGlass.conditionalAccessPolicy.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
         $createCaPolicy = $true
-        $caPolicyObj = Get-MgBetaIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $AADCABreakGlass.conditionalAccessPolicy.id -ErrorAction SilentlyContinue
+        $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $AADCABreakGlass.conditionalAccessPolicy.id -ErrorAction SilentlyContinue
     }
     elseif (
         ($null -ne $AADCABreakGlass.conditionalAccessPolicy.displayName) -and
         ($AADCABreakGlass.conditionalAccessPolicy.displayName -ne '')
     ) {
         $createCaPolicy = $true
-        $caPolicyObj = Get-MgBetaIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($AADCABreakGlass.conditionalAccessPolicy.displayName)'" -ErrorAction SilentlyContinue
+        $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($AADCABreakGlass.conditionalAccessPolicy.displayName)'" -ErrorAction SilentlyContinue
     }
 
     if ($null -ne $caPolicyObj) {
