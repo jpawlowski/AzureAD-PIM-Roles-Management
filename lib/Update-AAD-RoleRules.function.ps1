@@ -188,13 +188,13 @@ function Update-AAD-RoleRules {
                         $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
 
                         if ($role.ContainsKey($rolePolicyRule.Id)) {
-                            Write-Output "                [Individual role setting]       $($rolePolicyRule.Id)"
+                            Write-Output "                [Individual role setting]          $($rolePolicyRule.Id)"
                             foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
                                 $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
                             }
                         }
                         else {
-                            Write-Output "                [Inherited from Tier Default]   $($rolePolicyRule.Id)"
+                            Write-Output "                [Inherited from Tier $tier Defaults]   $($rolePolicyRule.Id)"
                         }
 
                         try {
@@ -225,14 +225,14 @@ $UpdateRoleRules = $false
 $RoleTemplateIDsWhitelist = @();
 $RoleNamesWhitelist = @();
 if (
-    ($UpdateRoles.Count -eq 1) -and
-    ($UpdateRoles[0].GetType().Name -eq 'String') -and
-    ($UpdateRoles[0] -eq 'All')
+    ($Roles.Count -eq 1) -and
+    ($Roles[0].GetType().Name -eq 'String') -and
+    ($Roles[0] -eq 'All')
 ) {
     $UpdateRoleRules = $true
 }
 else {
-    foreach ($role in $UpdateRoles) {
+    foreach ($role in $Roles) {
         if ($role.GetType().Name -eq 'String') {
             if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
                 $RoleTemplateIDsWhitelist += $role

@@ -30,6 +30,10 @@ $AADCABreakGlass = @{
                 # '#microsoft.graph.fido2AuthenticationMethod'          # Replace softwareOathAuthenticationMethod with FIDO2 for phishing resistant authentication without password
                 '#microsoft.graph.softwareOathAuthenticationMethod'     # Allows a shared secret, e.g. using a password manager with TOTP support, or printout for temporal setup of a TOTP generator app
             )
+            directoryRoles        = @(
+                '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
+                'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
+            )
         }
 
         #:-------------------------------------------------------------------------
@@ -47,15 +51,19 @@ $AADCABreakGlass = @{
         # Authentication methods for this account are not enforced via CA, but SHOULD be set nevertheless.
         #
         @{
-            id                            = '00000000-0000-0000-0000-000000000000'
-            displayName                   = "$CompanyName Emergency Admin (Backup)"
-            userPrincipalName             = 'admc-emergency912@tenant.onmicrosoft.com'
-            authenticationMethods         = @(
+            id                               = '00000000-0000-0000-0000-000000000000'
+            displayName                      = "$CompanyName Emergency Admin (Backup)"
+            userPrincipalName                = 'admc-emergency912@tenant.onmicrosoft.com'
+            authenticationMethods            = @(
                 '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
                 '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
                 # '#microsoft.graph.softwareOathAuthenticationMethod'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
             )
-            excludeFromBreakGlassCAPolicy = $true
+            directoryRoles                   = @(
+                '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
+                'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
+            )
+            isExcludedFromBreakGlassCAPolicy = $true
         }
     )
 
@@ -72,6 +80,7 @@ $AADCABreakGlass = @{
         id                 = '00000000-0000-0000-0000-000000000000'
         displayName        = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
         description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
+        visibility         = 'Private'
         isAssignableToRole = $true
     }
 
@@ -80,7 +89,7 @@ $AADCABreakGlass = @{
     #
     # The admin unit SHOULD have hidden membership configured.
     # The admin unit SHOULD have Management Restrictions enabled.
-    # The script has limitations to automatically fix things with Management Restrictions.
+    # The script might be limited to validate Break Glass with Management Restrictions turned on.
     #
     adminUnit = @{
         id                           = '00000000-0000-0000-0000-000000000000'
@@ -88,5 +97,21 @@ $AADCABreakGlass = @{
         description                  = 'Tier0 objects for Break Glass access. DO NOT CHANGE!'
         visibility                   = 'HiddenMembership'
         isMemberManagementRestricted = $true
+    }
+
+    #:-------------------------------------------------------------------------
+    # Conditional Access Policy to protect Break Glass accounts
+    #
+    conditionalAccessPolicy = @{
+        id            = '00000000-0000-0000-0000-000000000000'
+        displayName   = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-Allow-Break-Glass-Admins-Require-MFA') | Join-String -Separator $DisplayNameElementSeparator
+        description   = ''
+        state         = 'enabledForReportingButNotEnforced'
+        grantControls = @{
+            operator              = 'OR'
+            AuthenticationStrength = @{
+                Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
+            }
+        }
     }
 }

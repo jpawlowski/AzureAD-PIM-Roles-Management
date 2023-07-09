@@ -1,19 +1,53 @@
 #Requires -Version 7.2
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Identity.DirectoryManagement'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
-function Test-AAD-Tier0-BreakGlass {
-    if (!$CreateAdminCAPolicies -and !$CreateGeneralCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
+    $adminUnitObj = $null
 
-    if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
-        Write-Warning "Break Glass Account validation SKIPPED"
-        $validBreakGlass = $true
+    if (
+        ($null -ne $AADCABreakGlass.adminUnit.id) -and
+        ($AADCABreakGlass.adminUnit.id -notmatch '^00000000-') -and
+        ($AADCABreakGlass.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+    ) {
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $AADCABreakGlass.adminUnit.id -ErrorAction SilentlyContinue
+    }
+    elseif (
+        ($null -ne $AADCABreakGlass.adminUnit.displayName) -and
+        ($AADCABreakGlass.adminUnit.displayName -ne '')
+    ) {
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($AADCABreakGlass.adminUnit.displayName)'" -ErrorAction SilentlyContinue
+    }
+    elseif ($null -ne $AADCABreakGlass.adminUnit) {
+        Write-Error 'Defined Break Glass Admin Unit is incomplete'
         return
     }
 
-    $validBreakGlassCount = 0
+    if ($null -ne $AADCABreakGlass.adminUnit) {
+        if ($null -eq $adminUnitObj) {
+            Write-Error "Defined Break Glass Admin Unit $($AADCABreakGlass.adminUnit.id) ($($AADCABreakGlass.adminUnit.displayName)) does not exist"
+            return
+        }
+        if (
+            ($null -ne $AADCABreakGlass.adminUnit.visibility) -and
+            ($adminUnitObj.Visibility -ne $AADCABreakGlass.adminUnit.visibility)
+        ) {
+            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Visibility must be $($AADCABreakGlass.adminUnit.visibility)"
+            return
+        }
+        if (
+            ($null -ne $AADCABreakGlass.adminUnit.isMemberManagementRestricted) -and
+            ($adminUnitObj.isMemberManagementRestricted -ne $AADCABreakGlass.adminUnit.isMemberManagementRestricted)
+        ) {
+            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Restricted Management must be $($AADCABreakGlass.adminUnit.isMemberManagementRestricted)"
+            return
+        }
+        Write-Output "Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)) VALIDATED"
+    }
+
     $groupObj = $null
 
     if (
@@ -66,6 +100,13 @@ function Test-AAD-Tier0-BreakGlass {
         return
     }
     if (
+        ($null -ne $AADCABreakGlass.group.visibility) -and
+        ($AADCABreakGlass.group.visibility -ne $groupObj.visibility)
+    ) {
+        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Visibility must be $($AADCABreakGlass.group.visibility)"
+        return
+    }
+    if (
         ($null -ne $AADCABreakGlass.group.displayName) -and
         ($groupObj.DisplayName -ne $AADCABreakGlass.group.displayName)
     ) {
@@ -80,7 +121,8 @@ function Test-AAD-Tier0-BreakGlass {
             Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
             Update-MgGroup -GroupId $groupObj.Id -DisplayName $AADCABreakGlass.group.displayName
             $groupObj.DisplayName = $AADCABreakGlass.group.displayName
-        } else {
+        }
+        else {
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current display name does not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
         }
     }
@@ -99,13 +141,15 @@ function Test-AAD-Tier0-BreakGlass {
             Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
             Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
             $groupObj.Description = $AADCABreakGlass.group.description
-        } else {
+        }
+        else {
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current description not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
         }
     }
     #TODO: Block groups that were onboarded to PIM
     Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
 
+    $validBreakGlassCount = 0
     $breakGlassAccountIds = @()
 
     foreach ($account in $AADCABreakGlass.accounts) {
@@ -113,13 +157,15 @@ function Test-AAD-Tier0-BreakGlass {
         if (
             ($null -ne $account.id) -and
             ($account.id -notmatch '^00000000-') -and
-            ($account.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+            ($account.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') -and
+            ($null -ne $account.directoryRoles)
         ) {
             $userId = $account.id
         }
         elseif (
             ($null -ne $account.userPrincipalName) -and
-            ($account.userPrincipalName -match "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
+            ($account.userPrincipalName -match "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?") -and
+            ($null -ne $account.directoryRoles)
         ) {
             Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($account.userPrincipalName): SHOULD use explicit object ID in configuration"
             $userId = $account.userPrincipalName
@@ -204,26 +250,31 @@ function Test-AAD-Tier0-BreakGlass {
             }
         }
 
-        $roleAssignment = Get-MgRoleManagementDirectoryRoleAssignmentSchedule -Filter "(RoleDefinitionId eq '62e90394-69f5-4237-9190-012177145e10') and (PrincipalId eq '$($userObj.Id)')"
-        if ($userObj.Id -ne $roleAssignment.PrincipalId) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): MUST be assigned Global Administrator role"
-            return
-        }
-        if ('Direct' -ne $roleAssignment.MemberType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST NOT use transitive role assignment via group"
-            return
-        }
-        if ('Assigned' -ne $roleAssignment.AssignmentType) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST be active"
-            return
-        }
-        if ('noExpiration' -ne $roleAssignment.ScheduleInfo.Expiration.Type) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment MUST never expire"
-            return
-        }
-        if ('Provisioned' -ne $roleAssignment.Status) {
-            Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Global Administrator role assignment was not fully provisioned yet"
-            return
+        $roleAssignments = Get-MgRoleManagementDirectoryRoleAssignmentSchedule -Filter "PrincipalId eq '$($userObj.Id)'"
+        foreach ($RoleDefinitionId in $account.directoryRoles) {
+            $thisRoleAssignments = $roleAssignments | Where-Object -FilterScript {$_.RoleDefinitionId -eq $RoleDefinitionId}
+            if ($thisRoleAssignments.Count -lt 1) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): MUST be assigned directory role $RoleDefinitionId"
+                return
+            }
+            foreach($roleAssignment in $thisRoleAssignments) {
+                if ('Direct' -ne $roleAssignment.MemberType) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST NOT use transitive role assignment via group"
+                    return
+                }
+                if ('Assigned' -ne $roleAssignment.AssignmentType) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST be active"
+                    return
+                }
+                if ('noExpiration' -ne $roleAssignment.ScheduleInfo.Expiration.Type) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST never expire"
+                    return
+                }
+                if ('Provisioned' -ne $roleAssignment.Status) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment was not fully provisioned yet"
+                    return
+                }
+            }
         }
 
         $groupMemberOf = Get-MgUserMemberGroup -UserId $userObj.Id -SecurityEnabledOnly:$true
@@ -257,6 +308,7 @@ function Test-AAD-Tier0-BreakGlass {
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
         }
     }
+
 }
 
 $validBreakGlass = $false

@@ -1,13 +1,32 @@
-#Requires -Version 7.2
 <#
 .SYNOPSIS
     Create Break Glass accounts, Break Glass group, and Break Glass admin unit for Azure AD
+
 .DESCRIPTION
     This script creates Break Glass accounts, a Break Glass group, and add them to a restricted Break Glass admin unit.
     The Break Glass group and accounts can then be excluded in Azure AD Conditional Access policies to prevent lockout.
 
     Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
+
+.PARAMETER TenantId
+    Azure AD tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
+
+.PARAMETER UseDeviceCode
+    Use device code authentication instead of a browser control.
+
+.PARAMETER ConfigPath
+    Folder path to configuration files in PS1 format. Default: './config/'.
+
+.PARAMETER Force
+    Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited.
+
+.NOTES
+    Filename: New-AAD-Tier0-BreakGlass.ps1
+    Author: Julian Pawlowski
 #>
+
+#Requires -Version 7.2
+
 [CmdletBinding()]
 Param (
     [Parameter(HelpMessage = "Azure AD tenant ID.")]
@@ -56,9 +75,13 @@ switch ($result) {
         $MgScopes += 'AdministrativeUnit.ReadWrite.All'
         $MgScopes += 'Directory.Write.Restricted'
         $MgScopes += 'RoleManagement.ReadWrite.Directory'
+        $MgScopes += 'Policy.Read.All'
+        $MgScopes += 'Policy.ReadWrite.AuthenticationMethod'
+        $MgScopes += 'Policy.ReadWrite.ConditionalAccess'
+        $MgScopes += 'Application.Read.All'
 
         Connect-MyMgGraph
-        New-AAD-Tier0-BreakGlass
+        New-AAD-Tier0-BreakGlass $AADCABreakGlass
     }
     * {
         Write-Output ' Aborting command.'
