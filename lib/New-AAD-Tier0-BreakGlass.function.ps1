@@ -1,3 +1,7 @@
+#Requires -Version 7.2
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Identity.DirectoryManagement'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 function New-AAD-Tier0-BreakGlass {
     $adminUnitObj = $null
     $createAdminUnit = $false
@@ -69,7 +73,7 @@ function New-AAD-Tier0-BreakGlass {
         }
     }
     else {
-        Write-Output "Found existing Break Glass Group  :  $($groupObj.displayName)"
+        Write-Output "Found existing Break Glass Group               :  $($groupObj.displayName)"
     }
 
     $breakGlassAccountIds = @()
@@ -141,7 +145,7 @@ function New-AAD-Tier0-BreakGlass {
             }
         }
         else {
-            Write-Output "Found existing Break Glass Account :  $($userObj.UserPrincipalName)"
+            Write-Output "Found existing Break Glass Account             :  $($userObj.UserPrincipalName)"
         }
     }
 }

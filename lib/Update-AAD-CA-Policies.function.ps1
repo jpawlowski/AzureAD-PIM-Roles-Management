@@ -1,3 +1,4 @@
+#Requires -Version 7.2
 function Update-AAD-CA-Policies {
     if (!$CreateAdminCAPolicies -and !$CreateGeneralCAPolicies) { return }
     if (!$validBreakGlass) {

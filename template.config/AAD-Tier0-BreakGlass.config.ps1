@@ -1,3 +1,5 @@
+#Requires -Version 7.2
+
 $AADCABreakGlassGroupDisplayNamePrefix = $AADGroupDisplayNamePrefix
 
 $AADCABreakGlass = @{

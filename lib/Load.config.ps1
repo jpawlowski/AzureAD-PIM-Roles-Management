@@ -1,3 +1,4 @@
+#Requires -Version 7.2
 if (
     ($null -eq $ConfigPath) -or
     ($ConfigPath -eq '')

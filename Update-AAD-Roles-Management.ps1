@@ -1,3 +1,4 @@
+#Requires -Version 7.2
 <#
 .SYNOPSIS
     Implement a Security Tiering Model for Azure AD Privileged Roles using Azure AD Privileged Identity Management.
@@ -15,7 +16,7 @@ Param (
     [Parameter(HelpMessage = "Azure AD tenant ID.")]
     [string]$TenantId,
     [Parameter(HelpMessage = "Use device code authentication instead of a browser control.")]
-    [string]$UseDeviceCode,
+    [switch]$UseDeviceCode,
     [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
     [string]$ConfigPath,
     [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited. Note that updates of Tier0 settings always requires manual user interaction.")]

@@ -1,3 +1,5 @@
+#Requires -Version 7.2
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
 function Connect-MyMgGraph {
     if (
         ($null -eq $TenantId) -or

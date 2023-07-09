@@ -1,3 +1,5 @@
+#Requires -Version 7.2
+
 $AADCAAuthStrengthDisplayNamePrefix = $null
 $AADCAAuthStrengthDisplayNameSuffix = 'AuthStr'
 

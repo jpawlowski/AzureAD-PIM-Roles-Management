@@ -1,7 +1,7 @@
 # do not accidentially add custom configuration folders to repository
-config/*
-config.*/*
-.*config/*
+config/
+config.*/
+*.config/
 
 # Created by https://www.toptal.com/developers/gitignore/api/linux,macos,windows,powershell,visualstudiocode,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,macos,windows,powershell,visualstudiocode,git

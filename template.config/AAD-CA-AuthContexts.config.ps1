@@ -1,3 +1,5 @@
+#Requires -Version 7.2
+
 $AADCAAuthContextDisplayNamePrefix = $null
 $AADCAAuthContextDisplayNameSuffix = 'AuthCon'
 

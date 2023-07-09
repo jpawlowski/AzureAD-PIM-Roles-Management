@@ -1,3 +1,9 @@
+#Requires -Version 7.2
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 function Test-AAD-Tier0-BreakGlass {
     if (!$CreateAdminCAPolicies -and !$CreateGeneralCAPolicies -and !$ValidateBreakGlass -and !$SkipBreakGlassValidation) { return }
 
@@ -63,17 +69,39 @@ function Test-AAD-Tier0-BreakGlass {
         ($null -ne $AADCABreakGlass.group.displayName) -and
         ($groupObj.DisplayName -ne $AADCABreakGlass.group.displayName)
     ) {
-        Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
-        Update-MgGroup -GroupId $groupObj.Id -DisplayName $AADCABreakGlass.group.displayName
-        $groupObj.DisplayName = $AADCABreakGlass.group.displayName
+        if (
+            ('Group.ReadWrite.All' -in (Get-MgContext).Scopes) -and
+            (
+                ($null -eq $AADCABreakGlass.adminUnit) -or
+                !$AADCABreakGlass.adminUnit.isMemberManagementRestricted -or
+                'Directory.Write.Restricted' -in (Get-MgContext).Scopes
+            )
+        ) {
+            Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
+            Update-MgGroup -GroupId $groupObj.Id -DisplayName $AADCABreakGlass.group.displayName
+            $groupObj.DisplayName = $AADCABreakGlass.group.displayName
+        } else {
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current display name does not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
+        }
     }
     if (
         ($null -ne $AADCABreakGlass.group.description) -and
         ($groupObj.Description -ne $AADCABreakGlass.group.description)
     ) {
-        Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
-        Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
-        $groupObj.Description = $AADCABreakGlass.group.description
+        if (
+            ('Group.ReadWrite.All' -in (Get-MgContext).Scopes) -and
+            (
+                ($null -eq $AADCABreakGlass.adminUnit) -or
+                !$AADCABreakGlass.adminUnit.isMemberManagementRestricted -or
+                'Directory.Write.Restricted' -in (Get-MgContext).Scopes
+            )
+        ) {
+            Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
+            Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
+            $groupObj.Description = $AADCABreakGlass.group.description
+        } else {
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current description not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
+        }
     }
     #TODO: Block groups that were onboarded to PIM
     Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
@@ -162,7 +190,7 @@ function Test-AAD-Tier0-BreakGlass {
             $userObj.DisplayName = $account.displayName
         }
 
-        $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id
+        $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction SilentlyContinue
         foreach ($authMethod in $authMethods) {
             if ($authMethod.AdditionalProperties.'@odata.type' -notin $account.authenticationMethods) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
