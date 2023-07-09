@@ -155,49 +155,75 @@ function New-AAD-Tier0-BreakGlass($AADCABreakGlass) {
         $validBreakGlassCount++
     }
 
-    $caPolicyObj = $null
-    $createCaPolicy = $false
+    foreach ($caPolicy in $AADCABreakGlass.caPolicies) {
+        $caPolicyObj = $null
+        $createCaPolicy = $false
 
-    if (
-        ($null -ne $AADCABreakGlass.conditionalAccessPolicy.id) -and
-        ($AADCABreakGlass.conditionalAccessPolicy.id -notmatch '^00000000-') -and
-        ($AADCABreakGlass.conditionalAccessPolicy.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
-    ) {
-        $createCaPolicy = $true
-        $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $AADCABreakGlass.conditionalAccessPolicy.id -ErrorAction SilentlyContinue
-    }
-    elseif (
-        ($null -ne $AADCABreakGlass.conditionalAccessPolicy.displayName) -and
-        ($AADCABreakGlass.conditionalAccessPolicy.displayName -ne '')
-    ) {
-        $createCaPolicy = $true
-        $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($AADCABreakGlass.conditionalAccessPolicy.displayName)'" -ErrorAction SilentlyContinue
-    }
-
-    if ($null -ne $caPolicyObj) {
-        Write-Output "Found existing Break Glass Azure AD CA Policy  :  $($caPolicyObj.displayName)"
-    }
-    elseif ($createCaPolicy) {
-        $AADCABreakGlass['conditionalAccessPolicy'].Remove('id')
-        $AADCABreakGlass['conditionalAccessPolicy'].Remove('description')
-        $AADCABreakGlass.conditionalAccessPolicy.state = 'enabledForReportingButNotEnforced'
-        $AADCABreakGlass.conditionalAccessPolicy.conditions = @{
-            applications = @{
-                includeApplications = @( 'All' )
-            }
-            users        = @{
-                excludeUsers  = @()
-                includeGroups = @($groupObj.Id)
-            }
+        if (
+            ($null -ne $caPolicy.id) -and
+            ($caPolicy.id -notmatch '^00000000-') -and
+            ($caPolicy.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ) {
+            $createCaPolicy = $true
+            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $caPolicy.id -ErrorAction SilentlyContinue
+        }
+        elseif (
+            ($null -ne $caPolicy.displayName) -and
+            ($caPolicy.displayName -ne '')
+        ) {
+            $createCaPolicy = $true
+            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($caPolicy.displayName)'" -ErrorAction SilentlyContinue
         }
 
-        foreach ($account in $AADCABreakGlass.accounts) {
-            if ($account.isExcludedFromBreakGlassCAPolicy) {
-                $AADCABreakGlass.conditionalAccessPolicy.conditions.users.excludeUsers += $account.Id
-            }
+        if ($null -ne $caPolicyObj) {
+            Write-Output "Found existing Break Glass Azure AD CA Policy  :  $($caPolicyObj.displayName)"
         }
+        elseif ($createCaPolicy) {
+            $caPolicy.Remove('id')
+            $caPolicy.Remove('description')   # not supported (yet)
+            $caPolicy.state = 'enabledForReportingButNotEnforced'
+            $caPolicy.conditions = @{
+                applications = @{
+                    includeApplications = @( 'All' )
+                }
+                users        = @{
+                    includeUsers  = @()
+                    excludeUsers  = @()
+                    includeGroups = @()
+                }
+            }
 
-        $caPolicyObj = New-MgIdentityConditionalAccessPolicy -BodyParameter $AADCABreakGlass.conditionalAccessPolicy -ErrorAction Stop
-        Write-Output "Created new Break Glass Azure AD CA Policy     : '$($caPolicyObj.displayName)' ($($caPolicyObj.Id))"
+            if ($null -ne $caPolicy.breakGlassIncludeUsers) {
+                foreach($item in $caPolicy.breakGlassIncludeUsers) {
+                    if ($item -eq 'group') {
+                        $caPolicy.conditions.users.includeGroups = @($groupObj.Id)
+                    }
+                    elseif ($item -eq 'primary') {
+                        $caPolicy.conditions.users.includeUsers += $AADCABreakGlass.accounts[0].id
+                    }
+                    elseif ($item -eq 'backup') {
+                        $caPolicy.conditions.users.includeUsers += $AADCABreakGlass.accounts[1].id
+                    }
+                }
+                $caPolicy.Remove('breakGlassIncludeUsers')
+            }
+            if ($null -ne $caPolicy.breakGlassExcludeUsers) {
+                foreach($item in $caPolicy.breakGlassExcludeUsers) {
+                    if ($item -eq 'group') {
+                        $caPolicy.conditions.users.excludeGroups = @($groupObj.Id)
+                    }
+                    elseif ($item -eq 'primary') {
+                        $caPolicy.conditions.users.excludeUsers += $AADCABreakGlass.accounts[0].id
+                    }
+                    elseif ($item -eq 'backup') {
+                        $caPolicy.conditions.users.excludeUsers += $AADCABreakGlass.accounts[1].id
+                    }
+                }
+                $caPolicy.Remove('breakGlassExcludeUsers')
+            }
+
+            $caPolicyObj = New-MgIdentityConditionalAccessPolicy -BodyParameter $caPolicy -ErrorAction Stop
+            Write-Output "Created new Break Glass Azure AD CA Policy     : '$($caPolicyObj.displayName)' ($($caPolicyObj.Id))"
+        }
     }
 }

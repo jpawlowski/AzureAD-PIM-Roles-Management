@@ -63,7 +63,6 @@ $AADCABreakGlass = @{
                 '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
                 'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
             )
-            isExcludedFromBreakGlassCAPolicy = $true
         }
     )
 
@@ -102,16 +101,37 @@ $AADCABreakGlass = @{
     #:-------------------------------------------------------------------------
     # Conditional Access Policy to protect Break Glass accounts
     #
-    conditionalAccessPolicy = @{
-        id            = '00000000-0000-0000-0000-000000000000'
-        displayName   = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-Allow-Break-Glass-Admins-Require-MFA') | Join-String -Separator $DisplayNameElementSeparator
-        description   = 'Protect Primary Tier0 Break Glass account'
-        state         = 'enabledForReportingButNotEnforced'
-        grantControls = @{
-            operator              = 'OR'
-            AuthenticationStrength = @{
-                Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
+    #:-------------------------------------------------------------------------
+    # Conditional Access Policies to protect Break Glass Group and Break Glass Backup Account
+    #
+    caPolicies = @(
+        @{
+            id                     = '00000000-0000-0000-0000-000000000000'
+            displayName            = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-Allow-Break-Glass-Admins-Except-Backup-Require-MFA') | Join-String -Separator $DisplayNameElementSeparator
+            description            = 'Protect Primary Tier0 Break Glass account'
+            state                  = 'enabledForReportingButNotEnforced'   # change to 'enabled' when ready
+            grantControls          = @{
+                operator               = 'OR'
+                AuthenticationStrength = @{
+                    Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
+                }
             }
+            breakGlassIncludeUsers = @( 'group' )
+            breakGlassExcludeUsers = @( 'backup' )
         }
-    }
+        @{
+            id                     = '00000000-0000-0000-0000-000000000000'
+            displayName            = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-Allow-Backup-Break-Glass-Admin-ReportOnly-MFA') | Join-String -Separator $DisplayNameElementSeparator
+            description            = 'Monitor Backup Tier0 Break Glass account, but do not protect'
+            state                  = 'enabledForReportingButNotEnforced'   # keep this state, it is for monitoring the backup Break Glass account only
+            grantControls          = @{
+                operator               = 'OR'
+                AuthenticationStrength = @{
+                    Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
+                }
+            }
+            breakGlassIncludeUsers = @( 'backup' )
+            breakGlassExcludeUsers = @( 'none' )
+        }
+    )
 }
