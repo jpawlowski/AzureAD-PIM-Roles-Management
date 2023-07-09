@@ -181,7 +181,7 @@ function New-AAD-Tier0-BreakGlass($AADCABreakGlass) {
         elseif ($createCaPolicy) {
             $caPolicy.Remove('id')
             $caPolicy.Remove('description')   # not supported (yet)
-            $caPolicy.state = 'enabledForReportingButNotEnforced'
+            $caPolicy.state = 'enabledForReportingButNotEnforced'   # protect from accidential lockout during initial creation
             $caPolicy.conditions = @{
                 applications = @{
                     includeApplications = @( 'All' )

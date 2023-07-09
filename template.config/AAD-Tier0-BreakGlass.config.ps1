@@ -126,9 +126,9 @@ $AADCABreakGlass = @{
             state                  = 'enabledForReportingButNotEnforced'   # keep this state, it is for monitoring the backup Break Glass account only
             grantControls          = @{
                 operator               = 'OR'
-                AuthenticationStrength = @{
-                    Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
-                }
+                builtInControls = @(
+                    "mfa"
+                )
             }
             breakGlassIncludeUsers = @( 'backup' )
             breakGlassExcludeUsers = @( 'none' )
