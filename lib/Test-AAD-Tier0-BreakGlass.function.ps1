@@ -237,15 +237,86 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
         }
 
         $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction SilentlyContinue
-        foreach ($authMethod in $authMethods) {
-            if ($authMethod.AdditionalProperties.'@odata.type' -notin $account.authenticationMethods) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
+        foreach ($authMethodId in $account.authenticationMethods) {
+            $authMethodOdataType = '#microsoft.graph.' + $authMethodId + 'AuthenticationMethod'
+            if ($authMethodOdataType -notin $authMethods.AdditionalProperties.'@odata.type') {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethodId"
                 return
             }
         }
-        foreach ($authMethod in $account.authenticationMethods) {
-            if ($authMethod -notin $authMethods.AdditionalProperties.'@odata.type') {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethod"
+        foreach ($authMethod in $authMethods) {
+            $authMethodId = $null
+            if ($authMethod.AdditionalProperties.'@odata.type' -match '^#microsoft\.graph\.(.+)AuthenticationMethod$') {
+                $authMethodId = $Matches[1]
+            }
+            if (!$authMethodId -or ($authMethodId -notin $account.authenticationMethods)) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
+                return
+            }
+            if ($authMethodId -eq 'password') { continue }
+
+            $authMethodConf = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId $authMethodId
+            if ($authMethodConf.State -ne 'enabled') {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Authentication Method $authMethodId is currently not enabled for this tenant"
+                return
+            }
+
+            $isBreakGlassGroupExcluded = $false
+            if (
+                (
+                    ($null -eq $authMethodConf.ExcludeTargets) -and
+                    ($null -eq $authMethodConf.AdditionalProperties.excludeTargets)
+                ) -or
+                (
+                    ($null -ne $authMethodConf.ExcludeTargets) -and
+                    ($authMethodConf.ExcludeTargets | Where-Object -FilterScript {
+                        ($_.targetType -eq 'group') -and
+                        ($_.id -eq $groupObj.Id)
+                    })
+                ) -or
+                (
+                    ($null -ne $authMethodConf.AdditionalProperties.excludeTargets) -and
+                    ($authMethodConf.AdditionalProperties.excludeTargets | Where-Object -FilterScript {
+                        ($_.targetType -eq 'group') -and
+                        ($_.id -eq $groupObj.Id)
+                    })
+                )
+            ) {
+                $isBreakGlassGroupExcluded = $true
+            }
+
+            $isBreakGlassGroupIncluded = $false
+            if (
+                (
+                    ($null -ne $authMethodConf.IncludeTargets) -and
+                    ($authMethodConf.IncludeTargets | Where-Object -FilterScript {
+                        ($_.targetType -eq 'group') -and
+                        (
+                            ($_.id -eq 'all_users') -or
+                            ($_.id -eq $groupObj.Id)
+                        )
+                    })
+                ) -or
+                (
+                    ($null -ne $authMethodConf.AdditionalProperties.includeTargets) -and
+                    ($authMethodConf.AdditionalProperties.includeTargets | Where-Object -FilterScript {
+                        ($_.targetType -eq 'group') -and
+                        (
+                            ($_.id -eq 'all_users') -or
+                            ($_.id -eq $groupObj.Id)
+                        )
+                    })
+                )
+            ) {
+                $isBreakGlassGroupIncluded = $true
+            }
+
+            if ($isBreakGlassGroupExcluded) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must not be excluded to use Authentication Method $authMethodId"
+                return
+            }
+            if (!$isBreakGlassGroupIncluded) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must be included to use Authentication Method $authMethodId"
                 return
             }
         }

@@ -6,7 +6,7 @@ $AADCABreakGlass = @{
 
     # Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
     #
-    accounts  = @(
+    accounts   = @(
         #:-------------------------------------------------------------------------
         # Primary Break Glass Account to exclude from MOST Conditional Access Policies
         #
@@ -26,9 +26,9 @@ $AADCABreakGlass = @{
             displayName           = "$CompanyName Emergency Admin (Primary)"
             userPrincipalName     = 'admc-emergency911@tenant.onmicrosoft.com'
             authenticationMethods = @(
-                '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today, and required to use TOTP
-                # '#microsoft.graph.fido2AuthenticationMethod'          # Replace softwareOathAuthenticationMethod with FIDO2 for phishing resistant authentication without password
-                '#microsoft.graph.softwareOathAuthenticationMethod'     # Allows a shared secret, e.g. using a password manager with TOTP support, or printout for temporal setup of a TOTP generator app
+                'password'         # Can not be removed as of today, and required to use TOTP
+                # 'fido2'          # Replace softwareOathAuthenticationMethod with FIDO2 for phishing resistant authentication without password
+                'softwareOath'     # Allows a shared secret, e.g. using a password manager with TOTP support, or printout for temporal setup of a TOTP generator app
             )
             directoryRoles        = @(
                 '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
@@ -51,15 +51,15 @@ $AADCABreakGlass = @{
         # Authentication methods for this account are not enforced via CA, but SHOULD be set nevertheless.
         #
         @{
-            id                               = '00000000-0000-0000-0000-000000000000'
-            displayName                      = "$CompanyName Emergency Admin (Backup)"
-            userPrincipalName                = 'admc-emergency912@tenant.onmicrosoft.com'
-            authenticationMethods            = @(
-                '#microsoft.graph.passwordAuthenticationMethod'         # Can not be removed as of today
-                '#microsoft.graph.fido2AuthenticationMethod'            # Use phishing resistant authentication without password
-                # '#microsoft.graph.softwareOathAuthenticationMethod'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
+            id                    = '00000000-0000-0000-0000-000000000000'
+            displayName           = "$CompanyName Emergency Admin (Backup)"
+            userPrincipalName     = 'admc-emergency912@tenant.onmicrosoft.com'
+            authenticationMethods = @(
+                'password'         # Can not be removed as of today
+                'fido2'            # Use phishing resistant authentication without password
+                # 'softwareOath'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
             )
-            directoryRoles                   = @(
+            directoryRoles        = @(
                 '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
                 'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
             )
@@ -75,7 +75,7 @@ $AADCABreakGlass = @{
     # The script will only ensure all break glass accounts are member of this group.
     # The script will also REMOVE any other account from that group.
     #
-    group     = @{
+    group      = @{
         id                 = '00000000-0000-0000-0000-000000000000'
         displayName        = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
         description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
@@ -90,7 +90,7 @@ $AADCABreakGlass = @{
     # The admin unit SHOULD have Management Restrictions enabled.
     # The script might be limited to validate Break Glass with Management Restrictions turned on.
     #
-    adminUnit = @{
+    adminUnit  = @{
         id                           = '00000000-0000-0000-0000-000000000000'
         displayName                  = @($AADCABreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
         description                  = 'Tier0 objects for Break Glass access. DO NOT CHANGE!'
@@ -110,11 +110,13 @@ $AADCABreakGlass = @{
             grantControls          = @{
                 operator               = 'OR'
                 AuthenticationStrength = @{
-                    Id = '00000000-0000-0000-0000-000000000002'   # Built-in Multi-Factor Authentication Strength
+                    Id = '00000000-0000-0000-0000-000000000002'     # Built-in Multi-Factor Authentication Strength
+                    # Id = '00000000-0000-0000-0000-000000000003'   # Built-in Passwordless MFA Strength
+                    # Id = '00000000-0000-0000-0000-000000000004'   # Built-in Phishing Resistant MFA Strength
                 }
             }
             breakGlassIncludeUsers = @( 'group', 'primary' )
-            breakGlassExcludeUsers = @( 'backup' )
+            breakGlassExcludeUsers = @( 'backup' )   # Separate monitor-only CA policy for the backup Break Glass account
         }
         @{
             id                     = '00000000-0000-0000-0000-000000000000'
@@ -122,7 +124,7 @@ $AADCABreakGlass = @{
             description            = 'Monitor Backup Tier0 Break Glass account, but do not protect'
             state                  = 'enabledForReportingButNotEnforced'   # keep this state, it is for monitoring the backup Break Glass account only
             grantControls          = @{
-                operator               = 'OR'
+                operator        = 'OR'
                 builtInControls = @(
                     "mfa"
                 )
