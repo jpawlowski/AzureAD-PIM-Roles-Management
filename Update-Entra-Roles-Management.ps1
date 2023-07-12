@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Implement a Security Tiering Model for Microsoft Entra Privileged Roles using Microsoft Entra Privileged Identity Management.
+    Implement a Security Tiering Model for Microsoft Entra Privileged Roles using Microsoft Entra Privileged ID Management.
 
 .DESCRIPTION
     This script combines the following Microsoft Azure components to harden Privileged Roles in Microsoft Entra:
 
-    * Microsoft Entra Privileged Identity Management (requires Microsoft Entra ID P2 license)
+    * Microsoft Entra Privileged ID Management (requires Microsoft Entra ID P2 license)
     * Microsoft Entra Conditional Access (requires Microsoft Entra ID P1 or P2 license):
         - Authentication Contexts
         - Authentication Strengths

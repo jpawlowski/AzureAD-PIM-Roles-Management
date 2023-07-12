@@ -106,13 +106,13 @@ function Update-Entra-RoleRules {
         $result = 1
         if ($tier -eq 0 -and $Force) {
             Write-Output ''
-            Write-Warning "[Tier $tier] Privileged Identity Management policies can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+            Write-Warning "[Tier $tier] Privileged ID Management policies can NOT be forcably updated in unattended mode: -Force parameter is ignored"
         }
         if ($tier -ne 0 -and $Force) {
             $result = 0
         }
         else {
-            $title = "!!! WARNING: Update [Tier $tier] Privileged Identity Management policies !!!"
+            $title = "!!! WARNING: Update [Tier $tier] Privileged ID Management policies !!!"
             $message = "Do you confirm to update the management policies for a total of $totalCount Microsoft Entra role(s) in Tier ${tier} listed above?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }
