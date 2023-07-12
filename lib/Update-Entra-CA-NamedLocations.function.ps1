@@ -1,6 +1,6 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-function Update-AAD-CA-NamedLocations {
+function Update-Entra-CA-NamedLocations {
     $NamedLocationsTiers = @();
     if ($Tier0) {
         $NamedLocationsTiers += 0
@@ -21,20 +21,20 @@ function Update-AAD-CA-NamedLocations {
         $result = 1
         if ($tier -eq 0 -and $Force) {
             Write-Output ''
-            Write-Warning "[Tier $tier] Azure AD Conditional Access Named Locations can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+            Write-Warning "[Tier $tier] Microsoft Entra Conditional Access Named Locations can NOT be forcably updated in unattended mode: -Force parameter is ignored"
         }
         if ($tier -ne 0 -and $Force) {
             $result = 0
         }
         else {
-            $title = "!!! WARNING: Create and/or update [Tier $tier] Azure AD Conditional Access Named Locations !!!"
-            $message = "Do you confirm to create new or update a total of $($AADCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
+            $title = "!!! WARNING: Create and/or update [Tier $tier] Microsoft Entra Conditional Access Named Locations !!!"
+            $message = "Do you confirm to create new or update a total of $($EntraCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }
         switch ($result) {
             0 {
                 !$Force ? (Write-Output " Yes: Continue with creation or update.") : $null
-                foreach ($namedLocation in $AADCANamedLocations[$tier]) {
+                foreach ($namedLocation in $EntraCANamedLocations[$tier]) {
                     $updateOnly = $false
                     if ($namedLocation.id) {
                         if (

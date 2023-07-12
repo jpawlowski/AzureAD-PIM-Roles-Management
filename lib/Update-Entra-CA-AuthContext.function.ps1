@@ -1,6 +1,6 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-function Update-AAD-CA-AuthContext {
+function Update-Entra-CA-AuthContext {
     $AuthContextTiers = @();
     if ($Tier0) {
         $AuthContextTiers += 0
@@ -19,21 +19,21 @@ function Update-AAD-CA-AuthContext {
         $result = 1
         if ($tier -eq 0 -and $Force) {
             Write-Output ''
-            Write-Warning "[Tier $tier] Azure AD Conditional Access Authentication Contexts can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+            Write-Warning "[Tier $tier] Microsoft Entra Conditional Access Authentication Contexts can NOT be forcably updated in unattended mode: -Force parameter is ignored"
         }
         if ($tier -ne 0 -and $Force) {
             $result = 0
         }
         else {
-            $title = "!!! WARNING: Update [Tier $tier] Azure AD Conditional Access Authentication Contexts !!!"
-            $message = "Do you confirm to update a total of $($AADCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
+            $title = "!!! WARNING: Update [Tier $tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
+            $message = "Do you confirm to update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }
         switch ($result) {
             0 {
                 !$Force ? (Write-Output " Yes: Continue with update.") : $null
-                foreach ($key in $AADCAAuthContexts[$tier].Keys) {
-                    foreach ($authContext in $AADCAAuthContexts[$tier][$key]) {
+                foreach ($key in $EntraCAAuthContexts[$tier].Keys) {
+                    foreach ($authContext in $EntraCAAuthContexts[$tier][$key]) {
                         try {
                             Write-Output "`n[Tier $tier] Updating authentication context class reference $($authContext.id) ($($authContext.displayName))"
                             $null = Update-MgIdentityConditionalAccessAuthenticationContextClassReference `

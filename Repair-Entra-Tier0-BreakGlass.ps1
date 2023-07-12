@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Validates and repairs existing Break Glass accounts, Break Glass group, and Break Glass admin unit for Azure AD
+    Validates and repairs existing Break Glass accounts, Break Glass group, and Break Glass admin unit for Microsoft Entra
 
 .DESCRIPTION
     This script validates Break Glass accounts, the Break Glass group, and their Break Glass admin unit.
@@ -10,7 +10,7 @@
     Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
 
 .PARAMETER TenantId
-    Azure AD tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
+    Microsoft Entra tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
 
 .PARAMETER UseDeviceCode
     Use device code authentication instead of a browser control.
@@ -18,37 +18,27 @@
 .PARAMETER ConfigPath
     Folder path to configuration files in PS1 format. Default: './config/'.
 
-.PARAMETER Force
-    Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited.
-
 .NOTES
-    Filename: Repair-AAD-Tier0-BreakGlass.ps1
+    Filename: Repair-Entra-Tier0-BreakGlass.ps1
     Author: Julian Pawlowski
 #>
 
 #Requires -Version 7.2
 
-[CmdletBinding()]
+[CmdletBinding(
+    SupportsShouldProcess,
+    ConfirmImpact = 'High'
+)]
 Param (
-    [Parameter(HelpMessage = "Azure AD tenant ID.")]
     [string]$TenantId,
-
-    [Parameter(HelpMessage = "Use device code authentication instead of a browser control.")]
     [switch]$UseDeviceCode,
-
-    [Parameter(HelpMessage = "Folder path to configuration files in PS1 format. Default: './config/'.")]
-    [string]$ConfigPath,
-
-    [Parameter(HelpMessage = "Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited. Note that updates of Tier0 settings always requires manual user interaction.")]
-    [switch]$Force
+    [string]$ConfigPath
 )
-
-$ErrorActionPreference = 'Stop'
 
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    'Test-AAD-Tier0-BreakGlass.function.ps1'
+    'Test-Entra-Tier0-BreakGlass.function.ps1'
 )
 foreach ($FileName in $LibFiles) {
     if ($null -eq $FileName -or $FileName -eq '') { continue }
@@ -72,7 +62,5 @@ $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 $MgScopes += 'Directory.Write.Restricted'
 $MgScopes += 'RoleManagement.ReadWrite.Directory'
 
-$ValidateBreakGlass = $true
-
-Connect-MyMgGraph
-Test-AAD-Tier0-BreakGlass $AADCABreakGlass
+Connect-MyMgGraph -Scopes $MgScopes
+Test-Entra-Tier0-BreakGlass $EntraCABreakGlass

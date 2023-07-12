@@ -5,44 +5,53 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
+
+function Test-Entra-Tier0-BreakGlass {
+    [CmdletBinding(
+        SupportsShouldProcess,
+        ConfirmImpact = 'High'
+    )]
+    Param (
+        $EntraCABreakGlass
+    )
+
     $adminUnitObj = $null
 
     if (
-        ($null -ne $AADCABreakGlass.adminUnit.id) -and
-        ($AADCABreakGlass.adminUnit.id -notmatch '^00000000-') -and
-        ($AADCABreakGlass.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ($null -ne $EntraCABreakGlass.adminUnit.id) -and
+        ($EntraCABreakGlass.adminUnit.id -notmatch '^00000000-') -and
+        ($EntraCABreakGlass.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
-        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $AADCABreakGlass.adminUnit.id -ErrorAction SilentlyContinue
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $EntraCABreakGlass.adminUnit.id -ErrorAction SilentlyContinue
     }
     elseif (
-        ($null -ne $AADCABreakGlass.adminUnit.displayName) -and
-        ($AADCABreakGlass.adminUnit.displayName -ne '')
+        ($null -ne $EntraCABreakGlass.adminUnit.displayName) -and
+        ($EntraCABreakGlass.adminUnit.displayName -ne '')
     ) {
-        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($AADCABreakGlass.adminUnit.displayName)'" -ErrorAction SilentlyContinue
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($EntraCABreakGlass.adminUnit.displayName)'" -ErrorAction SilentlyContinue
     }
-    elseif ($null -ne $AADCABreakGlass.adminUnit) {
+    elseif ($null -ne $EntraCABreakGlass.adminUnit) {
         Write-Error 'Defined Break Glass Admin Unit is incomplete'
         return
     }
 
-    if ($null -ne $AADCABreakGlass.adminUnit) {
+    if ($null -ne $EntraCABreakGlass.adminUnit) {
         if ($null -eq $adminUnitObj) {
-            Write-Error "Defined Break Glass Admin Unit $($AADCABreakGlass.adminUnit.id) ($($AADCABreakGlass.adminUnit.displayName)) does not exist"
+            Write-Error "Defined Break Glass Admin Unit $($EntraCABreakGlass.adminUnit.id) ($($EntraCABreakGlass.adminUnit.displayName)) does not exist"
             return
         }
         if (
-            ($null -ne $AADCABreakGlass.adminUnit.visibility) -and
-            ($adminUnitObj.Visibility -ne $AADCABreakGlass.adminUnit.visibility)
+            ($null -ne $EntraCABreakGlass.adminUnit.visibility) -and
+            ($adminUnitObj.Visibility -ne $EntraCABreakGlass.adminUnit.visibility)
         ) {
-            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Visibility must be $($AADCABreakGlass.adminUnit.visibility)"
+            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Visibility must be $($EntraCABreakGlass.adminUnit.visibility)"
             return
         }
         if (
-            ($null -ne $AADCABreakGlass.adminUnit.isMemberManagementRestricted) -and
-            ($adminUnitObj.isMemberManagementRestricted -ne $AADCABreakGlass.adminUnit.isMemberManagementRestricted)
+            ($null -ne $EntraCABreakGlass.adminUnit.isMemberManagementRestricted) -and
+            ($adminUnitObj.isMemberManagementRestricted -ne $EntraCABreakGlass.adminUnit.isMemberManagementRestricted)
         ) {
-            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Restricted Management must be $($AADCABreakGlass.adminUnit.isMemberManagementRestricted)"
+            Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Restricted Management must be $($EntraCABreakGlass.adminUnit.isMemberManagementRestricted)"
             return
         }
         Write-Output "Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)) VALIDATED"
@@ -51,17 +60,17 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
     $groupObj = $null
 
     if (
-        ($null -ne $AADCABreakGlass.group.id) -and
-        ($AADCABreakGlass.group.id -notmatch '^00000000-') -and
-        ($AADCABreakGlass.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ($null -ne $EntraCABreakGlass.group.id) -and
+        ($EntraCABreakGlass.group.id -notmatch '^00000000-') -and
+        ($EntraCABreakGlass.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
-        $groupObj = Get-MgGroup -GroupId $AADCABreakGlass.group.id -ErrorAction SilentlyContinue
+        $groupObj = Get-MgGroup -GroupId $EntraCABreakGlass.group.id -ErrorAction SilentlyContinue
     }
     elseif (
-        ($null -ne $AADCABreakGlass.group.displayName) -and
-        ($AADCABreakGlass.group.displayName -ne '')
+        ($null -ne $EntraCABreakGlass.group.displayName) -and
+        ($EntraCABreakGlass.group.displayName -ne '')
     ) {
-        $groupObj = Get-MgGroup -All -Filter "displayName eq '$($AADCABreakGlass.group.displayName)'" -ErrorAction SilentlyContinue
+        $groupObj = Get-MgGroup -All -Filter "displayName eq '$($EntraCABreakGlass.group.displayName)'" -ErrorAction SilentlyContinue
         Write-Warning "Break Glass Group $($groupObj.displayName): Should use explicit object ID $($groupObj.Id) in configuration"
     }
     else {
@@ -70,80 +79,84 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
     }
 
     if ($null -eq $groupObj) {
-        Write-Error "Defined Break Glass Group $($AADCABreakGlass.group.id) ($($AADCABreakGlass.group.displayName)) does not exist"
+        Write-Error "Defined Break Glass Group $($EntraCABreakGlass.group.id) ($($EntraCABreakGlass.group.displayName)) does not exist"
         return
     }
     if ($groupObj.SecurityEnabled -ne $true) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Must be a security group"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Must be a security group"
         return
     }
     if ($groupObj.MailEnabled -ne $false) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not be mail-enabled"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Can not be mail-enabled"
         return
     }
     if ($groupObj.GroupTypes.Count -ne 0) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not have any specific group type"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Can not have any specific group type"
         return
     }
     if (
         ($null -ne $groupObj.MembershipRuleProcessingState) -or
         ($null -ne $groupObj.MembershipRule)
     ) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Can not have dynamic membership rules"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Can not have dynamic membership rules"
         return
     }
     if (
-        ($AADCABreakGlass.group.isAssignableToRole -eq $true) -and
+        ($EntraCABreakGlass.group.isAssignableToRole -eq $true) -and
         ($groupObj.IsAssignableToRole -ne $true)
     ) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Must be re-created with role-assignment capability enabled"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Must be re-created with role-assignment capability enabled"
         return
     }
     if (
-        ($null -ne $AADCABreakGlass.group.visibility) -and
-        ($AADCABreakGlass.group.visibility -ne $groupObj.visibility)
+        ($null -ne $EntraCABreakGlass.group.visibility) -and
+        ($EntraCABreakGlass.group.visibility -ne $groupObj.visibility)
     ) {
-        Write-Error "Break Glass Group $($AADCABreakGlass.group.id): Visibility must be $($AADCABreakGlass.group.visibility)"
+        Write-Error "Break Glass Group $($EntraCABreakGlass.group.id): Visibility must be $($EntraCABreakGlass.group.visibility)"
         return
     }
     if (
-        ($null -ne $AADCABreakGlass.group.displayName) -and
-        ($groupObj.DisplayName -ne $AADCABreakGlass.group.displayName)
+        ($null -ne $EntraCABreakGlass.group.displayName) -and
+        ($groupObj.DisplayName -ne $EntraCABreakGlass.group.displayName)
     ) {
         if (
             ('Group.ReadWrite.All' -in (Get-MgContext).Scopes) -and
             (
-                ($null -eq $AADCABreakGlass.adminUnit) -or
-                !$AADCABreakGlass.adminUnit.isMemberManagementRestricted -or
+                ($null -eq $EntraCABreakGlass.adminUnit) -or
+                !$EntraCABreakGlass.adminUnit.isMemberManagementRestricted -or
                 'Directory.Write.Restricted' -in (Get-MgContext).Scopes
             )
         ) {
             Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
-            Update-MgGroup -GroupId $groupObj.Id -DisplayName $AADCABreakGlass.group.displayName
-            $groupObj.DisplayName = $AADCABreakGlass.group.displayName
+            if ($PSCmdlet.ShouldProcess($groupObj.Id)) {
+                Update-MgGroup -GroupId $groupObj.Id -DisplayName $EntraCABreakGlass.group.displayName
+                $groupObj.DisplayName = $EntraCABreakGlass.group.displayName
+            }
         }
         else {
-            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current display name does not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current display name does not match configuration. Run Repair-Entra-Tier0-BreakGlass.ps1 to fix."
         }
     }
     if (
-        ($null -ne $AADCABreakGlass.group.description) -and
-        ($groupObj.Description -ne $AADCABreakGlass.group.description)
+        ($null -ne $EntraCABreakGlass.group.description) -and
+        ($groupObj.Description -ne $EntraCABreakGlass.group.description)
     ) {
         if (
             ('Group.ReadWrite.All' -in (Get-MgContext).Scopes) -and
             (
-                ($null -eq $AADCABreakGlass.adminUnit) -or
-                !$AADCABreakGlass.adminUnit.isMemberManagementRestricted -or
+                ($null -eq $EntraCABreakGlass.adminUnit) -or
+                !$EntraCABreakGlass.adminUnit.isMemberManagementRestricted -or
                 'Directory.Write.Restricted' -in (Get-MgContext).Scopes
             )
         ) {
             Write-Information "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
-            Update-MgGroup -GroupId $groupObj.Id -Description $AADCABreakGlass.group.description
-            $groupObj.Description = $AADCABreakGlass.group.description
+            if ($PSCmdlet.ShouldProcess($groupObj.Id)) {
+                Update-MgGroup -GroupId $groupObj.Id -Description $EntraCABreakGlass.group.description
+                $groupObj.Description = $EntraCABreakGlass.group.description
+            }
         }
         else {
-            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current description not match configuration. Run Repair-AAD-Tier0-BreakGlass.ps1 to fix."
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Current description not match configuration. Run Repair-Entra-Tier0-BreakGlass.ps1 to fix."
         }
     }
     #TODO: Block groups that were onboarded to PIM
@@ -152,7 +165,7 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
     $validBreakGlassCount = 0
     $breakGlassAccountIds = @()
 
-    foreach ($account in $AADCABreakGlass.accounts) {
+    foreach ($account in $EntraCABreakGlass.accounts) {
         $userId = $null
         if (
             ($null -ne $account.id) -and
@@ -232,8 +245,10 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
             ($userObj.DisplayName -ne $account.displayName)
         ) {
             Write-Information "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)): Updating display name"
-            Update-MgUser -UserID $userObj.Id -DisplayName $account.displayName
-            $userObj.DisplayName = $account.displayName
+            if ($PSCmdlet.ShouldProcess($userObj.Id)) {
+                Update-MgUser -UserID $userObj.Id -DisplayName $account.displayName
+                $userObj.DisplayName = $account.displayName
+            }
         }
 
         $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction SilentlyContinue
@@ -323,12 +338,12 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
 
         $roleAssignments = Get-MgRoleManagementDirectoryRoleAssignmentSchedule -Filter "PrincipalId eq '$($userObj.Id)'"
         foreach ($RoleDefinitionId in $account.directoryRoles) {
-            $thisRoleAssignments = $roleAssignments | Where-Object -FilterScript {$_.RoleDefinitionId -eq $RoleDefinitionId}
+            $thisRoleAssignments = $roleAssignments | Where-Object -FilterScript { $_.RoleDefinitionId -eq $RoleDefinitionId }
             if ($thisRoleAssignments.Count -lt 1) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): MUST be assigned directory role $RoleDefinitionId"
                 return
             }
-            foreach($roleAssignment in $thisRoleAssignments) {
+            foreach ($roleAssignment in $thisRoleAssignments) {
                 if ('Direct' -ne $roleAssignment.MemberType) {
                     Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST NOT use transitive role assignment via group"
                     return
@@ -348,10 +363,12 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
             }
         }
 
-        $groupMemberOf = Get-MgUserMemberGroup -UserId $userObj.Id -SecurityEnabledOnly:$true
+        $groupMemberOf = Get-MgUserMemberGroup -UserId $userObj.Id -SecurityEnabledOnly:$true -Confirm:$false
         if ($groupObj.Id -notin $groupMemberOf) {
-            New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id
-            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
+            if ($PSCmdlet.ShouldProcess($groupObj.Id)) {
+                Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
+                New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id
+            }
         }
 
         Write-Output "$($validBreakGlassCount + 1). Break Glass Account: $($userObj.Id) ($($userObj.DisplayName)) VALIDATED"
@@ -368,14 +385,14 @@ function Test-AAD-Tier0-BreakGlass($AADCABreakGlass) {
 
     $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id
     foreach ($groupOwner in $groupOwners) {
-        Remove-MgGroupOwnerByRef -GroupId $AADCABreakGlass.group.id -DirectoryObjectId $groupOwner.Id
+        Remove-MgGroupOwnerByRef -GroupId $EntraCABreakGlass.group.id -DirectoryObjectId $groupOwner.Id
         Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed suspicious group owner $($groupOwner.Id)"
     }
 
     $groupMembers = Get-MgGroupMember -GroupId $groupObj.Id
     foreach ($groupMember in $groupMembers) {
         if ($groupMember.Id -notin $breakGlassAccountIds) {
-            Remove-MgGroupMemberByRef -GroupId $AADCABreakGlass.group.id -DirectoryObjectId $groupMember.Id
+            Remove-MgGroupMemberByRef -GroupId $EntraCABreakGlass.group.id -DirectoryObjectId $groupMember.Id
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
         }
     }

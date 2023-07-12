@@ -19,13 +19,13 @@ $MgScopes = @()
 
 $ConfigFiles = @(
     'Environment.config.ps1'
-    'AAD-Tier0-BreakGlass.config.ps1'
-    'AAD-CA-AuthContexts.config.ps1'
-    'AAD-CA-AuthStrengths.config.ps1'
-    'AAD-CA-NamedLocations.config.ps1'
-    'AAD-CA-Policies.config.ps1'
-    'AAD-Role-Classifications.config.ps1'
-    'AAD-Role-ManagementRulesDefaults.config.ps1'
+    'Entra-Tier0-BreakGlass.config.ps1'
+    'Entra-CA-AuthContexts.config.ps1'
+    'Entra-CA-AuthStrengths.config.ps1'
+    'Entra-CA-NamedLocations.config.ps1'
+    'Entra-CA-Policies.config.ps1'
+    'Entra-Role-Classifications.config.ps1'
+    'Entra-Role-ManagementRulesDefaults.config.ps1'
 )
 
 foreach ($ConfigFile in $ConfigFiles) {

@@ -1,6 +1,10 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
 function Connect-MyMgGraph {
+    Param (
+        [string[]]$Scopes
+    )
+
     if (
         ($null -eq $TenantId) -or
         ($TenantId -eq '')
@@ -17,8 +21,8 @@ function Connect-MyMgGraph {
     }
 
     $reauth = $false
-    foreach ($MgScope in $MgScopes) {
-        if ($MgScope -notin @((Get-MgContext).Scopes)) {
+    foreach ($Scope in $Scopes) {
+        if ($Scope -notin @((Get-MgContext).Scopes)) {
             $reauth = $true
         }
     }
@@ -27,13 +31,14 @@ function Connect-MyMgGraph {
         $reauth -or
         ((Get-MgContext).TenantId -ne $TenantId)
     ) {
-        Write-Information "Connecting to tenant $TenantId with scopes: $($MgScopes)"
-        if ($null -eq $UseDeviceCode) { $UseDeviceCode = $false }
-        Connect-MgGraph `
-            -ContextScope Process `
-            -TenantId $TenantId `
-            -Scopes $MgScopes `
-            -UseDeviceCode:$UseDeviceCode
+        $params = @{
+            ContextScope = 'Process'
+            TenantId = $TenantId
+        }
+        if ($Scopes) { $params.Scopes = $Scopes }
+        if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
+        Write-Information "Connecting to tenant $TenantId with scopes: $Scopes"
+        Connect-MgGraph @params
     }
 }
 
@@ -44,10 +49,6 @@ function Test-NonInteractive {
         }
     }
     return $false
-}
-
-if (Test-NonInteractive -and $null -eq $Force) {
-    $Force = $true
 }
 
 function Get-RandomCharacter($length, $characters) {

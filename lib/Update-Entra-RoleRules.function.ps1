@@ -1,7 +1,7 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-function Update-AAD-RoleRules {
+function Update-Entra-RoleRules {
     $PolicyTiers = @();
     if ($Tier0) {
         $PolicyTiers += 0
@@ -19,7 +19,7 @@ function Update-AAD-RoleRules {
     foreach ($tier in $PolicyTiers) {
         $i = 0
         [array]$roleList = @()
-        foreach ($role in $AADRoleClassifications[$tier]) {
+        foreach ($role in $EntraRoleClassifications[$tier]) {
             if (
                 ($null -eq $role.IsBuiltIn) -or
                 ($role.IsBuiltIn -and -not $role.templateId) -or
@@ -31,7 +31,7 @@ function Update-AAD-RoleRules {
                 continue
             }
 
-            if (($AADRoleClassifications[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
+            if (($EntraRoleClassifications[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
                 Write-Output ''
                 Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is defined for this Tier already"
                 continue
@@ -40,7 +40,7 @@ function Update-AAD-RoleRules {
             $previousTier = $tier - 1;
             $duplicate = $false
             do {
-                if (($AADRoleClassifications[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                if (($EntraRoleClassifications[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
                     Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from higher Tier ${previousTier}"
                     $duplicate = $true
@@ -56,7 +56,7 @@ function Update-AAD-RoleRules {
             $nextTier = $tier + 1;
             $duplicate = $false
             do {
-                if (($AADRoleClassifications[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                if (($EntraRoleClassifications[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
                     Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from lower Tier ${nextTier}"
                     $duplicate = $true
@@ -113,7 +113,7 @@ function Update-AAD-RoleRules {
         }
         else {
             $title = "!!! WARNING: Update [Tier $tier] Privileged Identity Management policies !!!"
-            $message = "Do you confirm to update the management policies for a total of $totalCount Azure AD role(s) in Tier ${tier} listed above?"
+            $message = "Do you confirm to update the management policies for a total of $totalCount Microsoft Entra role(s) in Tier ${tier} listed above?"
             $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
         }
         switch ($result) {
@@ -184,7 +184,7 @@ function Update-AAD-RoleRules {
                         $roleDefinition.TemplateId +
                         " ($($roleDefinition.displayName)):"
                     )
-                    foreach ($rolePolicyRuleTemplate in $AADRoleManagementRulesDefaults[$tier]) {
+                    foreach ($rolePolicyRuleTemplate in $EntraRoleManagementRulesDefaults[$tier]) {
                         $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
 
                         if ($role.ContainsKey($rolePolicyRule.Id)) {
@@ -211,7 +211,7 @@ function Update-AAD-RoleRules {
                 }
             }
             1 {
-                Write-Output " No: Skipping management policy rules update for Tier $tier Azure AD Roles."
+                Write-Output " No: Skipping management policy rules update for Tier $tier Microsoft Entra Roles."
             }
             * {
                 Write-Output " Cancel: Aborting command."

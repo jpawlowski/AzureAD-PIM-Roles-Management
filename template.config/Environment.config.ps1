@@ -11,4 +11,4 @@ $DisplayNamePrefix = $null
 $DisplayNameElementSeparator = '-'
 
 # To prefix display names of groups, you may define some kind of namespace
-$AADGroupDisplayNamePrefix = 'CTSO'
+$EntraGroupDisplayNamePrefix = 'CTSO'

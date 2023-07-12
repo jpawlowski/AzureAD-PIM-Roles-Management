@@ -1,31 +1,31 @@
 <#
 .SYNOPSIS
-    Implement a Security Tiering Model for Azure AD Privileged Roles using Azure AD Privileged Identity Management.
+    Implement a Security Tiering Model for Microsoft Entra Privileged Roles using Microsoft Entra Privileged Identity Management.
 
 .DESCRIPTION
-    This script combines the following Microsoft Azure components to harden Privileged Roles in Azure Active Directory:
+    This script combines the following Microsoft Azure components to harden Privileged Roles in Microsoft Entra:
 
-    * Azure AD Privileged Identity Management (AAD PIM; requires Azure AD Premium Plan 2 license)
-    * Azure AD Conditional Access (AAD CA; requires Azure AD Premium Plan 1 or Plan 2 license):
+    * Microsoft Entra Privileged Identity Management (requires Microsoft Entra ID P2 license)
+    * Microsoft Entra Conditional Access (requires Microsoft Entra ID P1 or P2 license):
         - Authentication Contexts
         - Authentication Strengths
         - Conditional Access Policies
-    * Azure AD Administrative Units (AAD AU; requires Azure AD Premium Plan 1 license for admins)
+    * Microsoft Entra Administrative Units (requires Microsoft Entra ID P1 license for admins)
 
 .PARAMETER Roles
-    Use 'All' or only a specified list of Azure AD roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.
+    Use 'All' or only a specified list of Microsoft Entra roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.
 
 .PARAMETER AuthContext
-    Update Azure AD Authentication Contexts.
+    Update Microsoft Entra Authentication Contexts.
 
 .PARAMETER AuthStrength
-    Create or update Azure AD Authentication Strengths.
+    Create or update Microsoft Entra Authentication Strengths.
 
 .PARAMETER NamedLocations
-    Create or update Azure AD Named Locations.
+    Create or update Microsoft Entra Named Locations.
 
 .PARAMETER AdminCAPolicies
-    Create or update Azure AD Conditional Access policies for admins.
+    Create or update Microsoft Entra Conditional Access policies for admins.
 
 .PARAMETER ValidateBreakGlass
     Validate Break Glass Accounts (takes precedence to -NoBreakGlassValidation).
@@ -43,7 +43,7 @@
     Perform changes to Tier2.
 
 .PARAMETER TenantId
-    Azure AD tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
+    Microsoft Entra tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
 
 .PARAMETER UseDeviceCode
     Use device code authentication instead of a browser control.
@@ -51,17 +51,18 @@
 .PARAMETER ConfigPath
     Folder path to configuration files in PS1 format. Default: './config/'.
 
-.PARAMETER Force
-    Run script without user interaction. If PS session was started with -NonInteractive parameter, it will be inherited. Note that updates of Tier0 settings always requires manual user interaction.
-
 .NOTES
-    Filename: Update-AAD-Roles-Management.ps1
+    Filename: Update-Entra-Roles-Management.ps1
     Author: Julian Pawlowski
 #>
 
 #Requires -Version 7.2
 
-[CmdletBinding()]
+[
+    CmdletBinding(
+        SupportsShouldProcess
+    )
+]
 Param (
 
     # Mandatory parameters: at least 1 of 6 needs to be given
@@ -120,21 +121,18 @@ Param (
     [switch]$Tier2,
     [string]$TenantId,
     [switch]$UseDeviceCode,
-    [string]$ConfigPath,
-    [switch]$Force
+    [string]$ConfigPath
 )
-
-$ErrorActionPreference = 'Stop'
 
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    ($AdminCAPolicies -or $ValidateBreakGlass ? 'Test-AAD-Tier0-BreakGlass.function.ps1' : $null)
-    ($Roles ? 'Update-AAD-RoleRules.function.ps1' : $null)
-    ($AuthContext ? 'Update-AAD-CA-AuthContext.function.ps1' : $null)
-    ($AuthStrength ? 'Update-AAD-CA-AuthStrength.function.ps1' : $null)
-    ($NamedLocations ? 'Update-AAD-CA-NamedLocations.function.ps1' : $null)
-    ($AdminCAPolicies ? 'Update-AAD-CA-Policies.function.ps1' : $null)
+    ($AdminCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
+    ($Roles ? 'Update-Entra-RoleRules.function.ps1' : $null)
+    ($AuthContext ? 'Update-Entra-CA-AuthContext.function.ps1' : $null)
+    ($AuthStrength ? 'Update-Entra-CA-AuthStrength.function.ps1' : $null)
+    ($NamedLocations ? 'Update-Entra-CA-NamedLocations.function.ps1' : $null)
+    ($AdminCAPolicies ? 'Update-Entra-CA-Policies.function.ps1' : $null)
 )
 foreach ($FileName in $LibFiles) {
     if ($null -eq $FileName -or $FileName -eq '') { continue }
@@ -150,14 +148,6 @@ foreach ($FileName in $LibFiles) {
     else {
         Throw "File not found: $FilePath"
     }
-}
-
-if ($Force) {
-    Write-Output ''
-    Write-Output 'WARNING: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    Write-Output 'WARNING: ! Processing in unattended mode - BE CAREFUL !'
-    Write-Output 'WARNING: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    Write-Output ''
 }
 
 if ($Roles) {
@@ -183,19 +173,19 @@ if ($CreateAdminUnits) {
     $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 }
 
-Connect-MyMgGraph
+Connect-MyMgGraph -Scopes $MgScopes
 
 if ($NamedLocations) {
-    Update-AAD-CA-NamedLocations
+    Update-Entra-CA-NamedLocations
 }
 if ($AuthStrength) {
-    Update-AAD-CA-AuthStrength
+    Update-Entra-CA-AuthStrength
 }
 if ($AuthContext) {
-    Update-AAD-CA-AuthContext
+    Update-Entra-CA-AuthContext
 }
 if ($UpdateRoleRules) {
-    Update-AAD-RoleRules
+    Update-Entra-RoleRules
 }
 
 if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
@@ -204,11 +194,11 @@ if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
 }
 
 if (!$validBreakGlass -and ($AdminCAPolicies -or $ValidateBreakGlass)) {
-    Test-AAD-Tier0-BreakGlass $AADCABreakGlass
+    Test-Entra-Tier0-BreakGlass $EntraCABreakGlass
 }
 
 if ($validBreakGlass) {
     if ($AdminCAPolicies) {
-        Update-AAD-CA-Policies
+        Update-Entra-CA-Policies
     }
 }
