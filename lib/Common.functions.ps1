@@ -1,6 +1,20 @@
+<#
+.SYNOPSIS
+
+.DESCRIPTION
+
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
+.NOTES
+    Filename: Common.functions.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+#>
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
+
 function Connect-MyMgGraph {
+    [CmdletBinding()]
     Param (
         [string[]]$Scopes
     )
@@ -20,6 +34,8 @@ function Connect-MyMgGraph {
         }
     }
 
+    Write-Debug "Requesting the following scopes for Microsoft Graph PowerShell: `n           $(($MgScopes | Sort-Object | Get-Unique) -join "`n           ")`n"
+
     $reauth = $false
     foreach ($Scope in $Scopes) {
         if ($Scope -notin @((Get-MgContext).Scopes)) {
@@ -31,14 +47,17 @@ function Connect-MyMgGraph {
         $reauth -or
         ((Get-MgContext).TenantId -ne $TenantId)
     ) {
+        Write-Verbose "Re-authentication required"
         $params = @{
             ContextScope = 'Process'
             TenantId = $TenantId
         }
-        if ($Scopes) { $params.Scopes = $Scopes }
+        if ($Scopes) { $params.Scopes = $Scopes | Get-Unique }
         if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
-        Write-Information "Connecting to tenant $TenantId with scopes: $Scopes"
+        Write-Debug "Connecting to Microsoft Graph for tenant $TenantId"
         Connect-MgGraph @params
+    } else {
+        Write-Debug "Using existing connection to Microsoft Graph for tenant $((Get-MgContext).TenantId)"
     }
 }
 

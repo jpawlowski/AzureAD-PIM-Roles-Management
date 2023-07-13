@@ -18,11 +18,13 @@
 .PARAMETER ConfigPath
     Folder path to configuration files in PS1 format. Default: './config/'.
 
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
 .NOTES
     Filename: Repair-Entra-Tier0-BreakGlass.ps1
-    Author: Julian Pawlowski
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
 #>
-
 #Requires -Version 7.2
 
 [CmdletBinding(
@@ -35,32 +37,15 @@ Param (
     [string]$ConfigPath
 )
 
-$LibFiles = @(
-    'Common.functions.ps1'
-    'Load.config.ps1'
-    'Test-Entra-Tier0-BreakGlass.function.ps1'
-)
-foreach ($FileName in $LibFiles) {
-    if ($null -eq $FileName -or $FileName -eq '') { continue }
-    $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
-    if (Test-Path -Path $FilePath -PathType Leaf) {
-        try {
-            . $FilePath
-        }
-        catch {
-            Throw "Error loading file: $_"
-        }
-    }
-    else {
-        Throw "File not found: $FilePath"
-    }
+$LibPath = $(Join-Path $PSScriptRoot 'lib')
+try {
+    . (Join-Path $LibPath 'Common.functions.ps1')
+    . (Join-Path $LibPath 'Load.config.ps1')
+    . (Join-Path $LibPath 'Test-Entra-Tier0-BreakGlass.function.ps1')
+}
+catch {
+    Throw "Error loading file: $_"
 }
 
-$MgScopes += 'User.ReadWrite.All'
-$MgScopes += 'Group.ReadWrite.All'
-$MgScopes += 'AdministrativeUnit.ReadWrite.All'
-$MgScopes += 'Directory.Write.Restricted'
-$MgScopes += 'RoleManagement.ReadWrite.Directory'
-
 Connect-MyMgGraph -Scopes $MgScopes
-Test-Entra-Tier0-BreakGlass $EntraCABreakGlass
+exit Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass -Repair

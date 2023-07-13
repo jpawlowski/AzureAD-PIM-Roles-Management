@@ -1,6 +1,33 @@
+<#
+.SYNOPSIS
+
+.DESCRIPTION
+
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
+.NOTES
+    Filename: Update-Entra-CA-AuthStrength.function.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+#>
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+
+$MgScopes += 'Policy.Read.All'
+$MgScopes += 'Policy.ReadWrite.AuthenticationMethod'
+
 function Update-Entra-CA-AuthStrength {
+    [CmdletBinding(
+        SupportsShouldProcess,
+        ConfirmImpact = 'High'
+    )]
+    Param (
+        [string[]]$Config,
+        [switch]$Tier0,
+        [switch]$Tier1,
+        [switch]$Tier2
+    )
+
     $AuthStrengthTiers = @();
     if ($Tier0) {
         $AuthStrengthTiers += 0

@@ -1,46 +1,67 @@
+<#
+.SYNOPSIS
+
+.DESCRIPTION
+
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
+.NOTES
+    Filename: New-Entra-Tier0-BreakGlass.function.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+#>
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Identity.DirectoryManagement'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+
+$MgScopes += 'AdministrativeUnit.ReadWrite.All'
+$MgScopes += 'Directory.Write.Restricted'
+$MgScopes += 'User.ReadWrite.All'
+$MgScopes += 'Group.ReadWrite.All'
+$MgScopes += 'RoleManagement.ReadWrite.Directory'
+$MgScopes += 'Policy.ReadWrite.ConditionalAccess'
+$MgScopes += 'Application.Read.All'
 
 function New-Entra-Tier0-BreakGlass {
     [CmdletBinding(
         SupportsShouldProcess,
         ConfirmImpact = 'High'
     )]
+    [OutputType([Int])]
     Param (
-        $EntraCABreakGlass
+        [hashtable]$Config
     )
     $adminUnitObj = $null
     $createAdminUnit = $false
 
     if (
-        ($null -ne $EntraCABreakGlass.adminUnit.id) -and
-        ($EntraCABreakGlass.adminUnit.id -notmatch '^00000000-') -and
-        ($EntraCABreakGlass.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ($null -ne $Config.adminUnit.id) -and
+        ($Config.adminUnit.id -notmatch '^00000000-') -and
+        ($Config.adminUnit.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
         $createAdminUnit = $true
-        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $EntraCABreakGlass.adminUnit.id -ErrorAction SilentlyContinue
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -AdministrativeUnitId $Config.adminUnit.id -ErrorAction Stop
     }
     elseif (
-        ($null -ne $EntraCABreakGlass.adminUnit.displayName) -and
-        ($EntraCABreakGlass.adminUnit.displayName -ne '')
+        ($null -ne $Config.adminUnit.displayName) -and
+        ($Config.adminUnit.displayName -ne '')
     ) {
         $createAdminUnit = $true
-        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($EntraCABreakGlass.adminUnit.displayName)'" -ErrorAction SilentlyContinue
+        $adminUnitObj = Get-MgBetaDirectoryAdministrativeUnit -All -Filter "displayName eq '$($Config.adminUnit.displayName)'" -ErrorAction Stop
     }
 
     if ($null -ne $adminUnitObj) {
-        Write-Information "Found existing Break Glass Administrative Unit :  $($adminUnitObj.displayName)"
+        Write-Verbose "Found existing Break Glass Administrative Unit :  $($adminUnitObj.displayName)"
     }
     elseif ($createAdminUnit) {
-        $EntraCABreakGlass['adminUnit'].Remove('id')
+        $Config['adminUnit'].Remove('id')
         if ($PSCmdlet.ShouldProcess(
-                "Create new Administrative Unit '$($EntraCABreakGlass.adminUnit.displayName)' to consolidate Break Glass objects",
+                "Create new Administrative Unit '$($Config.adminUnit.displayName)' to consolidate Break Glass objects",
                 'Confirm creation of Administrative Unit?',
-                "Administrative Unit: $($EntraCABreakGlass.adminUnit.displayName)"
+                "Administrative Unit: $($Config.adminUnit.displayName)"
             )) {
-            $adminUnitObj = New-MgBetaDirectoryAdministrativeUnit -BodyParameter $EntraCABreakGlass.adminUnit -ErrorAction Stop -Confirm:$false
+            $adminUnitObj = New-MgBetaDirectoryAdministrativeUnit -BodyParameter $Config.adminUnit -ErrorAction Stop -Confirm:$false
             Write-Output "Created new Break Glass Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
         }
     }
@@ -48,37 +69,37 @@ function New-Entra-Tier0-BreakGlass {
     $groupObj = $null
 
     if (
-        ($null -ne $EntraCABreakGlass.group.id) -and
-        ($EntraCABreakGlass.group.id -notmatch '^00000000-') -and
-        ($EntraCABreakGlass.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ($null -ne $Config.group.id) -and
+        ($Config.group.id -notmatch '^00000000-') -and
+        ($Config.group.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
     ) {
-        $groupObj = Get-MgGroup -GroupId $EntraCABreakGlass.group.id -ErrorAction SilentlyContinue
+        $groupObj = Get-MgGroup -GroupId $Config.group.id -ErrorAction Stop
     }
     elseif (
-        ($null -ne $EntraCABreakGlass.group.displayName) -and
-        ($EntraCABreakGlass.group.displayName -ne '')
+        ($null -ne $Config.group.displayName) -and
+        ($Config.group.displayName -ne '')
     ) {
-        $groupObj = Get-MgGroup -All -Filter "displayName eq '$($EntraCABreakGlass.group.displayName)'"
+        $groupObj = Get-MgGroup -All -Filter "displayName eq '$($Config.group.displayName)'" -ErrorAction Stop
     }
     else {
         Write-Error 'Defined Break Glass Group is incomplete'
-        return
+        return 1
     }
 
     if ($null -eq $groupObj) {
         if ($PSCmdlet.ShouldProcess(
-                "Create new Break Glass Group '$($EntraCABreakGlass.group.displayName)' for Break Glass accounts",
+                "Create new Break Glass Group '$($Config.group.displayName)' for Break Glass accounts",
                 'Confirm creation of Break Glass Group?',
-                "Break Glass Group: $($EntraCABreakGlass.group.displayName)"
+                "Break Glass Group: $($Config.group.displayName)"
             )) {
             $groupObj = New-MgGroup `
                 -SecurityEnabled `
-                -Visibility $EntraCABreakGlass.group.visibility `
-                -IsAssignableToRole:$EntraCABreakGlass.group.isAssignableToRole `
+                -Visibility $Config.group.visibility `
+                -IsAssignableToRole:$Config.group.isAssignableToRole `
                 -MailEnabled:$false `
                 -MailNickname $((Get-RandomPassword -lowerChars 3 -upperChars 3 -numbers 2 -symbols 0) + '-f') `
-                -DisplayName $EntraCABreakGlass.group.displayName `
-                -Description $EntraCABreakGlass.group.description `
+                -DisplayName $Config.group.displayName `
+                -Description $Config.group.description `
                 -ErrorAction Stop `
                 -Confirm:$false
             Write-Output "Created new Break Glass Group: '$($groupObj.displayName)' ($($groupObj.Id))"
@@ -92,13 +113,13 @@ function New-Entra-Tier0-BreakGlass {
         }
     }
     else {
-        Write-Information "Found existing Break Glass Group               :  $($groupObj.displayName)"
+        Write-Verbose "Found existing Break Glass Group               :  $($groupObj.displayName)"
     }
-    $EntraCABreakGlass.group.id = $groupObj.Id
+    $Config.group.id = $groupObj.Id
 
     $validBreakGlassCount = 0
 
-    foreach ($account in $EntraCABreakGlass.accounts) {
+    foreach ($account in $Config.accounts) {
         $userId = $null
         if (
             ($null -ne $account.id) -and
@@ -117,9 +138,9 @@ function New-Entra-Tier0-BreakGlass {
         }
         else {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account is incomplete"
-            return
+            return 1
         }
-        $userObj = Get-MgUser -UserId $userId -ErrorAction SilentlyContinue
+        $userObj = Get-MgUser -UserId $userId -ErrorAction Stop
 
         if ($null -eq $userObj) {
             if ($PSCmdlet.ShouldProcess(
@@ -183,13 +204,13 @@ function New-Entra-Tier0-BreakGlass {
             }
         }
         else {
-            Write-Information "Found existing Break Glass Account             :  $($userObj.UserPrincipalName)"
+            Write-Verbose "Found existing Break Glass Account             :  $($userObj.UserPrincipalName)"
         }
         $account.id = $userObj.Id
         $validBreakGlassCount++
     }
 
-    foreach ($caPolicy in $EntraCABreakGlass.caPolicies) {
+    foreach ($caPolicy in $Config.caPolicies) {
         $caPolicyObj = $null
         $createCaPolicy = $false
 
@@ -199,18 +220,18 @@ function New-Entra-Tier0-BreakGlass {
             ($caPolicy.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
         ) {
             $createCaPolicy = $true
-            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $caPolicy.id -ErrorAction SilentlyContinue
+            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $caPolicy.id -ErrorAction Stop
         }
         elseif (
             ($null -ne $caPolicy.displayName) -and
             ($caPolicy.displayName -ne '')
         ) {
             $createCaPolicy = $true
-            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($caPolicy.displayName)'" -ErrorAction SilentlyContinue
+            $caPolicyObj = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($caPolicy.displayName)'" -ErrorAction Stop
         }
 
         if ($null -ne $caPolicyObj) {
-            Write-Information "Found existing Break Glass Microsoft Entra CA Policy  :  $($caPolicyObj.displayName)"
+            Write-Verbose "Found existing Break Glass CA Policy           :  $($caPolicyObj.displayName)"
         }
         elseif ($createCaPolicy) {
             $caPolicy.Remove('id')
@@ -233,10 +254,10 @@ function New-Entra-Tier0-BreakGlass {
                         $caPolicy.conditions.users.includeGroups = @($groupObj.Id)
                     }
                     elseif ($item -eq 'primary') {
-                        $caPolicy.conditions.users.includeUsers += $EntraCABreakGlass.accounts[0].id
+                        $caPolicy.conditions.users.includeUsers += $Config.accounts[0].id
                     }
                     elseif ($item -eq 'backup') {
-                        $caPolicy.conditions.users.includeUsers += $EntraCABreakGlass.accounts[1].id
+                        $caPolicy.conditions.users.includeUsers += $Config.accounts[1].id
                     }
                 }
                 $caPolicy.Remove('breakGlassIncludeUsers')
@@ -247,10 +268,10 @@ function New-Entra-Tier0-BreakGlass {
                         $caPolicy.conditions.users.excludeGroups = @($groupObj.Id)
                     }
                     elseif ($item -eq 'primary') {
-                        $caPolicy.conditions.users.excludeUsers += $EntraCABreakGlass.accounts[0].id
+                        $caPolicy.conditions.users.excludeUsers += $Config.accounts[0].id
                     }
                     elseif ($item -eq 'backup') {
-                        $caPolicy.conditions.users.excludeUsers += $EntraCABreakGlass.accounts[1].id
+                        $caPolicy.conditions.users.excludeUsers += $Config.accounts[1].id
                     }
                 }
                 $caPolicy.Remove('breakGlassExcludeUsers')
@@ -266,4 +287,6 @@ function New-Entra-Tier0-BreakGlass {
             }
         }
     }
+
+    return 0
 }

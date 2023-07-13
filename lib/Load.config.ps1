@@ -1,4 +1,17 @@
+<#
+.SYNOPSIS
+
+.DESCRIPTION
+
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
+.NOTES
+    Filename: Load.config.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+#>
 #Requires -Version 7.2
+
 if (
     ($null -eq $ConfigPath) -or
     ($ConfigPath -eq '')
@@ -9,11 +22,6 @@ if (
 if (!(Test-Path -Path $ConfigPath -PathType Container)) {
     Throw "Configuration folder $ConfigPath does not exist. Make a copy of the 'template.config' folder to begin, or use the -ConfigPath parameter."
 }
-
-$yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Description."
-$no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Description."
-$cancel = New-Object System.Management.Automation.Host.ChoiceDescription "&Cancel", "Description."
-$choices = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
 
 $MgScopes = @()
 

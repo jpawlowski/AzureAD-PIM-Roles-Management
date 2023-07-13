@@ -51,11 +51,13 @@
 .PARAMETER ConfigPath
     Folder path to configuration files in PS1 format. Default: './config/'.
 
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
 .NOTES
     Filename: Update-Entra-Roles-Management.ps1
-    Author: Julian Pawlowski
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
 #>
-
 #Requires -Version 7.2
 
 [
@@ -150,55 +152,48 @@ foreach ($FileName in $LibFiles) {
     }
 }
 
-if ($Roles) {
-    $MgScopes += 'RoleManagement.ReadWrite.Directory'
-}
-if ($AuthContext) {
-    $MgScopes += "AuthenticationContext.ReadWrite.All"
-}
-if ($NamedLocations -or $AuthStrength -or $AdminCAPolicies) {
-    $MgScopes += 'Policy.Read.All'
-    $MgScopes += 'Policy.ReadWrite.AuthenticationMethod'
-    $MgScopes += 'Policy.ReadWrite.ConditionalAccess'
-    $MgScopes += 'Application.Read.All'
-}
-if ($AdminCAPolicies -or $ValidateBreakGlass) {
-    $MgScopes += 'User.Read.All'
-    $MgScopes += 'Group.Read.All'
-    $MgScopes += 'AdministrativeUnit.Read.All'
-    $MgScopes += 'RoleManagement.Read.Directory'
-    $MgScopes += 'UserAuthenticationMethod.Read.All'
-}
-if ($CreateAdminUnits) {
-    $MgScopes += 'AdministrativeUnit.ReadWrite.All'
-}
+try {
+    Connect-MyMgGraph -Scopes $MgScopes
 
-Connect-MyMgGraph -Scopes $MgScopes
+    $params = @{}
+    if ($Tier0) { $params.Tier0 = $Tier0 }
+    if ($Tier1) { $params.Tier1 = $Tier1 }
+    if ($Tier2) { $params.Tier2 = $Tier2 }
 
-if ($NamedLocations) {
-    Update-Entra-CA-NamedLocations
-}
-if ($AuthStrength) {
-    Update-Entra-CA-AuthStrength
-}
-if ($AuthContext) {
-    Update-Entra-CA-AuthContext
-}
-if ($UpdateRoleRules) {
-    Update-Entra-RoleRules
-}
+    if ($NamedLocations) {
+        $params.Config = $EntraCANamedLocations
+        $null = Update-Entra-CA-NamedLocations @params
+    }
+    if ($AuthStrength) {
+        $params.Config = $EntraCAAuthStrengths
+        $null = Update-Entra-CA-AuthStrength @params
+    }
+    if ($AuthContext) {
+        $params.Config = $EntraCAAuthContexts
+        $null = Update-Entra-CA-AuthContext @params
+    }
+    if ($UpdateRoleRules) {
+        $params.Config = $EntraRoleClassifications
+        $params.DefaultConfig = $EntraRoleManagementRulesDefaults
+        $null = Update-Entra-RoleRules @params
+        $params.Remove('DefaultConfig')
+    }
 
-if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
-    Write-Warning "Break Glass Account validation SKIPPED"
-    $validBreakGlass = $true
-}
+    if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
+        Write-Warning "Break Glass Account validation SKIPPED"
+    } elseif ($AdminCAPolicies -or $ValidateBreakGlass) {
+        $null = Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
+    }
 
-if (!$validBreakGlass -and ($AdminCAPolicies -or $ValidateBreakGlass)) {
-    Test-Entra-Tier0-BreakGlass $EntraCABreakGlass
-}
-
-if ($validBreakGlass) {
     if ($AdminCAPolicies) {
-        Update-Entra-CA-Policies
+        $params.Remove('Config')
+        $params.ConfigPath = (Join-Path $ConfigPath $EntraCAPoliciesSubfolder)
+        $null = Update-Entra-CA-Policies @params
     }
 }
+catch {
+    Write-Error $_
+    exit 1
+}
+
+exit 0

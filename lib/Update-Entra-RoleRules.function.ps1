@@ -1,7 +1,34 @@
+<#
+.SYNOPSIS
+
+.DESCRIPTION
+
+.LINK
+    https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
+
+.NOTES
+    Filename: Update-Entra-RoleRules.function.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+#>
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+
+$MgScopes += 'RoleManagement.ReadWrite.Directory'
+
 function Update-Entra-RoleRules {
+    [CmdletBinding(
+        SupportsShouldProcess,
+        ConfirmImpact = 'High'
+    )]
+    Param (
+        [string[]]$Config,
+        [string[]]$DefaultConfig,
+        [switch]$Tier0,
+        [switch]$Tier1,
+        [switch]$Tier2
+    )
+
     $PolicyTiers = @();
     if ($Tier0) {
         $PolicyTiers += 0
@@ -19,7 +46,7 @@ function Update-Entra-RoleRules {
     foreach ($tier in $PolicyTiers) {
         $i = 0
         [array]$roleList = @()
-        foreach ($role in $EntraRoleClassifications[$tier]) {
+        foreach ($role in $Config[$tier]) {
             if (
                 ($null -eq $role.IsBuiltIn) -or
                 ($role.IsBuiltIn -and -not $role.templateId) -or
@@ -31,7 +58,7 @@ function Update-Entra-RoleRules {
                 continue
             }
 
-            if (($EntraRoleClassifications[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
+            if (($Config[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
                 Write-Output ''
                 Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is defined for this Tier already"
                 continue
@@ -40,7 +67,7 @@ function Update-Entra-RoleRules {
             $previousTier = $tier - 1;
             $duplicate = $false
             do {
-                if (($EntraRoleClassifications[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                if (($Config[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
                     Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from higher Tier ${previousTier}"
                     $duplicate = $true
@@ -56,7 +83,7 @@ function Update-Entra-RoleRules {
             $nextTier = $tier + 1;
             $duplicate = $false
             do {
-                if (($EntraRoleClassifications[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
+                if (($Config[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
                     Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from lower Tier ${nextTier}"
                     $duplicate = $true
@@ -184,7 +211,7 @@ function Update-Entra-RoleRules {
                         $roleDefinition.TemplateId +
                         " ($($roleDefinition.displayName)):"
                     )
-                    foreach ($rolePolicyRuleTemplate in $EntraRoleManagementRulesDefaults[$tier]) {
+                    foreach ($rolePolicyRuleTemplate in $DefaultConfig[$tier]) {
                         $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
 
                         if ($role.ContainsKey($rolePolicyRule.Id)) {
