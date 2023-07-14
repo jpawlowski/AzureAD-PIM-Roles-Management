@@ -85,7 +85,7 @@ function Test-Entra-Tier0-BreakGlass {
     Write-Verbose "Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)) VALIDATED"
 
     $params = @{
-        Activity         = 'Break Glass Check'
+        Activity         = 'Break Glass Validation'
         Status           = " 25% Complete: User Group"
         PercentComplete  = 25
         CurrentOperation = 'BreakGlassCheck'
@@ -196,7 +196,7 @@ function Test-Entra-Tier0-BreakGlass {
     Write-Verbose "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
 
     $params = @{
-        Activity         = 'Break Glass Check'
+        Activity         = 'Break Glass Validation'
         Status           = " 50% Complete: User Accounts"
         PercentComplete  = 50
         CurrentOperation = 'BreakGlassCheck'
@@ -423,7 +423,7 @@ function Test-Entra-Tier0-BreakGlass {
     }
 
     $params = @{
-        Activity         = 'Break Glass Check'
+        Activity         = 'Break Glass Validation'
         Status           = " 75% Complete: Remove suspicious owners and unexpected members from User Group"
         PercentComplete  = 75
         CurrentOperation = 'BreakGlassCheck'
@@ -445,7 +445,7 @@ function Test-Entra-Tier0-BreakGlass {
     }
 
     $params = @{
-        Activity         = 'Break Glass Check'
+        Activity         = 'Break Glass Validation'
         Status           = " 100% Complete"
         PercentComplete  = 100
         CurrentOperation = 'BreakGlassCheck'
