@@ -32,6 +32,15 @@ function New-Entra-Tier0-BreakGlass {
     Param (
         [hashtable]$Config
     )
+
+    $params = @{
+        Activity         = 'Break Glass Creation'
+        Status           = " 0% Complete: Administrative Unit"
+        PercentComplete  = 0
+        CurrentOperation = 'BreakGlassCreation'
+    }
+    Write-Progress @params
+
     $adminUnitObj = $null
     $createAdminUnit = $false
 
@@ -65,6 +74,14 @@ function New-Entra-Tier0-BreakGlass {
             Write-Output "Created new Break Glass Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
         }
     }
+
+    $params = @{
+        Activity         = 'Break Glass Creation'
+        Status           = " 25% Complete: User Group"
+        PercentComplete  = 25
+        CurrentOperation = 'BreakGlassCreation'
+    }
+    Write-Progress @params
 
     $groupObj = $null
 
@@ -116,6 +133,14 @@ function New-Entra-Tier0-BreakGlass {
         Write-Verbose "Found existing Break Glass Group               :  $($groupObj.displayName)"
     }
     $Config.group.id = $groupObj.Id
+
+    $params = @{
+        Activity         = 'Break Glass Creation'
+        Status           = " 50% Complete: User Accounts"
+        PercentComplete  = 50
+        CurrentOperation = 'BreakGlassCreation'
+    }
+    Write-Progress @params
 
     $validBreakGlassCount = 0
 
@@ -210,6 +235,14 @@ function New-Entra-Tier0-BreakGlass {
         $validBreakGlassCount++
     }
 
+    $params = @{
+        Activity         = 'Break Glass Creation'
+        Status           = " 75% Complete: Conditional Access Policies"
+        PercentComplete  = 75
+        CurrentOperation = 'BreakGlassCreation'
+    }
+    Write-Progress @params
+
     foreach ($caPolicy in $Config.caPolicies) {
         $caPolicyObj = $null
         $createCaPolicy = $false
@@ -287,4 +320,12 @@ function New-Entra-Tier0-BreakGlass {
             }
         }
     }
+
+    $params = @{
+        Activity         = 'Break Glass Creation'
+        Status           = " 100% Complete"
+        PercentComplete  = 100
+        CurrentOperation = 'BreakGlassCreation'
+    }
+    Write-Progress @params
 }
