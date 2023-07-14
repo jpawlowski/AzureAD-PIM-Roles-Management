@@ -36,6 +36,14 @@ function Test-Entra-Tier0-BreakGlass {
         [switch]$Repair
     )
 
+    $params = @{
+        Activity         = 'Break Glass Validation'
+        Status           = " 0% Complete: Administrative Unit"
+        PercentComplete  = 0
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
+
     $adminUnitObj = $null
 
     if (
@@ -75,6 +83,14 @@ function Test-Entra-Tier0-BreakGlass {
         return
     }
     Write-Verbose "Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)) VALIDATED"
+
+    $params = @{
+        Activity         = 'Break Glass Check'
+        Status           = " 25% Complete: User Group"
+        PercentComplete  = 25
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
 
     $groupObj = $null
 
@@ -178,6 +194,14 @@ function Test-Entra-Tier0-BreakGlass {
     }
     #TODO: Block role-enabled groups that were onboarded/registered to PIM
     Write-Verbose "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)) VALIDATED"
+
+    $params = @{
+        Activity         = 'Break Glass Check'
+        Status           = " 50% Complete: User Accounts"
+        PercentComplete  = 50
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
 
     $validBreakGlassCount = 0
     $breakGlassAccountIds = @()
@@ -398,7 +422,13 @@ function Test-Entra-Tier0-BreakGlass {
         return
     }
 
-    $validBreakGlass = $true
+    $params = @{
+        Activity         = 'Break Glass Check'
+        Status           = " 75% Complete: Remove suspicious owners and unexpected members from User Group"
+        PercentComplete  = 75
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
 
     $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id -ErrorAction Stop
     foreach ($groupOwner in $groupOwners) {
@@ -413,4 +443,13 @@ function Test-Entra-Tier0-BreakGlass {
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
         }
     }
+
+    $params = @{
+        Activity         = 'Break Glass Check'
+        Status           = " 100% Complete"
+        PercentComplete  = 100
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
+    Start-Sleep -Milliseconds 25
 }

@@ -130,7 +130,7 @@ try {
     }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
-        Write-Warning "Break Glass Account validation SKIPPED"
+        Write-Warning "Break Glass Validation SKIPPED"
     } elseif ($Roles -or $AdminCAPolicies -or $ValidateBreakGlass) {
         Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
     }

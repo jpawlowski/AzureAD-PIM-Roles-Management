@@ -261,10 +261,12 @@ function Update-Entra-RoleRules {
                     Start-Sleep -Milliseconds 25
                 }
 
+                Start-Sleep -Milliseconds 25
                 $i++
             }
         }
 
+        Start-Sleep -Milliseconds 25
         $k++
     }
 }
