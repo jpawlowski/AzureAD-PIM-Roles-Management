@@ -268,37 +268,3 @@ function Update-Entra-RoleRules {
         $k++
     }
 }
-
-$UpdateRoleRules = $false
-$RoleTemplateIDsWhitelist = @();
-$RoleNamesWhitelist = @();
-if (
-    ($Roles.Count -eq 1) -and
-    ($Roles[0].GetType().Name -eq 'String') -and
-    ($Roles[0] -eq 'All')
-) {
-    $UpdateRoleRules = $true
-}
-else {
-    foreach ($role in $Roles) {
-        if ($role.GetType().Name -eq 'String') {
-            if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
-                $RoleTemplateIDsWhitelist += $role
-            }
-            else {
-                $RoleNamesWhitelist += $role
-            }
-            $UpdateRoleRules = $true
-        }
-        elseif ($role.GetType().Name -eq 'Hashtable') {
-            if ($role.TemplateId) {
-                $RoleTemplateIDsWhitelist += $role.TemplateId
-                $UpdateRoleRules = $true
-            }
-            elseif ($role.displayName) {
-                $RoleNamesWhitelist += $role.displayName
-                $UpdateRoleRules = $true
-            }
-        }
-    }
-}

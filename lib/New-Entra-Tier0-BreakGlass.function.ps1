@@ -83,7 +83,7 @@ function New-Entra-Tier0-BreakGlass {
     }
     else {
         Write-Error 'Defined Break Glass Group is incomplete'
-        return 1
+        return
     }
 
     if ($null -eq $groupObj) {
@@ -138,7 +138,7 @@ function New-Entra-Tier0-BreakGlass {
         }
         else {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account is incomplete"
-            return 1
+            return
         }
         $userObj = Get-MgUser -UserId $userId -ErrorAction Stop
 
@@ -287,6 +287,4 @@ function New-Entra-Tier0-BreakGlass {
             }
         }
     }
-
-    return 0
 }

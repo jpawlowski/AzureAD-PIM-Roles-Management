@@ -66,58 +66,13 @@
     )
 ]
 Param (
-
-    # Mandatory parameters: at least 1 of 6 needs to be given
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption1")]
-    [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption2")]
-    [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption3")]
-    [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption4")]
-    [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption5")]
-    [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption6")]
     [string[]]$Roles,
-
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption2")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption3")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption4")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption5")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption6")]
     [switch]$AuthContext,
-
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption2")]
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption3")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption4")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption5")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption6")]
     [switch]$AuthStrength,
-
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption2")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption3")]
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption4")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption5")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption6")]
     [switch]$NamedLocations,
-
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption2")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption3")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption4")]
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption5")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption6")]
     [switch]$AdminCAPolicies,
-
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption2")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption3")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption4")]
-    [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption5")]
-    [Parameter(Mandatory, ParameterSetName = "AtLeastOption6")]
     [switch]$ValidateBreakGlass,
-
-    # Optional parameters
-    [switch]$SkipBreakGlassValidation = $false,
+    [switch]$SkipBreakGlassValidation,
     [switch]$Tier0,
     [switch]$Tier1,
     [switch]$Tier2,
@@ -129,7 +84,7 @@ Param (
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    ($AdminCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
+    ($Roles -or $AdminCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
     ($Roles ? 'Update-Entra-RoleRules.function.ps1' : $null)
     ($AuthContext ? 'Update-Entra-CA-AuthContext.function.ps1' : $null)
     ($AuthStrength ? 'Update-Entra-CA-AuthStrength.function.ps1' : $null)
@@ -141,6 +96,7 @@ foreach ($FileName in $LibFiles) {
     $FilePath = Join-Path $(Join-Path $PSScriptRoot 'lib') $FileName
     if (Test-Path -Path $FilePath -PathType Leaf) {
         try {
+            Write-Debug "Loading file $FilePath"
             . $FilePath
         }
         catch {
@@ -172,19 +128,56 @@ try {
         $params.Config = $EntraCAAuthContexts
         Update-Entra-CA-AuthContext @params
     }
-    if ($UpdateRoleRules) {
-        $params.Config = $EntraRoleClassifications
-        $params.DefaultConfig = $EntraRoleManagementRulesDefaults
-        if ($RoleTemplateIDsWhitelist) { $params.Id = $RoleTemplateIDsWhitelist }
-        if ($RoleNamesWhitelist) { $params.Name = $RoleNamesWhitelist }
-        Update-Entra-RoleRules @params
-        $params.Remove('DefaultConfig')
-    }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Account validation SKIPPED"
-    } elseif ($AdminCAPolicies -or $ValidateBreakGlass) {
+    } elseif ($Roles -or $AdminCAPolicies -or $ValidateBreakGlass) {
         Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
+    }
+
+    if ($Roles) {
+        $UpdateRoleRules = $false
+        $RoleTemplateIDsWhitelist = @();
+        $RoleNamesWhitelist = @();
+        if (
+            ($Roles.count -eq 1) -and
+            ($Roles[0].GetType().Name -eq 'String') -and
+            ($Roles[0] -eq 'All')
+        ) {
+            $UpdateRoleRules = $true
+        }
+        else {
+            foreach ($role in $Roles) {
+                if ($role.GetType().Name -eq 'String') {
+                    if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                        $RoleTemplateIDsWhitelist += $role
+                    }
+                    else {
+                        $RoleNamesWhitelist += $role
+                    }
+                    $UpdateRoleRules = $true
+                }
+                elseif ($role.GetType().Name -eq 'Hashtable') {
+                    if ($role.TemplateId) {
+                        $RoleTemplateIDsWhitelist += $role.TemplateId
+                        $UpdateRoleRules = $true
+                    }
+                    elseif ($role.displayName) {
+                        $RoleNamesWhitelist += $role.displayName
+                        $UpdateRoleRules = $true
+                    }
+                }
+            }
+        }
+
+        if ($UpdateRoleRules) {
+            $params.Config = $EntraRoleClassifications
+            $params.DefaultConfig = $EntraRoleManagementRulesDefaults
+            if ($RoleTemplateIDsWhitelist) { $params.Id = $RoleTemplateIDsWhitelist }
+            if ($RoleNamesWhitelist) { $params.Name = $RoleNamesWhitelist }
+            Update-Entra-RoleRules @params
+            $params.Remove('DefaultConfig')
+        }
     }
 
     if ($AdminCAPolicies) {

@@ -53,26 +53,26 @@ function Test-Entra-Tier0-BreakGlass {
     }
     elseif ($null -ne $Config.adminUnit) {
         Write-Error 'Defined Break Glass Admin Unit is incomplete'
-        return 1
+        return
     }
 
     if ($null -eq $adminUnitObj) {
         Write-Error "Defined Break Glass Admin Unit $($Config.adminUnit.id) ($($Config.adminUnit.displayName)) does not exist"
-        return 1
+        return
     }
     if (
         ($null -ne $Config.adminUnit.visibility) -and
         ($adminUnitObj.Visibility -ne $Config.adminUnit.visibility)
     ) {
         Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Visibility must be $($Config.adminUnit.visibility)"
-        return 1
+        return
     }
     if (
         ($null -ne $Config.adminUnit.isMemberManagementRestricted) -and
         ($adminUnitObj.isMemberManagementRestricted -ne $Config.adminUnit.isMemberManagementRestricted)
     ) {
         Write-Error "Break Glass Admin Unit $($adminUnitObj.id): Restricted Management must be $($Config.adminUnit.isMemberManagementRestricted)"
-        return 1
+        return
     }
     Write-Verbose "Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)) VALIDATED"
 
@@ -94,45 +94,45 @@ function Test-Entra-Tier0-BreakGlass {
     }
     else {
         Write-Error 'Defined Break Glass Group is incomplete'
-        return 1
+        return
     }
 
     if ($null -eq $groupObj) {
         Write-Error "Defined Break Glass Group $($Config.group.id) ($($Config.group.displayName)) does not exist"
-        return 1
+        return
     }
     if ($groupObj.SecurityEnabled -ne $true) {
         Write-Error "Break Glass Group $($Config.group.id): Must be a security group"
-        return 1
+        return
     }
     if ($groupObj.MailEnabled -ne $false) {
         Write-Error "Break Glass Group $($Config.group.id): Can not be mail-enabled"
-        return 1
+        return
     }
     if ($groupObj.GroupTypes.Count -ne 0) {
         Write-Error "Break Glass Group $($Config.group.id): Can not have any specific group type"
-        return 1
+        return
     }
     if (
         ($null -ne $groupObj.MembershipRuleProcessingState) -or
         ($null -ne $groupObj.MembershipRule)
     ) {
         Write-Error "Break Glass Group $($Config.group.id): Can not have dynamic membership rules"
-        return 1
+        return
     }
     if (
         ($Config.group.isAssignableToRole -eq $true) -and
         ($groupObj.IsAssignableToRole -ne $true)
     ) {
         Write-Error "Break Glass Group $($Config.group.id): Must be re-created with role-assignment capability enabled"
-        return 1
+        return
     }
     if (
         ($null -ne $Config.group.visibility) -and
         ($Config.group.visibility -ne $groupObj.visibility)
     ) {
         Write-Error "Break Glass Group $($Config.group.id): Visibility must be $($Config.group.visibility)"
-        return 1
+        return
     }
     if (
         ($null -ne $Config.group.displayName) -and
@@ -202,32 +202,32 @@ function Test-Entra-Tier0-BreakGlass {
         }
         else {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account is incomplete"
-            return 1
+            return
         }
         $userObj = Get-MgUser -UserId $userId -Property Id, UserPrincipalName, IsResourceAccount, UserType, ExternalUserState, OnPremisesSyncEnabled, CreatedDateTime, DeletedDateTime, AccountEnabled, PasswordProfile, LastPasswordChangeDateTime, Authentication, DisplayName -ErrorAction Stop
 
         if ($null -eq $userObj) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $userId does not exist"
-            return 1
+            return
         }
         if ($userObj.userPrincipalName -ne $account.userPrincipalName) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): User Principal Name does not match expected value '$($account.userPrincipalName)'"
-            return 1
+            return
         }
         if ($userObj.userPrincipalName -notmatch '^.+\.onmicrosoft\.com$') {
             Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): User Principal Name SHOULD use .onmicrosoft.com subdomain"
         }
         if ($null -ne $userObj.IsResourceAccount) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can not be of type Resource Account"
-            return 1
+            return
         }
         if ($userObj.UserType -ne 'Member') {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be of user type 'Member'"
-            return 1
+            return
         }
         if ($null -ne $userObj.ExternalUserState) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can not be external"
-            return 1
+            return
         }
         if ($null -ne $userObj.OnPremisesSyncEnabled) {
             if ($userObj.OnPremisesSyncEnabled -eq $true) {
@@ -236,26 +236,26 @@ function Test-Entra-Tier0-BreakGlass {
             else {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can never have synced with on-premises before and must be cloud-only right from the beginning"
             }
-            return 1
+            return
         }
         if ($null -ne $userObj.DeletedDateTime) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Was deleted and can not be used as Break Glass Account"
-            return 1
+            return
         }
         if ($userObj.AccountEnabled -ne $true) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be enabled for login"
-            return 1
+            return
         }
         if ($userObj.LastPasswordChangeDateTime -le $userObj.CreatedDateTime) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Password must be changed after initial creation"
-            return 1
+            return
         }
         if (
             ($null -ne $userObj.PasswordProfile.ForceChangePasswordNextSignIn) -or
             ($null -ne $userObj.PasswordProfile.ForceChangePasswordNextSignInWithMfa)
         ) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Temporary password must be changed to permanent password first"
-            return 1
+            return
         }
         if (
             ($null -ne $account.displayName) -and
@@ -273,7 +273,7 @@ function Test-Entra-Tier0-BreakGlass {
             $authMethodOdataType = '#microsoft.graph.' + $authMethodId + 'AuthenticationMethod'
             if ($authMethodOdataType -notin $authMethods.AdditionalProperties.'@odata.type') {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethodId"
-                return 1
+                return
             }
         }
         foreach ($authMethod in $authMethods) {
@@ -283,14 +283,14 @@ function Test-Entra-Tier0-BreakGlass {
             }
             if (!$authMethodId -or ($authMethodId -notin $account.authenticationMethods)) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
-                return 1
+                return
             }
             if ($authMethodId -eq 'password') { continue }
 
             $authMethodConf = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId $authMethodId -ErrorAction Stop
             if ($authMethodConf.State -ne 'enabled') {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Authentication Method $authMethodId is currently not enabled for this tenant"
-                return 1
+                return
             }
 
             $isBreakGlassGroupExcluded = $false
@@ -345,11 +345,11 @@ function Test-Entra-Tier0-BreakGlass {
 
             if ($isBreakGlassGroupExcluded) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must not be excluded to use Authentication Method $authMethodId"
-                return 1
+                return
             }
             if (!$isBreakGlassGroupIncluded) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must be included to use Authentication Method $authMethodId"
-                return 1
+                return
             }
         }
 
@@ -358,24 +358,24 @@ function Test-Entra-Tier0-BreakGlass {
             $thisRoleAssignments = $roleAssignments | Where-Object -FilterScript { $_.RoleDefinitionId -eq $RoleDefinitionId }
             if ($thisRoleAssignments.Count -lt 1) {
                 Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): MUST be assigned directory role $RoleDefinitionId"
-                return 1
+                return
             }
             foreach ($roleAssignment in $thisRoleAssignments) {
                 if ('Direct' -ne $roleAssignment.MemberType) {
                     Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST NOT use transitive role assignment via group"
-                    return 1
+                    return
                 }
                 if ('Assigned' -ne $roleAssignment.AssignmentType) {
                     Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST be active"
-                    return 1
+                    return
                 }
                 if ('noExpiration' -ne $roleAssignment.ScheduleInfo.Expiration.Type) {
                     Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment MUST never expire"
-                    return 1
+                    return
                 }
                 if ('Provisioned' -ne $roleAssignment.Status) {
                     Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): $RoleDefinitionId role assignment was not fully provisioned yet"
-                    return 1
+                    return
                 }
             }
         }
@@ -395,7 +395,7 @@ function Test-Entra-Tier0-BreakGlass {
 
     if ($validBreakGlassCount -lt 2) {
         Write-Error 'Break Glass account validation FAILED'
-        return 1
+        return
     }
 
     $validBreakGlass = $true
@@ -413,8 +413,4 @@ function Test-Entra-Tier0-BreakGlass {
             Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
         }
     }
-
-    return 0
 }
-
-$validBreakGlass = $false

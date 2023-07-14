@@ -34,7 +34,7 @@ function Connect-MyMgGraph {
         }
     }
 
-    Write-Debug "Requesting the following scopes for Microsoft Graph PowerShell: `n           $(($MgScopes | Sort-Object | Get-Unique) -join "`n           ")`n"
+    Write-Debug "Requesting the following scopes for Microsoft Graph PowerShell: `n           $(($MgScopes | Sort-Object | Get-Unique) -join "`n           ")"
 
     $reauth = $false
     foreach ($Scope in $Scopes) {
