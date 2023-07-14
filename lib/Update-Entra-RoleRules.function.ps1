@@ -138,12 +138,12 @@ function Update-Entra-RoleRules {
         Write-Progress @Loop1ProgressParameters
 
         if ($PSCmdlet.ShouldProcess(
-                "Update [Tier $tier] Privileged ID Management policies for a total of $($roleList.Count) Microsoft Entra role(s)",
+                "Update [Tier $tier] Privileged Identity Management policies for a total of $($roleList.Count) Microsoft Entra role(s)",
                 (
-                    "Do you confirm to update the following management policies for a total of $($roleList.Count) Microsoft Entra role(s) in Tier ${tier}?`n`n" + `
+                    "Do you confirm to update the management policies for the following $($roleList.Count) Microsoft Entra role(s) in Tier ${tier}?`n" + `
                     $($roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, isBuiltIn, templateId, id | Out-String)
                 ),
-                "!!! WARNING: Update [Tier $tier] Privileged ID Management policies !!!"
+                "!!! WARNING: Update [Tier $tier] Privileged Identity Management policies !!!"
             )) {
             $i = 0
             foreach ($role in $roleList) {

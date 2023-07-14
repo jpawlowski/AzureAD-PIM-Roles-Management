@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Implement a Security Tiering Model for Microsoft Entra Privileged Roles using Microsoft Entra Privileged ID Management.
+    Implement a Security Tiering Model for Microsoft Entra Privileged Roles using Microsoft Entra Privileged Identity Management.
 
 .DESCRIPTION
     This script combines the following Microsoft Azure components to harden Privileged Roles in Microsoft Entra:
 
-    * Microsoft Entra Privileged ID Management (requires Microsoft Entra ID P2 license)
+    * Microsoft Entra Privileged Identity Management (requires Microsoft Entra ID P2 license)
     * Microsoft Entra Conditional Access (requires Microsoft Entra ID P1 or P2 license):
         - Authentication Contexts
         - Authentication Strengths
@@ -74,7 +74,7 @@ Param (
     [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption4")]
     [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption5")]
     [Parameter (Mandatory = $false, ParameterSetName = "AtLeastOption6")]
-    [array]$Roles,
+    [string[]]$Roles,
 
     [Parameter(Mandatory = $false, ParameterSetName = "AtLeastOption1")]
     [Parameter(Mandatory, ParameterSetName = "AtLeastOption2")]

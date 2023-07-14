@@ -11,7 +11,7 @@ $EntraCAAuthContexts = @(
         default  = @{
             id          = 'c1'
             displayName = @($EntraCAAuthContextDisplayNamePrefix, 'Tier0-Admin', $EntraCAAuthContextDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
-            description = 'Tier0 administration using Privileged Identity Management'
+            description = 'Tier0 administration using Privileged Identityentity Management'
             isAvailable = $true
         }
         scopable = @{
@@ -29,7 +29,7 @@ $EntraCAAuthContexts = @(
         default  = @{
             id          = 'c2'
             displayName = @($EntraCAAuthContextDisplayNamePrefix, 'Tier1-Admin', $EntraCAAuthContextDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
-            description = 'Tier1 administration using Privileged Identity Management'
+            description = 'Tier1 administration using Privileged Identityentity Management'
             isAvailable = $true
         }
         scopable = @{
@@ -47,7 +47,7 @@ $EntraCAAuthContexts = @(
         default = @{
             id          = 'c3'
             displayName = @($EntraCAAuthContextDisplayNamePrefix, 'Tier2-Admin', $EntraCAAuthContextDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
-            description = 'Tier2 administration using Privileged Identity Management'
+            description = 'Tier2 administration using Privileged Identityentity Management'
             isAvailable = $true
         }
     }
