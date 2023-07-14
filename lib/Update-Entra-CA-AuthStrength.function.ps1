@@ -22,7 +22,7 @@ function Update-Entra-CA-AuthStrength {
         ConfirmImpact = 'High'
     )]
     Param (
-        [string[]]$Config,
+        [array]$Config,
         [switch]$Tier0,
         [switch]$Tier1,
         [switch]$Tier2

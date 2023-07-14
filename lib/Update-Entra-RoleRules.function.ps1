@@ -22,8 +22,10 @@ function Update-Entra-RoleRules {
         ConfirmImpact = 'High'
     )]
     Param (
-        [string[]]$Config,
-        [string[]]$DefaultConfig,
+        [array]$Config,
+        [array]$DefaultConfig,
+        [string[]]$Id,
+        [string[]]$Name,
         [switch]$Tier0,
         [switch]$Tier1,
         [switch]$Tier2
@@ -43,6 +45,7 @@ function Update-Entra-RoleRules {
         $PolicyTiers = @(0, 1, 2)
     }
 
+    $k = 0
     foreach ($tier in $PolicyTiers) {
         $i = 0
         [array]$roleList = @()
@@ -53,13 +56,11 @@ function Update-Entra-RoleRules {
                 ((-Not $role.IsBuiltIn) -and (-not $role.id) -and (-not $role.templateId)) -or
                 (-Not $role.displayName)
             ) {
-                Write-Output ''
                 Write-Warning "[Tier $tier] Incomplete role definition ignored from configuration at array position $i"
                 continue
             }
 
             if (($Config[$tier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 1) {
-                Write-Output ''
                 Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is defined for this Tier already"
                 continue
             }
@@ -68,7 +69,6 @@ function Update-Entra-RoleRules {
             $duplicate = $false
             do {
                 if (($Config[$previousTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
-                    Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from higher Tier ${previousTier}"
                     $duplicate = $true
                 }
@@ -84,7 +84,6 @@ function Update-Entra-RoleRules {
             $duplicate = $false
             do {
                 if (($Config[$nextTier] | Where-Object -FilterScript { ($_.templateId -eq $role.templateId) -or ($_.displayName -eq $role.displayName) } | Measure-Object).Count -gt 0) {
-                    Write-Output ''
                     Write-Warning "[Tier $tier] SKIPPED: '$($role.displayName)' ($($role.templateId)) is a duplicate from lower Tier ${nextTier}"
                     $duplicate = $true
                 }
@@ -96,19 +95,19 @@ function Update-Entra-RoleRules {
                 continue
             }
 
-            if ($RoleTemplateIDsWhitelist -or $RoleNamesWhitelist) {
+            if ($Id -or $Name) {
                 $found = $false
                 if (
-                    $RoleTemplateIDsWhitelist -and
+                    $Id -and
                     $role.TemplateId -and
-                    ($role.TemplateId -in $RoleTemplateIDsWhitelist)
+                    ($role.TemplateId -in $Id)
                 ) {
                     $found = $true
                 }
                 elseif (
-                    $RoleNamesWhitelist -and
+                    $Name -and
                     $role.displayName -and
-                    ($role.displayName -in $RoleNamesWhitelist)
+                    ($role.displayName -in $Name)
                 ) {
                     $found = $true
                 }
@@ -122,129 +121,151 @@ function Update-Entra-RoleRules {
         }
 
         if ($roleList.Count -eq 0) {
+            $k++
             continue
         }
 
         $roleList = $roleList | Sort-Object -Property displayName
-        $roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, isBuiltIn, templateId, id
-        $totalCount = $roleList.Count
-        $totalCountChars = ($totalCount | Measure-Object -Character).Characters
+        $totalCountChars = ($roleList.Count | Measure-Object -Character).Characters
 
-        $result = 1
-        if ($tier -eq 0 -and $Force) {
-            Write-Output ''
-            Write-Warning "[Tier $tier] Privileged ID Management policies can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+        $PercentComplete = $k / $PolicyTiers.Count * 100
+        $Loop1ProgressParameters = @{
+            Activity         = 'Working on Tier    '
+            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
+            PercentComplete  = $PercentComplete
+            CurrentOperation = 'Loop1'
         }
-        if ($tier -ne 0 -and $Force) {
-            $result = 0
-        }
-        else {
-            $title = "!!! WARNING: Update [Tier $tier] Privileged ID Management policies !!!"
-            $message = "Do you confirm to update the management policies for a total of $totalCount Microsoft Entra role(s) in Tier ${tier} listed above?"
-            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
-        }
-        switch ($result) {
-            0 {
-                !$Force ? (Write-Output " Yes: Continue with update.") : $null
-                $i = 0
-                foreach ($role in $roleList) {
-                    $i++
-                    if (-Not $role.IsBuiltIn) {
-                        if (-Not $role.templateId) {
-                            $role.templateId = $role.id
-                        }
-                        if (-Not $role.id) {
-                            $role.id = $role.templateId
-                        }
-                    }
-                    if ($role.id) {
-                        $filter = "Id eq '$($role.id)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
-                    }
-                    elseif ($role.templateId) {
-                        $filter = "TemplateId eq '$($role.templateId)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
-                    }
-                    else {
-                        $filter = "DisplayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
-                    }
-                    $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter
-                    if (-Not $roleDefinition) {
-                        Write-Output ''
-                        Write-Warning (
-                            "[Tier $tier] " +
-                            ('{0:d' + $totalCountChars + '}') -f $i +
-                            "/${totalCount}: " +
-                            "SKIPPED " +
-                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
-                            " role " +
-                            $roleDefinition.displayName +
-                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
-                            ": No role definition found"
-                        )
-                        continue
-                    }
+        Write-Progress @Loop1ProgressParameters
 
-                    $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
-                    $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter
-                    if (-Not $policyAssignment) {
-                        Write-Output ''
-                        Write-Warning (
-                            "`n[Tier $tier] " +
-                            ('{0:d' + $totalCountChars + '}') -f $i +
-                            "/${totalCount}: " +
-                            "SKIPPED " +
-                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
-                            " role " +
-                            $roleDefinition.displayName +
-                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
-                            ": No policy assignment found"
-                        )
-                        continue
+        if ($PSCmdlet.ShouldProcess(
+                "Update [Tier $tier] Privileged ID Management policies for a total of $($roleList.Count) Microsoft Entra role(s)",
+                (
+                    "Do you confirm to update the following management policies for a total of $($roleList.Count) Microsoft Entra role(s) in Tier ${tier}?`n`n" + `
+                    $($roleList | ForEach-Object { [PSCustomObject]$_ } | Format-Table -AutoSize -Property displayName, isBuiltIn, templateId, id | Out-String)
+                ),
+                "!!! WARNING: Update [Tier $tier] Privileged ID Management policies !!!"
+            )) {
+            $i = 0
+            foreach ($role in $roleList) {
+                $PercentComplete = $i / $roleList.Count * 100
+                $Loop2ProgressParameters = @{
+                    Id               = 1
+                    ParentId         = 0
+                    Activity         = 'Role             '
+                    Status           = " $([math]::floor($PercentComplete))% Complete: $($role.displayName)"
+                    PercentComplete  = $PercentComplete
+                    CurrentOperation = 'Loop2'
+                }
+                Write-Progress @Loop2ProgressParameters
+
+                if (-Not $role.IsBuiltIn) {
+                    if (-Not $role.templateId) {
+                        $role.templateId = $role.id
                     }
-
-                    Write-Output (
-                        "`n[Tier $tier] " +
-                        ('{0:d' + $totalCountChars + '}') -f $i +
-                        "/${totalCount}: " +
-                        "Updating management policy rules for " +
-                        ($role.IsBuiltIn ? "built-in" : "custom") +
-                        " role " +
-                        $roleDefinition.TemplateId +
-                        " ($($roleDefinition.displayName)):"
-                    )
-                    foreach ($rolePolicyRuleTemplate in $DefaultConfig[$tier]) {
-                        $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
-
-                        if ($role.ContainsKey($rolePolicyRule.Id)) {
-                            Write-Output "                [Individual role setting]          $($rolePolicyRule.Id)"
-                            foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
-                                $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
-                            }
-                        }
-                        else {
-                            Write-Output "                [Inherited from Tier $tier Defaults]   $($rolePolicyRule.Id)"
-                        }
-
-                        try {
-                            Update-MgPolicyRoleManagementPolicyRule `
-                                -UnifiedRoleManagementPolicyId $policyAssignment.PolicyId `
-                                -UnifiedRoleManagementPolicyRuleId $rolePolicyRule.Id `
-                                -BodyParameter $rolePolicyRule
-                        }
-                        catch {
-                            throw
-                        }
-                        Start-Sleep -Seconds 0.5
+                    if (-Not $role.id) {
+                        $role.id = $role.templateId
                     }
                 }
-            }
-            1 {
-                Write-Output " No: Skipping management policy rules update for Tier $tier Microsoft Entra Roles."
-            }
-            * {
-                Write-Output " Cancel: Aborting command."
-                exit
+                if ($role.id) {
+                    $filter = "Id eq '$($role.id)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
+                }
+                elseif ($role.templateId) {
+                    $filter = "TemplateId eq '$($role.templateId)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
+                }
+                else {
+                    $filter = "DisplayName eq '$($role.displayName)' and IsBuiltIn eq " + (($role.isBuiltIn).ToString()).ToLower()
+                }
+                $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter $filter -ErrorAction Stop
+                if (-Not $roleDefinition) {
+                    Write-Warning (
+                        "[Tier $tier] " +
+                            ('{0:d' + $totalCountChars + '}') -f $i +
+                        "/$($roleList.Count): " +
+                        "SKIPPED " +
+                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
+                        " role " +
+                        $roleDefinition.displayName +
+                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
+                        ": No role definition found"
+                    )
+                    $i++
+                    continue
+                }
+
+                $filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($roleDefinition.Id)'"
+                $policyAssignment = Get-MgPolicyRoleManagementPolicyAssignment -Filter $filter -ErrorAction Stop
+                if (-Not $policyAssignment) {
+                    Write-Warning (
+                        "`n[Tier $tier] " +
+                            ('{0:d' + $totalCountChars + '}') -f $i +
+                        "/$($roleList.Count): " +
+                        "SKIPPED " +
+                            ($role.IsBuiltIn ? "Built-in" : "Custom") +
+                        " role " +
+                        $roleDefinition.displayName +
+                            ($role.TemplateId ? " ($($role.TemplateId))" : '') +
+                        ": No policy assignment found"
+                    )
+                    $i++
+                    continue
+                }
+
+                Write-Verbose (
+                    "[Tier $tier] " +
+                        ('{0:d' + $totalCountChars + '}') -f $i +
+                    "/$($roleList.Count): " +
+                    "Updating management policy rules for " +
+                        ($role.IsBuiltIn ? "built-in" : "custom") +
+                    " role " +
+                    $roleDefinition.TemplateId +
+                    " ($($roleDefinition.displayName)):"
+                )
+
+                $j = 0
+                foreach ($rolePolicyRuleTemplate in $DefaultConfig[$tier]) {
+                    $j++
+                    $rolePolicyRule = $rolePolicyRuleTemplate.PsObject.Copy()
+
+                    if ($role.ContainsKey($rolePolicyRule.Id)) {
+                        Write-Verbose "                [Individual role setting]          $($rolePolicyRule.Id)"
+                        foreach ($key in $item.$($rolePolicyRule.Id).Keys) {
+                            $rolePolicyRule.$key = $item.$($rolePolicyRule.Id).$key
+                        }
+                    }
+                    else {
+                        Write-Verbose "                [Inherited from Tier $tier Defaults]   $($rolePolicyRule.Id)"
+                    }
+
+                    $PercentComplete = $j / $DefaultConfig[$tier].Count * 100
+                    $Loop3ProgressParameters = @{
+                        Id               = 2
+                        ParentId         = 1
+                        Activity         = 'Updating policy'
+                        Status           = " $([math]::floor($PercentComplete))% Complete: $($rolePolicyRule.Id)"
+                        PercentComplete  = $PercentComplete
+                        CurrentOperation = 'Loop3'
+                    }
+                    Write-Progress @Loop3ProgressParameters
+
+                    try {
+                        Update-MgPolicyRoleManagementPolicyRule `
+                            -UnifiedRoleManagementPolicyId $policyAssignment.PolicyId `
+                            -UnifiedRoleManagementPolicyRuleId $rolePolicyRule.Id `
+                            -BodyParameter $rolePolicyRule `
+                            -Confirm:$false
+                    }
+                    catch {
+                        throw
+                    }
+
+                    Start-Sleep -Milliseconds 25
+                }
+
+                $i++
             }
         }
+
+        $k++
     }
 }
 

@@ -23,6 +23,8 @@ function Update-Entra-CA-Policies {
     )]
     Param (
         [string]$ConfigPath,
+        [switch]$AdminCAPolicies,
+        [switch]$CommonCAPolicies,
         [switch]$Tier0,
         [switch]$Tier1,
         [switch]$Tier2

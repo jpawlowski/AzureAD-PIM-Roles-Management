@@ -48,4 +48,4 @@ catch {
 }
 
 Connect-MyMgGraph -Scopes $MgScopes
-exit Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass -Repair
+Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass -Repair

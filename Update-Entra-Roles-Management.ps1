@@ -162,33 +162,36 @@ try {
 
     if ($NamedLocations) {
         $params.Config = $EntraCANamedLocations
-        $null = Update-Entra-CA-NamedLocations @params
+        Update-Entra-CA-NamedLocations @params
     }
     if ($AuthStrength) {
         $params.Config = $EntraCAAuthStrengths
-        $null = Update-Entra-CA-AuthStrength @params
+        Update-Entra-CA-AuthStrength @params
     }
     if ($AuthContext) {
         $params.Config = $EntraCAAuthContexts
-        $null = Update-Entra-CA-AuthContext @params
+        Update-Entra-CA-AuthContext @params
     }
     if ($UpdateRoleRules) {
         $params.Config = $EntraRoleClassifications
         $params.DefaultConfig = $EntraRoleManagementRulesDefaults
-        $null = Update-Entra-RoleRules @params
+        if ($RoleTemplateIDsWhitelist) { $params.Id = $RoleTemplateIDsWhitelist }
+        if ($RoleNamesWhitelist) { $params.Name = $RoleNamesWhitelist }
+        Update-Entra-RoleRules @params
         $params.Remove('DefaultConfig')
     }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Account validation SKIPPED"
     } elseif ($AdminCAPolicies -or $ValidateBreakGlass) {
-        $null = Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
+        Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
     }
 
     if ($AdminCAPolicies) {
         $params.Remove('Config')
+        $params.AdminCAPolicies = $true
         $params.ConfigPath = (Join-Path $ConfigPath $EntraCAPoliciesSubfolder)
-        $null = Update-Entra-CA-Policies @params
+        Update-Entra-CA-Policies @params
     }
 }
 catch {
