@@ -53,7 +53,7 @@ function Update-Entra-CA-NamedLocations {
     foreach ($tier in $NamedLocationsTiers) {
         $PercentComplete = $i / $NamedLocationsTiers.Count * 100
         $params = @{
-            Activity         = 'Working on Tier'
+            Activity         = 'Working on Tier '
             Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
             PercentComplete  = $PercentComplete
             CurrentOperation = 'EntraCANamedLocationTier'
@@ -79,11 +79,12 @@ function Update-Entra-CA-NamedLocations {
                 $params = @{
                     Id               = 1
                     ParentId         = 0
-                    Activity         = 'Named Location '
+                    Activity         = 'Named Location'
                     Status           = " $([math]::floor($PercentComplete))% Complete: $($role.displayName)"
                     PercentComplete  = $PercentComplete
                     CurrentOperation = 'EntraCANamedLocationCreateOrUpdate'
                 }
+                Write-Progress @params
 
                 $updateOnly = $false
                 if ($namedLocation.id) {
