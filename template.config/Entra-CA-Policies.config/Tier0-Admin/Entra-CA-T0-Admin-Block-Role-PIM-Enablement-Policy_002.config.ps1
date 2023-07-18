@@ -3,23 +3,25 @@
         # id            = '00000000-0000-0000-0000-000000000000'
         displayName   = @(
             $EntraCAPolicyTier0DisplayNamePrefix,
-            "Global-Block-" + `
-                $EntraCAAuthContextDisplayNameSuffix + `
-            ($EntraCAAuthContexts[0].default.id -replace '\D') + `
-                '+' + `
-            ($EntraCAAuthContexts[0].scopable.id -replace '\D') + `
-                '-Tier0-Roles-MediumHighRisk-Users'
+            (
+                'Global-Block-' + `
+                    $EntraCAAuthContextDisplayNameSuffix + `
+                ($EntraCAAuthContexts[0].default.id -replace '\D') + `
+                    '+' + `
+                ($EntraCAAuthContexts[0].scopable.id -replace '\D') + `
+                    '-Tier0-Roles-MediumHighRisk-Users'
+            )
         ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' or '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context when the account is flagged as Medium or High Risk User."
         state         = 'enabled'       # considered to be 'safe' to enable right away
         conditions    = @{
-            applications     = @{
+            applications   = @{
                 includeAuthenticationContextClassReferences = @(
                     $EntraCAAuthContexts[0].default.id
                     $EntraCAAuthContexts[0].scopable.id
                 )
             }
-            users            = @{
+            users          = @{
                 includeUsers  = @(
                     'all'
                 )

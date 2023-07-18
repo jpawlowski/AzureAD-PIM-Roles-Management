@@ -2,15 +2,18 @@
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
         displayName   = @(
+            'TEST', # Remove line when policy is fully enabled for production
             $EntraCAPolicyTier0DisplayNamePrefix,
-            "A0C-Admins-Allow-" + `
-                $EntraCAAuthContextDisplayNameSuffix + `
-            ($EntraCAAuthContexts[0].default.id -replace '\D') + `
-                '-Tier0-Roles-Require-' + `
-                $EntraCAAuthStrengths[0].roleEnablement.displayName
+            (
+                'A0C-Admins-Allow-' + `
+                    $EntraCAAuthContextDisplayNameSuffix + `
+                ($EntraCAAuthContexts[0].default.id -replace '\D') + `
+                    '-Tier0-Roles-Require-' + `
+                    $EntraCAAuthStrengths[0].roleEnablement.displayName
+            )
         ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Require '$($EntraCAAuthStrengths[0].roleEnablement.displayName)' authentication methods before A0C cloud-only admin users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[0].default.displayName)' authentication context in PIM."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
+        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeAuthenticationContextClassReferences = @(
@@ -28,7 +31,7 @@
             }
         }
         grantControls = @{
-            operator        = 'AND'
+            operator               = 'AND'
             AuthenticationStrength = @{
                 Id = $EntraCAAuthStrengths[0].roleEnablement.Id
             }

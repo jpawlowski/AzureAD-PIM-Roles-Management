@@ -1,7 +1,10 @@
 @(
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
-        displayName   = @($EntraCAPolicyTier0DisplayNamePrefix, 'All-Entra-Roles-Except-Tier2-Block-HighRisk-SignIns') | Join-String -Separator $DisplayNameElementSeparator
+        displayName   = @(
+            $EntraCAPolicyTier0DisplayNamePrefix,
+            'All-Entra-Roles-Except-Tier2-Block-HighRisk-SignIns'
+        ) | Join-String -Separator $DisplayNameElementSeparator
         description   = 'Block access for High Risk sign-ins for accounts with any active Entra ID role, except roles from Tier 2 that could be assigned to any type of user.'
         state         = 'enabled'       # considered to be 'safe' to enable right away
         conditions    = @{

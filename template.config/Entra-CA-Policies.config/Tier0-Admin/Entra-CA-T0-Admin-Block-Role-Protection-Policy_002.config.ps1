@@ -1,9 +1,13 @@
 @(
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
-        displayName   = @($EntraCAPolicyTier0DisplayNamePrefix, 'Entra-Roles-Except-Scopable-Block-Unsupported-Devices') | Join-String -Separator $DisplayNameElementSeparator
+        displayName   = @(
+            'TEST', # Remove line when policy is fully enabled for production
+            $EntraCAPolicyTier0DisplayNamePrefix,
+            'Entra-Roles-Except-Scopable-Block-Unsupported-Devices'
+        ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Block access for users with active, non-scopable Tier 0 Roles from any device, except when using a Privileged Access Workstation (PAW).`nScopable Tier 0 Roles are excluded because they can be used in Tier 1 under the condition that an appropriate Administrative Unit restricts access to required objects only."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
+        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeApplications = @(
@@ -26,7 +30,7 @@
                     'all'
                 )
                 excludePlatforms = @(
-                    'windows'
+                    'Windows'
                 )
             }
             devices      = @{

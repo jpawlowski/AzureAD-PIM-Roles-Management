@@ -2,14 +2,17 @@
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
         displayName   = @(
+            'TEST', # Remove line when policy is fully enabled for production
             $EntraCAPolicyTier0DisplayNamePrefix,
-            "Global-Except-A0C-Admins-Block-" + `
-                $EntraCAAuthContextDisplayNameSuffix + `
-            ($EntraCAAuthContexts[0].default.id -replace '\D') + `
-                '-Tier0-Roles'
+            (
+                'Global-Except-A0C-Admins-Block-' + `
+                    $EntraCAAuthContextDisplayNameSuffix + `
+                ($EntraCAAuthContexts[0].default.id -replace '\D') + `
+                    '-Tier0-Roles'
+            )
         ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' authentication context for everyone, except for A0C cloud-only admins."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
+        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeAuthenticationContextClassReferences = @(

@@ -1,9 +1,13 @@
 @(
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
-        displayName   = @($EntraCAPolicyTier0DisplayNamePrefix, 'Entra-Roles-Allow-Require-Tier0-Admin-Role-AuthStr') | Join-String -Separator $DisplayNameElementSeparator
+        displayName   = @(
+            'TEST', # Remove line when policy is fully enabled for production
+            $EntraCAPolicyTier0DisplayNamePrefix,
+            'Entra-Roles-Allow-Require-Tier0-Admin-Role-AuthStr'
+        ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Require '$($EntraCAAuthStrengths[0].activeRole.displayName)' authentication methods for users with active Tier 0 Roles."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
+        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeApplications = @(
@@ -26,7 +30,7 @@
             }
         }
         grantControls = @{
-            operator        = 'AND'
+            operator               = 'AND'
             AuthenticationStrength = @{
                 Id = $EntraCAAuthStrengths[0].activeRole.Id
             }
