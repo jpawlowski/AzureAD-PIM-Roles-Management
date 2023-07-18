@@ -129,13 +129,13 @@ function Update-Entra-RoleRules {
         $totalCountChars = ($roleList.Count | Measure-Object -Character).Characters
 
         $PercentComplete = $k / $PolicyTiers.Count * 100
-        $Loop1ProgressParameters = @{
-            Activity         = 'Working on Tier    '
+        $params = @{
+            Activity         = 'Working on Tier  '
             Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
             PercentComplete  = $PercentComplete
-            CurrentOperation = 'Loop1'
+            CurrentOperation = 'EntraRoleRulesTier'
         }
-        Write-Progress @Loop1ProgressParameters
+        Write-Progress @params
 
         if ($PSCmdlet.ShouldProcess(
                 "Update [Tier $tier] Privileged Identity Management policies for a total of $($roleList.Count) Microsoft Entra role(s)",
@@ -148,15 +148,15 @@ function Update-Entra-RoleRules {
             $i = 0
             foreach ($role in $roleList) {
                 $PercentComplete = $i / $roleList.Count * 100
-                $Loop2ProgressParameters = @{
+                $params = @{
                     Id               = 1
                     ParentId         = 0
-                    Activity         = 'Role             '
+                    Activity         = 'Role           '
                     Status           = " $([math]::floor($PercentComplete))% Complete: $($role.displayName)"
                     PercentComplete  = $PercentComplete
-                    CurrentOperation = 'Loop2'
+                    CurrentOperation = 'EntraRoleUpdate'
                 }
-                Write-Progress @Loop2ProgressParameters
+                Write-Progress @params
 
                 if (-Not $role.IsBuiltIn) {
                     if (-Not $role.templateId) {
@@ -214,7 +214,7 @@ function Update-Entra-RoleRules {
                     "[Tier $tier] " +
                         ('{0:d' + $totalCountChars + '}') -f $i +
                     "/$($roleList.Count): " +
-                    "Updating management policy rules for " +
+                    "Updated management policy rules for " +
                         ($role.IsBuiltIn ? "built-in" : "custom") +
                     " role " +
                     $roleDefinition.TemplateId +
@@ -237,25 +237,26 @@ function Update-Entra-RoleRules {
                     }
 
                     $PercentComplete = $j / $DefaultConfig[$tier].Count * 100
-                    $Loop3ProgressParameters = @{
+                    $params = @{
                         Id               = 2
                         ParentId         = 1
-                        Activity         = 'Updating policy'
+                        Activity         = 'Update policy'
                         Status           = " $([math]::floor($PercentComplete))% Complete: $($rolePolicyRule.Id)"
                         PercentComplete  = $PercentComplete
-                        CurrentOperation = 'Loop3'
+                        CurrentOperation = 'EntraRolePolicyRuleUpdate'
                     }
-                    Write-Progress @Loop3ProgressParameters
+                    Write-Progress @params
 
                     try {
                         Update-MgPolicyRoleManagementPolicyRule `
                             -UnifiedRoleManagementPolicyId $policyAssignment.PolicyId `
                             -UnifiedRoleManagementPolicyRuleId $rolePolicyRule.Id `
                             -BodyParameter $rolePolicyRule `
+                            -ErrorAction Stop `
                             -Confirm:$false
                     }
                     catch {
-                        throw
+                        throw $_
                     }
 
                     Start-Sleep -Milliseconds 25

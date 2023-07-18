@@ -13,13 +13,12 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
-$MgScopes += 'Policy.Read.All'
 $MgScopes += 'AuthenticationContext.ReadWrite.All'
 
 function Update-Entra-CA-AuthContext {
     [CmdletBinding(
         SupportsShouldProcess,
-        ConfirmImpact = 'Medium'
+        ConfirmImpact = 'High'
     )]
     Param (
         [array]$Config,
@@ -42,47 +41,56 @@ function Update-Entra-CA-AuthContext {
         $AuthContextTiers = @(0, 1, 2)
     }
 
+    $i = 0
     foreach ($tier in $AuthContextTiers) {
-        $result = 1
-        if ($tier -eq 0 -and $Force) {
-            Write-Output ''
-            Write-Warning "[Tier $tier] Microsoft Entra Conditional Access Authentication Contexts can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+        $PercentComplete = $i / $AuthContextTiers.Count * 100
+        $params = @{
+            Activity         = 'Working on Tier                  '
+            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
+            PercentComplete  = $PercentComplete
+            CurrentOperation = 'EntraCAAuthContextTier'
         }
-        if ($tier -ne 0 -and $Force) {
-            $result = 0
-        }
-        else {
-            $title = "!!! WARNING: Update [Tier $tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
-            $message = "Do you confirm to update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?"
-            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
-        }
-        switch ($result) {
-            0 {
-                !$Force ? (Write-Output " Yes: Continue with update.") : $null
-                foreach ($key in $EntraCAAuthContexts[$tier].Keys) {
-                    foreach ($authContext in $EntraCAAuthContexts[$tier][$key]) {
-                        try {
-                            Write-Output "`n[Tier $tier] Updating authentication context class reference $($authContext.id) ($($authContext.displayName))"
-                            $null = Update-MgIdentityConditionalAccessAuthenticationContextClassReference `
-                                -AuthenticationContextClassReferenceId $authContext.id `
-                                -DisplayName $authContext.displayName `
-                                -Description $authContext.description `
-                                -IsAvailable:$authContext.isAvailable
-                        }
-                        catch {
-                            throw $_
-                        }
-                        Start-Sleep -Seconds 0.5
+        Write-Progress @params
+
+        if ($PSCmdlet.ShouldProcess(
+                "Update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) in [Tier $tier]",
+                "Do you confirm to update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?",
+                "!!! WARNING: Update [Tier $tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
+            )) {
+
+            foreach ($key in $EntraCAAuthContexts[$tier].Keys) {
+                $j = 0
+
+                foreach ($authContext in $EntraCAAuthContexts[$tier][$key]) {
+                    $j++
+                    $PercentComplete = $j / $EntraCAAuthContexts[$tier][$key].Count * 100
+                    $params = @{
+                        Id               = 1
+                        ParentId         = 0
+                        Activity         = 'Updating Authentication Context'
+                        Status           = " $([math]::floor($PercentComplete))% Complete: $($authContext.displayName)"
+                        PercentComplete  = $PercentComplete
+                        CurrentOperation = 'EntraCAAuthContextClassReference'
                     }
+                    Write-Progress @params
+
+                    Write-Verbose "[Tier $tier] Updating authentication context class reference $($authContext.id) ($($authContext.displayName))"
+                    Update-MgIdentityConditionalAccessAuthenticationContextClassReference `
+                        -AuthenticationContextClassReferenceId $authContext.id `
+                        -DisplayName $authContext.displayName `
+                        -Description $authContext.description `
+                        -IsAvailable:$authContext.isAvailable `
+                        -ErrorAction Stop `
+                        -Confirm:$false
+
+                    Start-Sleep -Milliseconds 25
                 }
-            }
-            1 {
-                !$Force ? (Write-Output " No: Skipping Tier $tier Authentication Context updates.") : $null
-            }
-            * {
-                !$Force ? (Write-Output " Cancel: Aborting command.") : $null
-                exit
+
+                Start-Sleep -Milliseconds 25
             }
         }
+
+        Start-Sleep -Milliseconds 25
+        $i++
     }
 }

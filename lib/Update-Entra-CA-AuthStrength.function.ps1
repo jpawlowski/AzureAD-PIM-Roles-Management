@@ -13,7 +13,6 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
-$MgScopes += 'Policy.Read.All'
 $MgScopes += 'Policy.ReadWrite.AuthenticationMethod'
 
 function Update-Entra-CA-AuthStrength {
@@ -42,124 +41,169 @@ function Update-Entra-CA-AuthStrength {
         $AuthStrengthTiers = @(0, 1, 2)
     }
 
-    $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'"
+    try {
+        $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'" -ErrorAction Stop
+    }
+    catch {
+        Throw $_
+    }
 
+    $i = 0
     foreach ($tier in $AuthStrengthTiers) {
-        $result = 1
-        if ($tier -eq 0 -and $Force) {
-            Write-Output ''
-            Write-Warning "[Tier $tier] Microsoft Entra Conditional Access Authentication Strengths can NOT be forcably updated in unattended mode: -Force parameter is ignored"
+        $PercentComplete = $i / $AuthStrengthTiers.Count * 100
+        $params = @{
+            Activity         = 'Working on Tier                 '
+            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
+            PercentComplete  = $PercentComplete
+            CurrentOperation = 'EntraCAAuthStrengthTier'
         }
-        if ($tier -ne 0 -and $Force) {
-            $result = 0
-        }
-        else {
-            $title = "!!! WARNING: Create and/or update [Tier $tier] Microsoft Entra Conditional Access Authentication Strengths !!!"
-            $message = "Do you confirm to create new or update a total of $($EntraCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?"
-            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
-        }
-        switch ($result) {
-            0 {
-                !$Force ? (Write-Output " Yes: Continue with creation or update.") : $null
-                foreach ($key in $EntraCAAuthStrengths[$tier].Keys) {
-                    foreach ($authStrength in $EntraCAAuthStrengths[$tier][$key]) {
-                        $updateOnly = $false
-                        if ($authStrength.id) {
-                            if ($authStrengthPolicies | Where-Object -FilterScript { $_.Id -eq $authStrength.id }) {
-                                $updateOnly = $true
-                            }
-                            else {
-                                Write-Output ''
-                                Write-Warning "[Tier $tier] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
-                                continue
-                            }
+        Write-Progress @params
+
+        if ($PSCmdlet.ShouldProcess(
+                "Update a total of $($EntraCAAuthStrengths[$tier].Count) Authentication Stength policies in [Tier $tier]",
+                "Do you confirm to create new or update a total of $($EntraCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?",
+                "!!! WARNING: Create and/or update [Tier $tier] Microsoft Entra Conditional Access Authentication Strengths !!!"
+            )) {
+            $j = 0
+            foreach ($key in $EntraCAAuthStrengths[$tier].Keys) {
+                $j++
+
+                $PercentComplete = $j / $EntraCAAuthStrengths[$tier].Count * 100
+                $params = @{
+                    Id               = 1
+                    ParentId         = 0
+                    Activity         = 'Authentication Strength       '
+                    Status           = " $([math]::floor($PercentComplete))% Complete: $($role.displayName)"
+                    PercentComplete  = $PercentComplete
+                    CurrentOperation = 'EntraCAAuthStrengthCreateOrUpdate'
+                }
+
+                foreach ($authStrength in $EntraCAAuthStrengths[$tier][$key]) {
+
+                    $updateOnly = $false
+                    if ($authStrength.id) {
+                        if ($authStrengthPolicies | Where-Object -FilterScript { $_.Id -eq $authStrength.id }) {
+                            $updateOnly = $true
                         }
                         else {
-                            $obj = $authStrengthPolicies | Where-Object -FilterScript { $_.DisplayName -eq $authStrength.displayName }
-                            if ($obj) {
-                                $authStrength.id = $obj.Id
-                                $updateOnly = $true
-                            }
+                            Write-Warning "[Tier $tier] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
+                            continue
                         }
+                    }
+                    else {
+                        $obj = $authStrengthPolicies | Where-Object -FilterScript { $_.DisplayName -eq $authStrength.displayName }
+                        if ($obj) {
+                            $authStrength.id = $obj.Id
+                            $updateOnly = $true
+                        }
+                    }
 
-                        if ($updateOnly) {
-                            try {
-                                Write-Output "`n[Tier $tier] Updating authentication strength policy $($authStrength.id) ($($authStrength.displayName))"
-                                $null = Update-MgPolicyAuthenticationStrengthPolicy `
+                    if ($updateOnly) {
+                        $params.Activity = 'Update Authentication Strength'
+                        $params.Status = " $([math]::floor($PercentComplete))% Complete: $($authStrength.displayName)"
+                        Write-Progress @params
+
+                        try {
+                            Write-Verbose "[Tier $tier] Updating authentication strength policy $($authStrength.id) ($($authStrength.displayName))"
+                            $null = Update-MgPolicyAuthenticationStrengthPolicy `
+                                -AuthenticationStrengthPolicyId $authStrength.id `
+                                -DisplayName $authStrength.displayName `
+                                -Description $authStrength.description `
+                                -ErrorAction Stop `
+                                -Confirm:$false
+
+                            $params.Status = " $([math]::floor($PercentComplete))% Complete: $($authStrength.displayName) - Allowed Combinations"
+                            Write-Progress @params
+
+                            Write-Verbose "            Updating allowed combinations: $($authStrength.allowedCombinations -join '; ')"
+                            $null = Update-MgPolicyAuthenticationStrengthPolicyAllowedCombination `
+                                -AuthenticationStrengthPolicyId $authStrength.id `
+                                -AllowedCombinations $authStrength.allowedCombinations `
+                                -ErrorAction Stop `
+                                -Confirm:$false
+
+                            if ($authStrength.CombinationConfigurations) {
+                                $combConfs = Get-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
                                     -AuthenticationStrengthPolicyId $authStrength.id `
-                                    -DisplayName $authStrength.displayName `
-                                    -Description $authStrength.description
+                                    -ErrorAction Stop
 
-                                Write-Output "            Updating allowed combinations: $($authStrength.allowedCombinations -join '; ')"
-                                $null = Update-MgPolicyAuthenticationStrengthPolicyAllowedCombination `
-                                    -AuthenticationStrengthPolicyId $authStrength.id `
-                                    -AllowedCombinations $authStrength.allowedCombinations
+                                foreach ($key in $authStrength.CombinationConfigurations.Keys) {
+                                    $params.Status = " $([math]::floor($PercentComplete))% Complete: $($authStrength.displayName) - $key Combination Configuration"
+                                    Write-Progress @params
 
-                                if ($authStrength.CombinationConfigurations) {
-                                    $combConfs = Get-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
-                                        -AuthenticationStrengthPolicyId $authStrength.id
-
-                                    foreach ($key in $authStrength.CombinationConfigurations.Keys) {
-                                        $obj = $combConfs | Where-Object -FilterScript { $_.AppliesToCombinations -contains $key }
-                                        if ($obj) {
-                                            Write-Output "            Updating combination configuration for '$key'"
-                                            if ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs) {
-                                                Write-Output ("               " + ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs -join "`n               "))
-                                            }
-                                            $null = Update-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
-                                                -AuthenticationCombinationConfigurationId $obj.id `
-                                                -AuthenticationStrengthPolicyId $authStrength.id `
-                                                -AppliesToCombinations $key `
-                                                -AdditionalProperties $authStrength.CombinationConfigurations.$key
+                                    $obj = $combConfs | Where-Object -FilterScript { $_.AppliesToCombinations -contains $key }
+                                    if ($obj) {
+                                        Write-Verbose "            Updating combination configuration for '$key'"
+                                        if ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs) {
+                                            Write-Verbose ("               " + ($authStrength.CombinationConfigurations.$key.allowedAAGUIDs -join "`n               "))
                                         }
-                                        else {
-                                            Write-Output "            Creating combination configuration for '$key'"
-                                            $null = New-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
-                                                -AuthenticationStrengthPolicyId $authStrength.id `
-                                                -AppliesToCombinations $key `
-                                                -AdditionalProperties $authStrength.CombinationConfigurations.$key
-                                        }
+                                        $null = Update-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                            -AuthenticationCombinationConfigurationId $obj.id `
+                                            -AuthenticationStrengthPolicyId $authStrength.id `
+                                            -AppliesToCombinations $key `
+                                            -AdditionalProperties $authStrength.CombinationConfigurations.$key `
+                                            -ErrorAction Stop `
+                                            -Confirm:$false
                                     }
-                                }
-                            }
-                            catch {
-                                throw $_
-                            }
-                        }
-                        else {
-                            try {
-                                Write-Output "`n[Tier $tier] Creating authentication strength policy '$($authStrength.displayName)'"
-                                $obj = New-MgPolicyAuthenticationStrengthPolicy `
-                                    -DisplayName $authStrength.displayName `
-                                    -Description $authStrength.description `
-                                    -AllowedCombinations $authStrength.allowedCombinations
-                                $authStrength.id = $obj.Id
-
-                                if ($authStrength.CombinationConfigurations) {
-                                    foreach ($key in $authStrength.CombinationConfigurations.Keys) {
-                                        Write-Output "            Creating combination configuration for '$key'"
+                                    else {
+                                        Write-Verbose "            Creating combination configuration for '$key'"
                                         $null = New-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
                                             -AuthenticationStrengthPolicyId $authStrength.id `
                                             -AppliesToCombinations $key `
-                                            -AdditionalProperties $authStrength.CombinationConfigurations.$key
+                                            -AdditionalProperties $authStrength.CombinationConfigurations.$key `
+                                            -ErrorAction Stop `
+                                            -Confirm:$false
                                     }
                                 }
                             }
-                            catch {
-                                throw $_
+                        }
+                        catch {
+                            throw $_
+                        }
+                    }
+                    else {
+                        $params.Activity = 'Create Authentication Strength'
+                        $params.Status = " $([math]::floor($PercentComplete))% Complete: $($authStrength.displayName)"
+                        Write-Progress @params
+
+                        try {
+                            Write-Verbose "[Tier $tier] Creating authentication strength policy '$($authStrength.displayName)'"
+                            $obj = New-MgPolicyAuthenticationStrengthPolicy `
+                                -DisplayName $authStrength.displayName `
+                                -Description $authStrength.description `
+                                -AllowedCombinations $authStrength.allowedCombinations `
+                                -ErrorAction Stop `
+                                -Confirm:$false
+                            $authStrength.id = $obj.Id
+
+                            if ($authStrength.CombinationConfigurations) {
+                                foreach ($key in $authStrength.CombinationConfigurations.Keys) {
+                                    $params.Status = " $([math]::floor($PercentComplete))% Complete: $($authStrength.displayName) - $key Combination Configuration"
+                                    Write-Progress @params
+
+                                    Write-Verbose "            Creating combination configuration for '$key'"
+                                    $null = New-MgPolicyAuthenticationStrengthPolicyCombinationConfiguration `
+                                        -AuthenticationStrengthPolicyId $authStrength.id `
+                                        -AppliesToCombinations $key `
+                                        -AdditionalProperties $authStrength.CombinationConfigurations.$key `
+                                        -ErrorAction Stop `
+                                        -Confirm:$false
+                                }
                             }
                         }
-                        Start-Sleep -Seconds 0.5
+                        catch {
+                            throw $_
+                        }
                     }
+
+                    Start-Sleep -Milliseconds 25
                 }
-            }
-            1 {
-                !$Force ? (Write-Output " No: Skipping Tier $tier Authentication Strengths creation / updates.") : $null
-            }
-            * {
-                !$Force ? (Write-Output " Cancel: Aborting command.") : $null
-                exit
+
+                Start-Sleep -Milliseconds 25
             }
         }
+
+        Start-Sleep -Milliseconds 25
+        $i++
     }
 }

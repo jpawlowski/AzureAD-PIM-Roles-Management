@@ -159,20 +159,6 @@ $EntraRoleClassifications = @(
             }
         }
         @{
-            displayName                   = 'Entra ID Joined Device Local Administrator'
-            templateId                    = '9f06204d-73c1-4d4c-880a-6edb90606fd8'
-            isBuiltIn                     = $true
-            Expiration_EndUser_Assignment = @{
-                maximumDuration = 'PT1H'
-            }
-            Enablement_EndUser_Assignment = @{
-                enabledRules = @(
-                    'Justification'
-                    'Ticketing'
-                )
-            }
-        }
-        @{
             displayName                   = 'Azure DevOps Administrator'
             templateId                    = 'e3973bdf-4987-49ae-837a-ba8e231c7286'
             isBuiltIn                     = $true
@@ -186,7 +172,7 @@ $EntraRoleClassifications = @(
             }
         }
         @{
-            displayName                   = 'Entra Information Protection Administrator'
+            displayName                   = 'Azure Information Protection Administrator'
             templateId                    = '7495fdc4-34c4-4d15-a289-98788ce399fd'
             isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
@@ -260,6 +246,20 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
+            displayName                   = 'Entra ID Joined Device Local Administrator'
+            templateId                    = '9f06204d-73c1-4d4c-880a-6edb90606fd8'
+            isBuiltIn                     = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = 'PT1H'
+            }
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    'Justification'
+                    'Ticketing'
+                )
+            }
+        }
+        @{
             displayName = 'Desktop Analytics Administrator'
             templateId  = '38a96431-2bdf-4b4c-8b6e-5d3d8abac1a4'
             isBuiltIn   = $true
@@ -319,6 +319,32 @@ $EntraRoleClassifications = @(
         @{
             displayName                   = 'External Identity Provider Administrator'
             templateId                    = 'be2f45a1-457d-42af-a067-6ec1fa63bc45'
+            isBuiltIn                     = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = 'PT4H'
+            }
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    'Justification'
+                )
+            }
+        }
+        @{
+            displayName                   = 'Fabric Administrator'
+            templateId                    = 'a9ea8996-122f-4c74-9520-8edcd192826c'
+            isBuiltIn                     = $true
+            Expiration_EndUser_Assignment = @{
+                maximumDuration = 'PT4H'
+            }
+            Enablement_EndUser_Assignment = @{
+                enabledRules = @(
+                    'Justification'
+                )
+            }
+        }
+        @{
+            displayName                   = 'Global Secure Access Administrator'
+            templateId                    = 'ac434307-12b9-4fa1-a708-88bf58caabc1'
             isBuiltIn                     = $true
             Expiration_EndUser_Assignment = @{
                 maximumDuration = 'PT4H'
@@ -419,19 +445,6 @@ $EntraRoleClassifications = @(
             displayName = 'Permissions Management Administrator'
             templateId  = 'af78dc32-cf4d-46f9-ba4e-4428526346b5'
             isBuiltIn   = $true
-        }
-        @{
-            displayName                   = 'Power BI Administrator'
-            templateId                    = 'a9ea8996-122f-4c74-9520-8edcd192826c'
-            isBuiltIn                     = $true
-            Expiration_EndUser_Assignment = @{
-                maximumDuration = 'PT4H'
-            }
-            Enablement_EndUser_Assignment = @{
-                enabledRules = @(
-                    'Justification'
-                )
-            }
         }
         @{
             displayName                   = 'Power Platform Administrator'
