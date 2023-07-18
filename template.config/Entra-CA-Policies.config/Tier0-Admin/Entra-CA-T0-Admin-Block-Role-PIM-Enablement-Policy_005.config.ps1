@@ -1,18 +1,24 @@
 @(
     @{
         # id            = '00000000-0000-0000-0000-000000000000'
-        displayName   = @($EntraCAPolicyTier0DisplayNamePrefix, 'Scopable-Entra-Roles-Block-Unsupported-Devices') | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Block access for users with active, scopable Tier 0 Roles from any device, except those that are explicitly whitelisted for access.`nUsing a Privileged Access Workstation is not required here under the condition that role assignments to A1C cloud-only admin accounts are always restricted to a specific Administration Unit so only a defined set of objects can be changed."
+        displayName   = @(
+            $EntraCAPolicyTier0DisplayNamePrefix,
+            "Global-Block-" + `
+                $EntraCAAuthContextDisplayNameSuffix + `
+            ($EntraCAAuthContexts[0].scopable.id -replace '\D') + `
+                '-Tier0-Scopable-Roles-Unsupported-Devices'
+        ) | Join-String -Separator $DisplayNameElementSeparator
+        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context from any device, except those that are explicitly whitelisted."
         state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
         conditions    = @{
             applications = @{
-                includeApplications = @(
-                    'all'
+                includeAuthenticationContextClassReferences = @(
+                    $EntraCAAuthContexts[0].scopable.id
                 )
             }
             users        = @{
-                includeRoles  = @(
-                    'tier0_scopable_roles'
+                includeUsers  = @(
+                    'all'
                 )
                 excludeGroups = @(
                     'breakglass_group'   # always implied by the script, only added here as reminder
@@ -24,7 +30,6 @@
                 )
                 excludePlatforms = @(
                     'windows'
-                    'macOS'
                 )
             }
         }

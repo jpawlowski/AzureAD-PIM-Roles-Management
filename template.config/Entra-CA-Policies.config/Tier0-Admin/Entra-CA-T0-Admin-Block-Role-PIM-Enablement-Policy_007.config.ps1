@@ -1,0 +1,37 @@
+@(
+    @{
+        # id            = '00000000-0000-0000-0000-000000000000'
+        displayName   = @(
+            $EntraCAPolicyTier0DisplayNamePrefix,
+            "Global-Except-A0C+A1C-Admins-Block-" + `
+                $EntraCAAuthContextDisplayNameSuffix + `
+            ($EntraCAAuthContexts[0].scopable.id -replace '\D') + `
+                '-Tier0-Roles'
+        ) | Join-String -Separator $DisplayNameElementSeparator
+        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context for everyone, except for A0C and A1C cloud-only admins."
+        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time.
+        conditions    = @{
+            applications = @{
+                includeAuthenticationContextClassReferences = @(
+                    $EntraCAAuthContexts[0].scopable.id
+                )
+            }
+            users        = @{
+                includeUsers  = @(
+                    'all'
+                )
+                excludeGroups = @(
+                    '00000000-0000-0000-0000-000000000001'   # This MUST be a role-assignable group containing ONLY your Tier0 admin (A0C) user accounts. This ensures the group is manually managed by admins with either Global Administrator or Privileged Role Administrator privileges only.
+                    '00000000-0000-0000-0000-000000000002'   # This SHOULD be a dynamic group containing all your Tier0 AND Tier1 admin accounts, e.g. named like CTSO-IAM-D-Entra-Privileged-Role-Tier1-Users. As a best practise, include the condition that the user also needs to have an Entra ID P2 license assigned with enabled service plan.
+                    'breakglass_group'   # always implied by the script, only added here as reminder
+                )
+            }
+        }
+        grantControls = @{
+            operator        = 'AND'
+            builtInControls = @(
+                'block'
+            )
+        }
+    }
+)
