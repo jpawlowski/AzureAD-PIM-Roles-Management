@@ -26,7 +26,7 @@
                     'all'
                 )
                 excludeGroups = @(
-                    '00000000-0000-0000-0000-000000000001'   # This MUST be a role-assignable group containing ONLY your Tier0 admin (A0C) user accounts. This ensures the group is manually managed by admins with either Global Administrator or Privileged Role Administrator privileges only.
+                    '00000000-0000-0000-0000-000000000001'   # This MUST be a role-assignable group containing all your Tier0 admin (A0C) user accounts. This ensures the group is manually managed by admins with either Global Administrator or Privileged Role Administrator privileges only.
                     'breakglass_group'   # always implied by the script, only added here as reminder
                 )
             }

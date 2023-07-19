@@ -1,6 +1,6 @@
 #Requires -Version 7.2
 
-$EntraT0BreakGlassGroupDisplayNamePrefix = $EntraGroupDisplayNamePrefix
+$EntraT0BreakGlassGroupDisplayNamePrefix = $EntraGroupsDisplayNamePrefix
 
 $EntraT0BreakGlass = @{
 
@@ -23,7 +23,7 @@ $EntraT0BreakGlass = @{
         #
         @{
             id                    = '00000000-0000-0000-0000-000000000000'
-            displayName           = "$CompanyName Emergency Admin (Primary)"
+            displayName           = "$CompanyNameShort Emergency Admin (Primary)"
             userPrincipalName     = 'admc-emergency911@tenant.onmicrosoft.com'
             authenticationMethods = @(
                 'password'         # Can not be removed as of today, and required to use TOTP
@@ -52,7 +52,7 @@ $EntraT0BreakGlass = @{
         #
         @{
             id                    = '00000000-0000-0000-0000-000000000000'
-            displayName           = "$CompanyName Emergency Admin (Backup)"
+            displayName           = "$CompanyNameShort Emergency Admin (Backup)"
             userPrincipalName     = 'admc-emergency912@tenant.onmicrosoft.com'
             authenticationMethods = @(
                 'password'         # Can not be removed as of today

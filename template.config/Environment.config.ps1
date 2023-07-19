@@ -5,10 +5,8 @@
 #$TenantId = '00000000-0000-0000-0000-000000000000'
 
 $CompanyName = 'Contoso'
+$CompanyNameShort = 'CTSO'
 
 # Prefix string: Could be a namespace, a tenant indicator, etc.
 $DisplayNamePrefix = $null
 $DisplayNameElementSeparator = '-'
-
-# To prefix display names of groups, you may define some kind of namespace
-$EntraGroupDisplayNamePrefix = 'CTSO'

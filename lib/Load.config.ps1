@@ -27,6 +27,7 @@ $MgScopes = @()
 
 $ConfigFiles = @(
     'Environment.config.ps1'
+    'Entra-Groups.config.ps1'
     'Entra-Tier0-BreakGlass.config.ps1'
     'Entra-CA-AuthContexts.config.ps1'
     'Entra-CA-AuthStrengths.config.ps1'
