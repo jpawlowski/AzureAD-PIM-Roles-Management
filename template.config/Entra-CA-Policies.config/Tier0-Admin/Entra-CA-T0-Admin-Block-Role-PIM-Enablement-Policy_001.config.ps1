@@ -12,7 +12,7 @@
                     '-Tier0-Roles-LowMediumHighRisk-SignIns'
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' or '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context when the user is flagged for any sign-in risk."
+        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' or '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context when the user is flagged for any sign-in risk. DO NOT CHANGE MANUALLY!"
         state         = 'enabled'       # considered to be 'safe' to enable right away
         conditions    = @{
             applications     = @{

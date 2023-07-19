@@ -6,7 +6,7 @@
             $EntraCAPolicyTier1DisplayNamePrefix,
             'Entra-Roles-Allow-Require-' + $EntraCAAuthStrengths[1].activeRole.displayName
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Require '$($EntraCAAuthStrengths[1].activeRole.displayName)' authentication methods for A1C cloud-only admins and users with active Tier 1 Roles."
+        description   = "Require '$($EntraCAAuthStrengths[1].activeRole.displayName)' authentication methods for A1C cloud-only admins and users with active Tier 1 Roles. DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

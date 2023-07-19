@@ -6,7 +6,7 @@
             $EntraCAPolicyTier1DisplayNamePrefix,
             'Entra-Roles-Block-Unsupported-Locations'
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = 'Block access for users with active Tier 1 Roles from any country IPv4 and IPv6 address, except from those that are explicitly whitelisted.'
+        description   = 'Block access for users with active Tier 1 Roles from any country IPv4 and IPv6 address, except from those that are explicitly whitelisted. DO NOT CHANGE MANUALLY!'
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

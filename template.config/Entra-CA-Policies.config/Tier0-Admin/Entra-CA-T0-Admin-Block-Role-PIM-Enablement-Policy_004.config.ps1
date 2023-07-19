@@ -11,7 +11,7 @@
                     '-Tier0-Roles-Unsupported-Devices'
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' authentication context from any device, except when using a Privileged Access Workstation (PAW)."
+        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' authentication context from any device, except when using a Privileged Access Workstation (PAW). DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

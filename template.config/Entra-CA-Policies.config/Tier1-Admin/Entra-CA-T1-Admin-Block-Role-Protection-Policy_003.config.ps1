@@ -6,7 +6,7 @@
             $EntraCAPolicyTier1DisplayNamePrefix,
             'Scopable-Entra-Roles-Block-Unsupported-Devices'
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Block access for users with active, scopable Tier 1 Roles from any device, except those that are explicitly whitelisted for access."
+        description   = "Block access for users with active, scopable Tier 1 Roles from any device, except those that are explicitly whitelisted for access. DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

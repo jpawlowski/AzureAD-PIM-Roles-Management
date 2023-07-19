@@ -5,7 +5,7 @@
             $EntraCAPolicyTier0DisplayNamePrefix,
             'All-Entra-Roles-Except-Tier2-Block-HighRisk-SignIns'
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = 'Block access for High Risk sign-ins for accounts with any active Entra ID role, except roles from Tier 2 that could be assigned to any type of user.'
+        description   = 'Block access for High Risk sign-ins for accounts with any active Entra ID role, except roles from Tier 2 that could be assigned to any type of user. DO NOT CHANGE MANUALLY!'
         state         = 'enabled'       # considered to be 'safe' to enable right away
         conditions    = @{
             applications     = @{
