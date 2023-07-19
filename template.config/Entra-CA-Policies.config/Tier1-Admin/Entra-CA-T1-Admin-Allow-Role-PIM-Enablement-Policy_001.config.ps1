@@ -3,23 +3,23 @@
         # id            = '00000000-0000-0000-0000-000000000000'
         displayName   = @(
             'TEST', # Remove line when policy is fully enabled for production
-            $EntraCAPolicyTier0DisplayNamePrefix,
+            $EntraCAPolicyTier1DisplayNamePrefix,
             (
                 'A0C+A1C-Admins-Allow-' + `
                     $EntraCAAuthContextDisplayNameSuffix + `
-                ($EntraCAAuthContexts[0].scopable.id -replace '\D') + `
-                    '-Tier0-Scopable-Roles-Require-' + `
-                    $EntraCAAuthStrengths[0].scopableRoleEnablement.displayName
+                ($EntraCAAuthContexts[1].default.id -replace '\D') + `
+                    '-Tier1-Roles-Require-' + `
+                    $EntraCAAuthStrengths[1].roleEnablement.displayName
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Require '$($EntraCAAuthStrengths[0].scopableRoleEnablement.displayName)' authentication methods before A0C or A1C cloud-only admin users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context in PIM. DO NOT CHANGE MANUALLY!"
+        description   = "Require '$($EntraCAAuthStrengths[1].roleEnablement.displayName)' authentication methods before A0C or A1C cloud-only admin users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[1].default.displayName)' authentication context in PIM. DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeAuthenticationContextClassReferences = @(
-                    $EntraCAAuthContexts[0].scopable.id
+                    $EntraCAAuthContexts[1].default.id
                 )
             }
             users        = @{
@@ -36,7 +36,7 @@
         grantControls = @{
             operator               = 'AND'
             AuthenticationStrength = @{
-                Id = $EntraCAAuthStrengths[0].scopableRoleEnablement.Id
+                Id = $EntraCAAuthStrengths[1].roleEnablement.Id
             }
         }
     }
