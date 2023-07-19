@@ -60,12 +60,6 @@ function Update-Entra-CA-NamedLocations {
         }
         Write-Progress @params
 
-        if ($tier -ne 0 -and $Force) {
-            $title = "!!! WARNING: Create and/or update [Tier $tier] Microsoft Entra Conditional Access Named Locations !!!"
-            $message = "Do you confirm to create new or update a total of $($EntraCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?"
-            $result = $host.ui.PromptForChoice($title, $message, $choices, 1)
-        }
-
         if ($PSCmdlet.ShouldProcess(
                 "Update a total of $($EntraCANamedLocations[$tier].Count) Named Locations in [Tier $tier]",
                 "Do you confirm to create new or update a total of $($EntraCANamedLocations[$tier].Count) Named Locations for Tier ${tier}?",

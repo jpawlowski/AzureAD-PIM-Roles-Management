@@ -14,7 +14,9 @@
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
         description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[0].default.displayName)' or '$($EntraCAAuthContexts[0].scopable.displayName)' authentication context from any location, except from those that are explicitly whitelisted."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
+        state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
+                                                                # As a best practise, update the ID parameter above at the same time.
+                                                                # Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeAuthenticationContextClassReferences = @(

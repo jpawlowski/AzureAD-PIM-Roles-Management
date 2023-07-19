@@ -4,21 +4,17 @@
         displayName   = @(
             'TEST', # Remove line when policy is fully enabled for production
             $EntraCAPolicyTier0DisplayNamePrefix,
-            'Entra-Roles-Allow-Require-Tier0-Admin-Role-AuthStr'
+            'Entra-Roles-Allow-Require-' + $EntraCAAuthStrengths[0].activeRole.displayName
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Require '$($EntraCAAuthStrengths[0].activeRole.displayName)' authentication methods for users with active Tier 0 Roles."
-        state         = 'enabledForReportingButNotEnforced'       # change to 'enabled' when ready. As a best practise, update the ID parameter above at the same time. Also, update the displayName above and remove the 'TEST' prefix.
+        description   = "Require '$($EntraCAAuthStrengths[0].activeRole.displayName)' authentication methods for A0C cloud-only admins and users with active Tier 0 Roles."
+        state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
+                                                                # As a best practise, update the ID parameter above at the same time.
+                                                                # Also, update the displayName above and remove the 'TEST' prefix.
         conditions    = @{
             applications = @{
                 includeApplications = @(
                     'all'
                 )
-
-                # # Avoid issues during Windows Enterprise license activation during Windows Autopilot setup of PAW devices.
-                # # Only required if Tier0 admin has active Tier0 role during Autopilot setup. Best practise is to remove any active Tier0 role beforehand so this policy does not apply.
-                # excludeApplications = @(
-                #     '45a330b1-b1ec-4cc1-9161-9f03992aa49f'   # Universal Store Service APIs and Web Application
-                # )
             }
             users        = @{
                 includeRoles  = @(

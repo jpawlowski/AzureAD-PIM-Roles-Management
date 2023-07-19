@@ -32,15 +32,6 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'Cloud Device Administrator'
-            templateId                               = '7698a772-787b-4ac8-901f-60d6b08affd2'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[0].scopable.Id
-            }
-        }
-        @{
             displayName = 'Conditional Access Administrator'
             templateId  = 'b1be1c3e-b65d-4f19-8427-f6fa0d97feb9'
             isBuiltIn   = $true
@@ -63,15 +54,6 @@ $EntraRoleClassifications = @(
         #     templateId  = '62e90394-69f5-4237-9190-012177145e10'
         #     isBuiltIn   = $true
         # }
-        @{
-            displayName                              = 'Groups Administrator'
-            templateId                               = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[0].scopable.Id
-            }
-        }
         @{
             displayName = 'Hybrid Identity Administrator'
             templateId  = '8ac3fc64-6eca-42ea-9e69-59f4c7b60eb2'
@@ -106,15 +88,6 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'User Administrator'
-            templateId                               = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[0].scopable.Id
-            }
-        }
-        @{
             displayName = 'Windows 365 Administrator'
             templateId  = '11451d60-acb2-45eb-a7d6-43d0f0125c13'
             isBuiltIn   = $true
@@ -147,15 +120,12 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'Authentication Administrator'
-            templateId                               = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            Expiration_EndUser_Assignment            = @{
+            displayName                   = 'Authentication Administrator'
+            templateId                    = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
+            isBuiltIn                     = $true
+            isScopable                    = $true
+            Expiration_EndUser_Assignment = @{
                 maximumDuration = 'PT1H'
-            }
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
             }
         }
         @{
@@ -221,6 +191,18 @@ $EntraRoleClassifications = @(
             displayName = 'Cloud Application Administrator'
             templateId  = '158c047a-c907-4556-b7ef-446551a6b5f7'
             isBuiltIn   = $true
+        }
+        @{
+            displayName                              = 'Cloud Device Administrator'
+            templateId                               = '7698a772-787b-4ac8-901f-60d6b08affd2'
+            isBuiltIn                                = $true
+            isScopable                               = $true
+
+            # This role is considered Tier0 unless using Admin Unit scopes for access restrictions, so it can be used in Tier1.
+            # Consequently, the role is put into Tier1 but uses an Authentication Context defined in Tier0 with dedication for such scopable roles.
+            AuthenticationContext_EndUser_Assignment = @{
+                claimValue = $EntraCAAuthContexts[0].scopable.Id
+            }
         }
         @{
             displayName                   = 'Compliance Administrator'
@@ -356,20 +338,29 @@ $EntraRoleClassifications = @(
             }
         }
         @{
-            displayName                              = 'Helpdesk Administrator'
-            templateId                               = '729827e3-9c14-49f7-bb1b-9608f156bbb8'
+            displayName                              = 'Groups Administrator'
+            templateId                               = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
             isBuiltIn                                = $true
             isScopable                               = $true
-            Expiration_EndUser_Assignment            = @{
+
+            # This role is considered Tier0 unless using Admin Unit scopes for access restrictions, so it can be used in Tier1.
+            # Consequently, the role is put into Tier1 but uses an Authentication Context defined in Tier0 with dedication for such scopable roles.
+            AuthenticationContext_EndUser_Assignment = @{
+                claimValue = $EntraCAAuthContexts[0].scopable.Id
+            }
+        }
+        @{
+            displayName                   = 'Helpdesk Administrator'
+            templateId                    = '729827e3-9c14-49f7-bb1b-9608f156bbb8'
+            isBuiltIn                     = $true
+            isScopable                    = $true
+            Expiration_EndUser_Assignment = @{
                 maximumDuration = 'PT1H'
             }
-            Enablement_EndUser_Assignment            = @{
+            Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     'Ticketing'
                 )
-            }
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
             }
         }
         @{
@@ -393,15 +384,12 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'License Administrator'
-            templateId                               = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            Expiration_EndUser_Assignment            = @{
+            displayName                   = 'License Administrator'
+            templateId                    = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+            isBuiltIn                     = $true
+            isScopable                    = $true
+            Expiration_EndUser_Assignment = @{
                 maximumDuration = 'PT1H'
-            }
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
             }
         }
         @{
@@ -425,20 +413,17 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'Password Administrator'
-            templateId                               = '966707d0-3269-4727-9be2-8c3a10f19b9d'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            Expiration_EndUser_Assignment            = @{
+            displayName                   = 'Password Administrator'
+            templateId                    = '966707d0-3269-4727-9be2-8c3a10f19b9d'
+            isBuiltIn                     = $true
+            isScopable                    = $true
+            Expiration_EndUser_Assignment = @{
                 maximumDuration = 'PT1H'
             }
-            Enablement_EndUser_Assignment            = @{
+            Enablement_EndUser_Assignment = @{
                 enabledRules = @(
                     'Ticketing'
                 )
-            }
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
             }
         }
         @{
@@ -457,15 +442,6 @@ $EntraRoleClassifications = @(
                 enabledRules = @(
                     'Justification'
                 )
-            }
-        }
-        @{
-            displayName                              = 'Printer Administrator'
-            templateId                               = '644ef478-e28f-4e28-b9dc-3fdde9aa0b1f'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
             }
         }
         @{
@@ -498,29 +474,20 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'Teams Administrator'
-            templateId                               = '69091246-20e8-4a56-aa4d-066075b2a7a8'
-            isBuiltIn                                = $true
-            isScopable                               = $true
-            Expiration_EndUser_Assignment            = @{
-                maximumDuration = 'PT4H'
-            }
-            AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
-            }
-        }
-        @{
             displayName = 'Teams Communications Administrator'
             templateId  = 'baf37b3a-610e-45da-9e62-d9d1e5e8914b'
             isBuiltIn   = $true
         }
         @{
-            displayName                              = 'Teams Devices Administrator'
-            templateId                               = '3d762c5a-1b6c-493f-843e-55a3b42923d4'
+            displayName                              = 'User Administrator'
+            templateId                               = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
             isBuiltIn                                = $true
             isScopable                               = $true
+
+            # This role is considered Tier0 unless using Admin Unit scopes for access restrictions, so it can be used in Tier1.
+            # Consequently, the role is put into Tier1 but uses an Authentication Context defined in Tier0 with dedication for such scopable roles.
             AuthenticationContext_EndUser_Assignment = @{
-                claimValue = $EntraCAAuthContexts[1].scopable.Id
+                claimValue = $EntraCAAuthContexts[0].scopable.Id
             }
         }
         @{
@@ -658,6 +625,18 @@ $EntraRoleClassifications = @(
             isBuiltIn   = $true
         }
         @{
+            displayName                              = 'Printer Administrator'
+            templateId                               = '644ef478-e28f-4e28-b9dc-3fdde9aa0b1f'
+            isBuiltIn                                = $true
+            isScopable                               = $true
+
+            # This role is considered Tier1 unless using Admin Unit scopes for access restrictions, so it can be used in Tier2.
+            # Consequently, the role is put into Tier2 but uses an Authentication Context defined in Tier1 with dedication for such scopable roles.
+            AuthenticationContext_EndUser_Assignment = @{
+                claimValue = $EntraCAAuthContexts[1].scopable.Id
+            }
+        }
+        @{
             displayName = 'Printer Technician'
             templateId  = 'e8cef6f1-e4bd-4ea8-bc07-4b8d950f4477'
             isBuiltIn   = $true
@@ -695,6 +674,21 @@ $EntraRoleClassifications = @(
             }
         }
         @{
+            displayName                              = 'Teams Administrator'
+            templateId                               = '69091246-20e8-4a56-aa4d-066075b2a7a8'
+            isBuiltIn                                = $true
+            isScopable                               = $true
+            Expiration_EndUser_Assignment            = @{
+                maximumDuration = 'PT4H'
+            }
+
+            # This role is considered Tier1 unless using Admin Unit scopes for access restrictions, so it can be used in Tier2.
+            # Consequently, the role is put into Tier2 but uses an Authentication Context defined in Tier1 with dedication for such scopable roles.
+            AuthenticationContext_EndUser_Assignment = @{
+                claimValue = $EntraCAAuthContexts[1].scopable.Id
+            }
+        }
+        @{
             displayName = 'Teams Communications Support Engineer'
             templateId  = 'f70938a0-fc10-4177-9e90-2178f8765737'
             isBuiltIn   = $true
@@ -703,6 +697,12 @@ $EntraRoleClassifications = @(
             displayName = 'Teams Communications Support Specialist'
             templateId  = 'fcf91098-03e3-41a9-b5ba-6f0ec8188a12'
             isBuiltIn   = $true
+        }
+        @{
+            displayName = 'Teams Devices Administrator'
+            templateId  = '3d762c5a-1b6c-493f-843e-55a3b42923d4'
+            isBuiltIn   = $true
+            isScopable  = $true
         }
         @{
             displayName = 'Usage Summary Reports Reader'
