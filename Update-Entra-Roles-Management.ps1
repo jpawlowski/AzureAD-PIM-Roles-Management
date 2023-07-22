@@ -16,16 +16,16 @@
     Use 'All' or only a specified list of Microsoft Entra roles. When combined with -Tier0, -Tier1, or -Tier2 parameter, roles outside these tiers are ignored.
 
 .PARAMETER AuthContext
-    Update Microsoft Entra Authentication Contexts.
+    Use 'All' or only a specified list of Microsoft Entra Conditional Access Authentication Contexts. When combined with -Tier0, -Tier1, or -Tier2 parameter, Authentication Contexts outside these tiers are ignored.
 
 .PARAMETER AuthStrength
-    Create or update Microsoft Entra Authentication Strengths.
+    Use 'All' or only a specified list of Microsoft Entra Conditional Access Authentication Stengths. When combined with -Tier0, -Tier1, or -Tier2 parameter, Authentication Stengths outside these tiers are ignored.
 
 .PARAMETER NamedLocations
-    Create or update Microsoft Entra Named Locations.
+    Use 'All' or only a specified list of Microsoft Entra Conditional Access Named Locations. When combined with -Tier0, -Tier1, or -Tier2 parameter, locations outside these tiers are ignored.
 
 .PARAMETER TierCAPolicies
-    Create or update Microsoft Entra Conditional Access policies for admins.
+    Use 'All' or only a specified list of Microsoft Entra Conditional Access policies for admins. When combined with -Tier0, -Tier1, or -Tier2 parameter, policies outside these tiers are ignored.
 
 .PARAMETER ValidateBreakGlass
     Validate Break Glass Accounts (takes precedence to -NoBreakGlassValidation).
@@ -49,7 +49,7 @@
     Use device code authentication instead of a browser control.
 
 .PARAMETER ConfigPath
-    Folder path to configuration files in PS1 format. Default: './config/'.
+    Folder path to configuration files in PS1 script format. Default: './config/'.
 
 .LINK
     https://github.com/jpawlowski/AzureAD-PIM-Roles-Management
@@ -61,20 +61,20 @@
 #Requires -Version 7.2
 
 [
-    CmdletBinding(
-        SupportsShouldProcess
-    )
+CmdletBinding(
+    SupportsShouldProcess
+)
 ]
 Param (
     [string[]]$Roles,
-    [switch]$AuthContext,
-    [switch]$AuthStrength,
-    [switch]$NamedLocations,
+    [string[]]$AuthContext,
+    [string[]]$AuthStrength,
+    [string[]]$NamedLocations,
     [switch]$ValidateBreakGlass,
     [switch]$SkipBreakGlassValidation,
-    [switch]$TierAdminUnits,
-    [switch]$TierCAPolicies,
-    [switch]$TierGroups,
+    [string[]]$TierAdminUnits,
+    [string[]]$TierCAPolicies,
+    [string[]]$TierGroups,
     [switch]$Tier0,
     [switch]$Tier1,
     [switch]$Tier2,
@@ -126,94 +126,210 @@ try {
     if ($Tier2) { $params.Tier2 = $Tier2 }
 
     if ($NamedLocations) {
-        $params.Config = $EntraCANamedLocations
-        Update-Entra-CA-NamedLocations @params
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+
+        if ($Update) {
+            $params.Config = $EntraCANamedLocations
+            Update-Entra-CA-NamedLocations @params
+        }
     }
     if ($AuthStrength) {
-        $params.Config = $EntraCAAuthStrengths
-        Update-Entra-CA-AuthStrength @params
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+
+        if ($Update) {
+            $params.Config = $EntraCAAuthStrengths
+            Update-Entra-CA-AuthStrength @params
+        }
     }
     if ($AuthContext) {
-        $params.Config = $EntraCAAuthContexts
-        Update-Entra-CA-AuthContext @params
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+
+        if ($Update) {
+            $params.Config = $EntraCAAuthContexts
+            Update-Entra-CA-AuthContext @params
+        }
     }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Validation SKIPPED"
-    } elseif ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
+    }
+    elseif ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
         Test-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass
     }
 
     if ($Roles) {
-        $UpdateRoleRules = $false
-        $RoleTemplateIDsWhitelist = @();
-        $RoleNamesWhitelist = @();
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
         if (
             ($Roles.count -eq 1) -and
             ($Roles[0].GetType().Name -eq 'String') -and
             ($Roles[0] -eq 'All')
         ) {
-            $UpdateRoleRules = $true
+            $Update = $true
         }
         else {
-            foreach ($role in $Roles) {
-                if ($role.GetType().Name -eq 'String') {
-                    if ($role -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
-                        $RoleTemplateIDsWhitelist += $role
+            foreach ($item in $Roles) {
+                if ($item.GetType().Name -eq 'String') {
+                    if ($item -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                        $WhitelistIDs += $item
                     }
                     else {
-                        $RoleNamesWhitelist += $role
+                        $WhitelistNames += $item
                     }
-                    $UpdateRoleRules = $true
+                    $Update = $true
                 }
-                elseif ($role.GetType().Name -eq 'Hashtable') {
-                    if ($role.TemplateId) {
-                        $RoleTemplateIDsWhitelist += $role.TemplateId
-                        $UpdateRoleRules = $true
+                elseif ($item.GetType().Name -eq 'Hashtable') {
+                    if ($item.Id) {
+                        $WhitelistIDs += $item.Id
+                        $Update = $true
                     }
-                    elseif ($role.displayName) {
-                        $RoleNamesWhitelist += $role.displayName
-                        $UpdateRoleRules = $true
+                    elseif ($item.TemplateId) {
+                        $WhitelistIDs += $item.TemplateId
+                        $Update = $true
+                    }
+                    elseif ($item.displayName) {
+                        $WhitelistNames += $item.displayName
+                        $Update = $true
                     }
                 }
             }
         }
 
-        if ($UpdateRoleRules) {
+        if ($Update) {
             $params.Config = $EntraRoleClassifications
             $params.DefaultConfig = $EntraRoleManagementRulesDefaults
-            if ($RoleTemplateIDsWhitelist) { $params.Id = $RoleTemplateIDsWhitelist }
-            if ($RoleNamesWhitelist) { $params.Name = $RoleNamesWhitelist }
+            if ($WhitelistIDs) { $params.Id = $WhitelistIDs }
+            if ($WhitelistNames) { $params.Name = $WhitelistNames }
             Update-Entra-RoleRules @params
             $params.Remove('DefaultConfig')
+            $params.Remove('Id')
+            $params.Remove('Name')
         }
     }
 
     if ($TierAdminUnits) {
-        $params.Config = $EntraAdminUnits
-        $params.TierAdminUnits = $true
-        $params.CommonAdminUnits = $false
-        Update-Entra-AdminUnits @params
-        $params.Remove('TierAdminUnits')
-        $params.Remove('CommonAdminUnits')
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+        if (
+            ($TierAdminUnits.count -eq 1) -and
+            ($TierAdminUnits[0].GetType().Name -eq 'String') -and
+            ($TierAdminUnits[0] -eq 'All')
+        ) {
+            $Update = $true
+        }
+        else {
+            foreach ($item in $TierAdminUnits) {
+                if ($item.GetType().Name -eq 'String') {
+                    if ($item -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                        $WhitelistIDs += $item
+                    }
+                    else {
+                        $WhitelistNames += $item
+                    }
+                    $Update = $true
+                }
+                elseif ($item.GetType().Name -eq 'Hashtable') {
+                    if ($item.Id) {
+                        $WhitelistIDs += $item.Id
+                        $Update = $true
+                    }
+                    elseif ($item.TemplateId) {
+                        $WhitelistIDs += $item.TemplateId
+                        $Update = $true
+                    }
+                    elseif ($item.displayName) {
+                        $WhitelistNames += $item.displayName
+                        $Update = $true
+                    }
+                }
+            }
+        }
+
+        if ($Update) {
+            $params.Config = $EntraAdminUnits
+            $params.TierAdminUnits = $true
+            if ($WhitelistIDs) { $params.Id = $WhitelistIDs }
+            if ($WhitelistNames) { $params.Name = $WhitelistNames }
+            Update-Entra-AdminUnits @params
+            $params.Remove('TierAdminUnits')
+            $params.Remove('Id')
+            $params.Remove('Name')
+        }
     }
 
     if ($TierGroups) {
-        $params.Config = $EntraGroups
-        $params.TierGroups = $true
-        $params.CommonGroups = $false
-        Update-Entra-Groups @params
-        $params.Remove('TierGroups')
-        $params.Remove('CommonGroups')
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+        if (
+            ($TierGroups.count -eq 1) -and
+            ($TierGroups[0].GetType().Name -eq 'String') -and
+            ($TierGroups[0] -eq 'All')
+        ) {
+            $Update = $true
+        }
+        else {
+            foreach ($item in $TierGroups) {
+                if ($item.GetType().Name -eq 'String') {
+                    if ($item -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                        $WhitelistIDs += $item
+                    }
+                    else {
+                        $WhitelistNames += $item
+                    }
+                    $Update = $true
+                }
+                elseif ($item.GetType().Name -eq 'Hashtable') {
+                    if ($item.Id) {
+                        $WhitelistIDs += $item.Id
+                        $Update = $true
+                    }
+                    elseif ($item.TemplateId) {
+                        $WhitelistIDs += $item.TemplateId
+                        $Update = $true
+                    }
+                    elseif ($item.displayName) {
+                        $WhitelistNames += $item.displayName
+                        $Update = $true
+                    }
+                }
+            }
+        }
+
+        if ($Update) {
+            $params.Config = $EntraGroups
+            $params.TierGroups = $true
+            if ($WhitelistIDs) { $params.Id = $WhitelistIDs }
+            if ($WhitelistNames) { $params.Name = $WhitelistNames }
+            Update-Entra-Groups @params
+            $params.Remove('TierGroups')
+            $params.Remove('Id')
+            $params.Remove('Name')
+        }
     }
 
     if ($TierCAPolicies) {
-        $params.Config = $EntraCAPolicies
-        $params.TierCAPolicies = $true
-        $params.CommonCAPolicies = $false
-        Update-Entra-CA-Policies @params
-        $params.Remove('TierCAPolicies')
-        $params.Remove('CommonCAPolicies')
+        $Update = $false
+        $WhitelistIDs = @()
+        $WhitelistNames = @()
+
+        if ($Update) {
+            $params.Config = $EntraCAPolicies
+            $params.TierCAPolicies = $true
+            if ($WhitelistIDs) { $params.Id = $WhitelistIDs }
+            if ($WhitelistNames) { $params.Name = $WhitelistNames }
+            Update-Entra-CA-Policies @params
+            $params.Remove('TierCAPolicies')
+            $params.Remove('CommonCAPolicies')
+        }
     }
 }
 catch {

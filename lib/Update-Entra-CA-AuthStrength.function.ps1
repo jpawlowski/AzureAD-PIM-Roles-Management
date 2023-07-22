@@ -27,48 +27,55 @@ function Update-Entra-CA-AuthStrength {
         [switch]$Tier2
     )
 
-    $AuthStrengthTiers = @();
+    $ConfigLevels = @();
     if ($Tier0) {
-        $AuthStrengthTiers += 0
+        $ConfigLevels += 0
     }
     if ($Tier1) {
-        $AuthStrengthTiers += 1
+        $ConfigLevels += 1
     }
     if ($Tier2) {
-        $AuthStrengthTiers += 2
+        $ConfigLevels += 2
     }
-    if ($AuthStrengthTiers.Count -eq 0) {
-        $AuthStrengthTiers = @(0, 1, 2)
+    if ($ConfigLevels.Count -eq 0) {
+        $ConfigLevels = @(0, 1, 2)
     }
 
     try {
-        $authStrengthPolicies = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'" -ErrorAction Stop
+        $current = Get-MgPolicyAuthenticationStrengthPolicy -Filter "PolicyType eq 'custom'" -ErrorAction Stop
     }
     catch {
         Throw $_
     }
 
     $i = 0
-    foreach ($tier in $AuthStrengthTiers) {
-        $PercentComplete = $i / $AuthStrengthTiers.Count * 100
+    foreach ($ConfigLevel in $ConfigLevels) {
+        if (
+            ($null -eq $Config[$ConfigLevel]) -or
+            ($Config[$ConfigLevel].Count -eq 0)
+        ) {
+            continue
+        }
+
+        $PercentComplete = $i / $ConfigLevels.Count * 100
         $params = @{
             Activity         = 'Working on Tier                 '
-            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
+            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $ConfigLevel"
             PercentComplete  = $PercentComplete
-            CurrentOperation = 'EntraCAAuthStrengthTier'
+            CurrentOperation = 'EntraCAAuthStrengthConfigLevel'
         }
         Write-Progress @params
 
         if ($PSCmdlet.ShouldProcess(
-                "Update a total of $($EntraCAAuthStrengths[$tier].Count) Authentication Stength policies in [Tier $tier]",
-                "Do you confirm to create new or update a total of $($EntraCAAuthStrengths[$tier].Count) Authentication Strength policies for Tier ${tier}?",
-                "!!! WARNING: Create and/or update [Tier $tier] Microsoft Entra Conditional Access Authentication Strengths !!!"
+                "Update a total of $($ConfigLevels[$ConfigLevel].Count) Authentication Stength policies in [Tier $ConfigLevel]",
+                "Do you confirm to create new or update a total of $($ConfigLevels[$ConfigLevel].Count) Authentication Strength policies for Tier ${tier}?",
+                "!!! WARNING: Create and/or update [Tier $ConfigLevel] Microsoft Entra Conditional Access Authentication Strengths !!!"
             )) {
             $j = 0
-            foreach ($key in $EntraCAAuthStrengths[$tier].Keys) {
+            foreach ($key in $ConfigLevels[$ConfigLevel].Keys) {
                 $j++
 
-                $PercentComplete = $j / $EntraCAAuthStrengths[$tier].Count * 100
+                $PercentComplete = $j / $ConfigLevels[$ConfigLevel].Count * 100
                 $params = @{
                     Id               = 1
                     ParentId         = 0
@@ -78,20 +85,20 @@ function Update-Entra-CA-AuthStrength {
                     CurrentOperation = 'EntraCAAuthStrengthCreateOrUpdate'
                 }
 
-                foreach ($authStrength in $EntraCAAuthStrengths[$tier][$key]) {
+                foreach ($authStrength in $ConfigLevels[$ConfigLevel][$key]) {
 
                     $updateOnly = $false
                     if ($authStrength.id) {
-                        if ($authStrengthPolicies | Where-Object -FilterScript { $_.Id -eq $authStrength.id }) {
+                        if ($current | Where-Object -FilterScript { $_.Id -eq $authStrength.id }) {
                             $updateOnly = $true
                         }
                         else {
-                            Write-Warning "[Tier $tier] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
+                            Write-Warning "[Tier $ConfigLevel] SKIPPED $($authStrength.id) Authentication Strength: No existing policy found"
                             continue
                         }
                     }
                     else {
-                        $obj = $authStrengthPolicies | Where-Object -FilterScript { $_.DisplayName -eq $authStrength.displayName }
+                        $obj = $current | Where-Object -FilterScript { $_.DisplayName -eq $authStrength.displayName }
                         if ($obj) {
                             $authStrength.id = $obj.Id
                             $updateOnly = $true
@@ -104,7 +111,7 @@ function Update-Entra-CA-AuthStrength {
                         Write-Progress @params
 
                         try {
-                            Write-Verbose "[Tier $tier] Updating authentication strength policy $($authStrength.id) ($($authStrength.displayName))"
+                            Write-Verbose "[Tier $ConfigLevel] Updating authentication strength policy $($authStrength.id) ($($authStrength.displayName))"
                             $null = Update-MgPolicyAuthenticationStrengthPolicy `
                                 -AuthenticationStrengthPolicyId $authStrength.id `
                                 -DisplayName $authStrength.displayName `
@@ -167,7 +174,7 @@ function Update-Entra-CA-AuthStrength {
                         Write-Progress @params
 
                         try {
-                            Write-Verbose "[Tier $tier] Creating authentication strength policy '$($authStrength.displayName)'"
+                            Write-Verbose "[Tier $ConfigLevel] Creating authentication strength policy '$($authStrength.displayName)'"
                             $obj = New-MgPolicyAuthenticationStrengthPolicy `
                                 -DisplayName $authStrength.displayName `
                                 -Description $authStrength.description `

@@ -69,7 +69,9 @@ foreach ($ConfigSubfolder in (Get-Variable -Name '*ConfigSubfolder')) {
         foreach ($f in (Get-ChildItem -LiteralPath $d.FullName -File -Include '*.config.ps1' | Sort-Object -Property Name)) {
             try {
                 Write-Debug "   Loading configuration file $($f.Name)"
-                $null = $dirConfig.Add((. $f.FullName))
+                $tmp = . $f.FullName
+                $tmp.FileOrigin = $f
+                $null = $dirConfig.Add($tmp)
             }
             catch {
                 Throw "Error reading configuration file: $_"
@@ -82,7 +84,11 @@ foreach ($ConfigSubfolder in (Get-Variable -Name '*ConfigSubfolder')) {
     [System.Collections.ArrayList]$dirConfig = @()
     $i = $Config.Add($dirConfig)
 
-    if ($null -eq $EntraMaxAdminTier) {
+    if (
+        ($null -eq $EntraMaxAdminTier) -or
+        $EntraMaxAdminTier -notmatch '^\d+$' -or
+        $EntraMaxAdminTier -lt ($i - 1)
+    ) {
         $EntraMaxAdminTier = $i - 1
     }
 
@@ -95,6 +101,7 @@ foreach ($ConfigSubfolder in (Get-Variable -Name '*ConfigSubfolder')) {
             try {
                 Write-Debug "   Loading configuration file $($f.Name)"
                 $dirConfig += . $f.FullName
+                $dirConfig.FileOrigin = $f
             }
             catch {
                 Throw "Error reading configuration file: $_"

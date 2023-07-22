@@ -53,17 +53,17 @@ function Update-Entra-CA-AuthContext {
         Write-Progress @params
 
         if ($PSCmdlet.ShouldProcess(
-                "Update a total of $($EntraCAAuthContexts[$Tier].Count) Authentication Context(s) in [Tier $Tier]",
-                "Do you confirm to update a total of $($EntraCAAuthContexts[$Tier].Count) Authentication Context(s) for Tier ${tier}?",
+                "Update a total of $($Config[$Tier].Count) Authentication Context(s) in [Tier $Tier]",
+                "Do you confirm to update a total of $($Config[$Tier].Count) Authentication Context(s) for Tier ${tier}?",
                 "!!! WARNING: Update [Tier $Tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
             )) {
 
-            foreach ($key in $EntraCAAuthContexts[$Tier].Keys) {
+            foreach ($key in $Config[$Tier].Keys) {
                 $j = 0
 
-                foreach ($authContext in $EntraCAAuthContexts[$Tier][$key]) {
+                foreach ($authContext in $Config[$Tier][$key]) {
                     $j++
-                    $PercentComplete = $j / $EntraCAAuthContexts[$Tier][$key].Count * 100
+                    $PercentComplete = $j / $Config[$Tier][$key].Count * 100
                     $params = @{
                         Id               = 1
                         ParentId         = 0
