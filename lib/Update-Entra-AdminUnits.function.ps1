@@ -214,7 +214,7 @@ function Update-Entra-AdminUnits {
                         continue
                     }
                     elseif ($obj) {
-                        Write-Warning "[$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                        Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
                         $ConfigItem.id = $obj.Id
                         $updateOnly = $true
                     }

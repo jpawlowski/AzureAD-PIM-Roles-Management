@@ -74,6 +74,26 @@ function Test-NonInteractive {
     return $false
 }
 
+function Write-InformationColored {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [Object]$MessageData,
+        [ConsoleColor]$ForegroundColor = $Host.UI.RawUI.ForegroundColor, # Make sure we use the current colours by default
+        [ConsoleColor]$BackgroundColor = $Host.UI.RawUI.BackgroundColor,
+        [Switch]$NoNewline
+    )
+
+    $params = [System.Management.Automation.HostInformationMessage]@{
+        Message         = $MessageData
+        ForegroundColor = $ForegroundColor
+        BackgroundColor = $BackgroundColor
+        NoNewline       = $NoNewline.IsPresent
+    }
+
+    Write-Information @params
+}
+
 function Get-RandomCharacter($length, $characters) {
     if ($length -lt 1) { return '' }
     $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }

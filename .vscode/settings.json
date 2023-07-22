@@ -1,6 +1,11 @@
 {
+    // Use a custom Theme
+    "window.autoDetectColorScheme": true,
+    "workbench.preferredDarkColorTheme": "Dark Powershell Theme",
+    "workbench.preferredLightColorTheme": "PowerShell ISE",
+    "workbench.colorTheme": "Dark Powershell Theme",
+
     // Use a custom PowerShell Script Analyzer settings file for this workspace.
     // Relative paths for this setting are always relative to the workspace root dir.
     "powershell.scriptAnalysis.settingsPath": ".vscode/PSScriptAnalyzerSettings.psd1"
 }
-
