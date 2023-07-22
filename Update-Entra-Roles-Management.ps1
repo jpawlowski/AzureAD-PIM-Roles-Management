@@ -24,7 +24,7 @@
 .PARAMETER NamedLocations
     Create or update Microsoft Entra Named Locations.
 
-.PARAMETER AdminCAPolicies
+.PARAMETER TierCAPolicies
     Create or update Microsoft Entra Conditional Access policies for admins.
 
 .PARAMETER ValidateBreakGlass
@@ -43,7 +43,7 @@
     Perform changes to Tier2.
 
 .PARAMETER TenantId
-    Microsoft Entra tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
+    Microsoft Entra tenant ID. Otherwise implied from configuration files or $env:AZURE_TENANT_ID.
 
 .PARAMETER UseDeviceCode
     Use device code authentication instead of a browser control.
@@ -70,9 +70,11 @@ Param (
     [switch]$AuthContext,
     [switch]$AuthStrength,
     [switch]$NamedLocations,
-    [switch]$AdminCAPolicies,
     [switch]$ValidateBreakGlass,
     [switch]$SkipBreakGlassValidation,
+    [switch]$TierAdminUnits,
+    [switch]$TierCAPolicies,
+    [switch]$TierGroups,
     [switch]$Tier0,
     [switch]$Tier1,
     [switch]$Tier2,
@@ -84,12 +86,14 @@ Param (
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    ($Roles -or $AdminCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
+    ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
     ($Roles ? 'Update-Entra-RoleRules.function.ps1' : $null)
     ($AuthContext ? 'Update-Entra-CA-AuthContext.function.ps1' : $null)
     ($AuthStrength ? 'Update-Entra-CA-AuthStrength.function.ps1' : $null)
     ($NamedLocations ? 'Update-Entra-CA-NamedLocations.function.ps1' : $null)
-    ($AdminCAPolicies ? 'Update-Entra-CA-Policies.function.ps1' : $null)
+    ($TierAdminUnits ? 'Update-Entra-AdminUnits.function.ps1' : $null)
+    ($TierGroups ? 'Update-Entra-Groups.function.ps1' : $null)
+    ($TierCAPolicies ? 'Update-Entra-CA-Policies.function.ps1' : $null)
 )
 foreach ($FileName in $LibFiles) {
     if ($null -eq $FileName -or $FileName -eq '') { continue }
@@ -109,7 +113,12 @@ foreach ($FileName in $LibFiles) {
 }
 
 try {
-    Connect-MyMgGraph -Scopes $MgScopes
+    $params = @{
+        Scopes = $MgScopes
+    }
+    if ($TenantId) { $params.TenantId = $TenantId }
+    if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
+    Connect-MyMgGraph @params
 
     $params = @{}
     if ($Tier0) { $params.Tier0 = $Tier0 }
@@ -131,8 +140,8 @@ try {
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Validation SKIPPED"
-    } elseif ($Roles -or $AdminCAPolicies -or $ValidateBreakGlass) {
-        Test-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
+    } elseif ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
+        Test-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass
     }
 
     if ($Roles) {
@@ -180,11 +189,31 @@ try {
         }
     }
 
-    if ($AdminCAPolicies) {
-        $params.Remove('Config')
-        $params.AdminCAPolicies = $true
-        $params.ConfigPath = (Join-Path $ConfigPath $EntraCAPoliciesSubfolder)
+    if ($TierAdminUnits) {
+        $params.Config = $EntraAdminUnits
+        $params.TierAdminUnits = $true
+        $params.CommonAdminUnits = $false
+        Update-Entra-AdminUnits @params
+        $params.Remove('TierAdminUnits')
+        $params.Remove('CommonAdminUnits')
+    }
+
+    if ($TierGroups) {
+        $params.Config = $EntraGroups
+        $params.TierGroups = $true
+        $params.CommonGroups = $false
+        Update-Entra-Groups @params
+        $params.Remove('TierGroups')
+        $params.Remove('CommonGroups')
+    }
+
+    if ($TierCAPolicies) {
+        $params.Config = $EntraCAPolicies
+        $params.TierCAPolicies = $true
+        $params.CommonCAPolicies = $false
         Update-Entra-CA-Policies @params
+        $params.Remove('TierCAPolicies')
+        $params.Remove('CommonCAPolicies')
     }
 }
 catch {

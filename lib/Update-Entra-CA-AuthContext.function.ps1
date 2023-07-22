@@ -42,28 +42,28 @@ function Update-Entra-CA-AuthContext {
     }
 
     $i = 0
-    foreach ($tier in $AuthContextTiers) {
+    foreach ($Tier in $AuthContextTiers) {
         $PercentComplete = $i / $AuthContextTiers.Count * 100
         $params = @{
             Activity         = 'Working on Tier                  '
-            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $tier"
+            Status           = " $([math]::floor($PercentComplete))% Complete: Tier $Tier"
             PercentComplete  = $PercentComplete
             CurrentOperation = 'EntraCAAuthContextTier'
         }
         Write-Progress @params
 
         if ($PSCmdlet.ShouldProcess(
-                "Update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) in [Tier $tier]",
-                "Do you confirm to update a total of $($EntraCAAuthContexts[$tier].Count) Authentication Context(s) for Tier ${tier}?",
-                "!!! WARNING: Update [Tier $tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
+                "Update a total of $($EntraCAAuthContexts[$Tier].Count) Authentication Context(s) in [Tier $Tier]",
+                "Do you confirm to update a total of $($EntraCAAuthContexts[$Tier].Count) Authentication Context(s) for Tier ${tier}?",
+                "!!! WARNING: Update [Tier $Tier] Microsoft Entra Conditional Access Authentication Contexts !!!"
             )) {
 
-            foreach ($key in $EntraCAAuthContexts[$tier].Keys) {
+            foreach ($key in $EntraCAAuthContexts[$Tier].Keys) {
                 $j = 0
 
-                foreach ($authContext in $EntraCAAuthContexts[$tier][$key]) {
+                foreach ($authContext in $EntraCAAuthContexts[$Tier][$key]) {
                     $j++
-                    $PercentComplete = $j / $EntraCAAuthContexts[$tier][$key].Count * 100
+                    $PercentComplete = $j / $EntraCAAuthContexts[$Tier][$key].Count * 100
                     $params = @{
                         Id               = 1
                         ParentId         = 0
@@ -74,7 +74,7 @@ function Update-Entra-CA-AuthContext {
                     }
                     Write-Progress @params
 
-                    Write-Verbose "[Tier $tier] Updating authentication context class reference $($authContext.id) ($($authContext.displayName))"
+                    Write-Verbose "[Tier $Tier] Updating authentication context class reference $($authContext.id) ($($authContext.displayName))"
                     Update-MgIdentityConditionalAccessAuthenticationContextClassReference `
                         -AuthenticationContextClassReferenceId $authContext.id `
                         -DisplayName $authContext.displayName `

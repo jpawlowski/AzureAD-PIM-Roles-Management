@@ -12,7 +12,7 @@
                     $EntraCAAuthStrengths[1].roleEnablement.displayName
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Require '$($EntraCAAuthStrengths[1].roleEnablement.displayName)' authentication methods before A0C or A1C cloud-only admin users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[1].default.displayName)' authentication context in PIM. DO NOT CHANGE MANUALLY!"
+        description   = "Require '$($EntraCAAuthStrengths[1].roleEnablement.displayName)' authentication methods before A0C or A1C cloud native admin users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[1].default.displayName)' authentication context in PIM. DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

@@ -255,10 +255,10 @@ function Test-Entra-Tier0-BreakGlass {
         }
         if ($null -ne $userObj.OnPremisesSyncEnabled) {
             if ($userObj.OnPremisesSyncEnabled -eq $true) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be cloud-only"
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Must be cloud native"
             }
             else {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can never have synced with on-premises before and must be cloud-only right from the beginning"
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Can never have synced with on-premises before and must be cloud native right from the beginning"
             }
             return
         }

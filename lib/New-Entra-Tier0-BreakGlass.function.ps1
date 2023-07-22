@@ -114,7 +114,7 @@ function New-Entra-Tier0-BreakGlass {
                 -Visibility $Config.group.visibility `
                 -IsAssignableToRole:$Config.group.isAssignableToRole `
                 -MailEnabled:$false `
-                -MailNickname $((Get-RandomPassword -lowerChars 3 -upperChars 3 -numbers 2 -symbols 0) + '-f') `
+                -MailNickname (New-Guid).Guid.Substring(0, 10) `
                 -DisplayName $Config.group.displayName `
                 -Description $Config.group.description `
                 -ErrorAction Stop `
@@ -177,7 +177,7 @@ function New-Entra-Tier0-BreakGlass {
                     -UserPrincipalName $account.userPrincipalName `
                     -DisplayName $account.displayName `
                     -AccountEnabled:$false `
-                    -MailNickname $((Get-RandomPassword -lowerChars 3 -upperChars 3 -numbers 2 -symbols 0) + '-f') `
+                    -MailNickname (New-Guid).Guid.Substring(0, 10) `
                     -PasswordProfile @{
                     Password                             = Get-RandomPassword -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
                     ForceChangePasswordNextSignIn        = $true
@@ -215,7 +215,7 @@ function New-Entra-Tier0-BreakGlass {
                 Write-Output "   UPN             :  $($userObj.UserPrincipalName)"
                 Write-Output "   Object ID       :  $($userObj.Id)"
                 Write-Output "   Display Name    :  $($userObj.DisplayName)"
-                Write-Output "   Directory Role  :  Global Administrator of tenant ID $TenantId"
+                Write-Output "   Directory Role  :  Global Administrator of tenant ID $((Get-MgContext).TenantId)"
                 Write-Output "   Account Enabled :  Disabled. Please activate before use."
                 Write-Output "   Password        :  Please reset the password to configure the account."
                 if ($null -ne $adminUnitObj) {

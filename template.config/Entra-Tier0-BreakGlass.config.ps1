@@ -1,8 +1,8 @@
 #Requires -Version 7.2
 
-$EntraT0BreakGlassGroupDisplayNamePrefix = $EntraGroupsDisplayNamePrefix
+$EntraTier0BreakGlassGroupDisplayNamePrefix = $EntraGroupsTier0DisplayNamePrefix
 
-$EntraT0BreakGlass = @{
+$EntraTier0BreakGlass = @{
 
     # Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
     #
@@ -14,7 +14,7 @@ $EntraT0BreakGlass = @{
         # The account SHOULD use the .onmicrosoft.com subdomain as User Principal Name.
         # The account MUST have Global Administrator role permanently assigned and active.
         # The account CAN NOT use transitive role assignment via group.
-        # The account MUST be cloud-only, NOT a synced/federated account.
+        # The account MUST be cloud native, NOT a synced/federated account.
         # The account MUST have configured methods for Multi-Factor Authentication.
         #
         # It is highly recommended to have a dedicated CA policy targeted to this account
@@ -43,7 +43,7 @@ $EntraT0BreakGlass = @{
         # The account SHOULD use the .onmicrosoft.com subdomain as User Principal Name.
         # The account MUST have Global Administrator role permanently assigned and active.
         # The account CAN NOT use transitive role assignment via group.
-        # The account MUST be cloud-only, NOT a synced/federated account.
+        # The account MUST be cloud native, NOT a synced/federated account.
         # The account SHOULD have configured methods for Multi-Factor Authentication.
         #
         # This backup break glass admin account MUST be excluded from _ALL_ Conditional Access policies,
@@ -77,7 +77,7 @@ $EntraT0BreakGlass = @{
     #
     group      = @{
         id                 = '00000000-0000-0000-0000-000000000000'
-        displayName        = @($EntraT0BreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
+        displayName        = @($EntraTier0BreakGlassGroupDisplayNamePrefix, 'S-Break-Glass-Admins') | Join-String -Separator $DisplayNameElementSeparator
         description        = 'Global group for emergency Break Glass accounts. DO NOT CHANGE!'
         visibility         = 'Private'
         isAssignableToRole = $true
@@ -92,7 +92,7 @@ $EntraT0BreakGlass = @{
     #
     adminUnit  = @{
         id                           = '00000000-0000-0000-0000-000000000000'
-        displayName                  = @($EntraT0BreakGlassGroupDisplayNamePrefix, 'T0-S-Break-Glass-RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+        displayName                  = @($EntraTier0BreakGlassGroupDisplayNamePrefix, 'S-Break-Glass', 'RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
         description                  = 'Tier0 objects for Break Glass access. DO NOT CHANGE!'
         visibility                   = 'HiddenMembership'
         isMemberManagementRestricted = $true
@@ -104,7 +104,7 @@ $EntraT0BreakGlass = @{
     caPolicies = @(
         @{
             id                     = '00000000-0000-0000-0000-000000000000'
-            displayName            = @($EntraT0BreakGlassGroupDisplayNamePrefix, 'T0-Break-Glass-Admins-Except-Backup-Allow-Require-MFA') | Join-String -Separator $DisplayNameElementSeparator
+            displayName            = @($EntraTier0BreakGlassGroupDisplayNamePrefix, 'Break-Glass-Admins-Except-Backup-Allow-Require-MFA') | Join-String -Separator $DisplayNameElementSeparator
             description            = 'Protect Tier0 Break Glass Accounts with MFA, but still exclude a single Backup Breaking Glass Account. DO NOT CHANGE!'
             state                  = 'enabledForReportingButNotEnforced'   # change to 'enabled' when ready
             grantControls          = @{
@@ -120,7 +120,7 @@ $EntraT0BreakGlass = @{
         }
         @{
             id                     = '00000000-0000-0000-0000-000000000000'
-            displayName            = @($EntraT0BreakGlassGroupDisplayNamePrefix, 'T0-Backup-Break-Glass-Admin-Allow-ReportOnly-MFA') | Join-String -Separator $DisplayNameElementSeparator
+            displayName            = @($EntraTier0BreakGlassGroupDisplayNamePrefix, 'Backup-Break-Glass-Admin-Allow-ReportOnly-MFA') | Join-String -Separator $DisplayNameElementSeparator
             description            = 'Monitor Backup Tier0 Break Glass account, but do not protect. DO NOT CHANGE!'
             state                  = 'enabledForReportingButNotEnforced'   # keep this state, it is for monitoring the backup Break Glass account only
             grantControls          = @{

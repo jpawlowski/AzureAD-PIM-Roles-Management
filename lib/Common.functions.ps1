@@ -16,7 +16,9 @@
 function Connect-MyMgGraph {
     [CmdletBinding()]
     Param (
-        [string[]]$Scopes
+        [string[]]$Scopes,
+        [string]$TenantId,
+        [switch]$UseDeviceCode
     )
 
     if (
@@ -24,13 +26,13 @@ function Connect-MyMgGraph {
         ($TenantId -eq '')
     ) {
         if (
-            ($null -ne $env:TenantId) -and
-            ($env:TenantId -ne '')
+            ($null -ne $env:AZURE_TENANT_ID) -and
+            ($env:AZURE_TENANT_ID -ne '')
         ) {
-            $TenantId = $env:TenantId
+            $TenantId = $env:AZURE_TENANT_ID
         }
         else {
-            Write-Error "Missing `$env:TenantId environment variable or -TenantId parameter"
+            Write-Error "Missing `$env:AZURE_TENANT_ID environment variable or -TenantId parameter"
         }
     }
 
@@ -49,14 +51,16 @@ function Connect-MyMgGraph {
     ) {
         Write-Verbose "Re-authentication required"
         $params = @{
+            ErrorAction  = 'Stop'
             ContextScope = 'Process'
-            TenantId = $TenantId
         }
         if ($Scopes) { $params.Scopes = $Scopes | Get-Unique }
+        if ($TenantId) { $params.TenantId = $TenantId }
         if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
-        Write-Debug "Connecting to Microsoft Graph for tenant $TenantId"
+        Write-Debug "Connecting to Microsoft Graph with parameters: $($params | Out-String)"
         Connect-MgGraph @params
-    } else {
+    }
+    else {
         Write-Debug "Using existing connection to Microsoft Graph for tenant $((Get-MgContext).TenantId)"
     }
 }
@@ -72,9 +76,9 @@ function Test-NonInteractive {
 
 function Get-RandomCharacter($length, $characters) {
     if ($length -lt 1) { return '' }
-    $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length }
+    $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
     $private:ofs = ''
-    return [String]$characters[$random]
+    return [string]$characters[$random]
 }
 
 function Get-ScrambleString([string]$inputString) {

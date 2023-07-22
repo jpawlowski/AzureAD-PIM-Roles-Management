@@ -5,4 +5,4 @@ $EntraCAPolicyTier0DisplayNamePrefix = @($EntraCAPolicyDisplayNamePrefix, 'T0') 
 $EntraCAPolicyTier1DisplayNamePrefix = @($EntraCAPolicyDisplayNamePrefix, 'T1') | Join-String -Separator $DisplayNameElementSeparator
 $EntraCAPolicyTier2DisplayNamePrefix = @($EntraCAPolicyDisplayNamePrefix, 'T2') | Join-String -Separator $DisplayNameElementSeparator
 
-$EntraCAPoliciesSubfolder = 'Entra-CA-Policies.config'
+$EntraCAPoliciesConfigSubfolder = 'Entra-CA-Policies.config'

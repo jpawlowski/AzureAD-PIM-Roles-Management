@@ -11,7 +11,7 @@
                     '-Tier1-Roles'
             )
         ) | Join-String -Separator $DisplayNameElementSeparator
-        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[1].default.displayName)' authentication context for everyone, except for A0C and A1C cloud-only admins. DO NOT CHANGE MANUALLY!"
+        description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[1].default.displayName)' authentication context for everyone, except for A0C and A1C cloud native admins. DO NOT CHANGE MANUALLY!"
         state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                                 # As a best practise, update the ID parameter above at the same time.
                                                                 # Also, update the displayName above and remove the 'TEST' prefix.

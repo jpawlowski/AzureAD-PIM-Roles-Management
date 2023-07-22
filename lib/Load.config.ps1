@@ -25,10 +25,14 @@ if (!(Test-Path -Path $ConfigPath -PathType Container)) {
 
 $MgScopes = @()
 
+# Make sure subfolder variables will only be defined in config files
+Clear-Variable -Name '*ConfigSubfolder'
+
 $ConfigFiles = @(
     'Environment.config.ps1'
-    'Entra-Groups.config.ps1'
     'Entra-Tier0-BreakGlass.config.ps1'
+    'Entra-AdminUnits.config.ps1'
+    'Entra-Groups.config.ps1'
     'Entra-CA-AuthContexts.config.ps1'
     'Entra-CA-AuthStrengths.config.ps1'
     'Entra-CA-NamedLocations.config.ps1'
@@ -41,6 +45,7 @@ foreach ($ConfigFile in $ConfigFiles) {
     $FilePath = Join-Path $ConfigPath $ConfigFile
     if (Test-Path -Path $FilePath -PathType Leaf) {
         try {
+            Write-Debug "Loading configuration file $FilePath"
             . $FilePath
         }
         catch {
@@ -50,4 +55,54 @@ foreach ($ConfigFile in $ConfigFiles) {
     else {
         Throw "Configuration file not found: $FilePath"
     }
+}
+
+foreach ($ConfigSubfolder in (Get-Variable -Name '*ConfigSubfolder')) {
+    if ($null -eq $ConfigSubfolder.Value) { continue }
+    [System.Collections.ArrayList]$Config = @()
+
+    # Always process Tier configs first into separate arrays
+    foreach ($d in (Get-ChildItem -LiteralPath (Join-Path $ConfigPath $ConfigSubfolder.Value) -Directory -Depth 0 -Include 'Tier*-Admin' | Sort-Object -Property Name)) {
+        Write-Debug "Processing configuration folder $($d.FullName)"
+
+        [System.Collections.ArrayList]$dirConfig = @()
+        foreach ($f in (Get-ChildItem -LiteralPath $d.FullName -File -Include '*.config.ps1' | Sort-Object -Property Name)) {
+            try {
+                Write-Debug "   Loading configuration file $($f.Name)"
+                $null = $dirConfig.Add((. $f.FullName))
+            }
+            catch {
+                Throw "Error reading configuration file: $_"
+            }
+        }
+
+        $null = $Config.Add($dirConfig)
+    }
+
+    [System.Collections.ArrayList]$dirConfig = @()
+    $i = $Config.Add($dirConfig)
+
+    if ($null -eq $EntraMaxAdminTier) {
+        $EntraMaxAdminTier = $i - 1
+    }
+
+    # Add any other config to same array
+    $dirConfig = @()
+    foreach ($d in (Get-ChildItem -LiteralPath (Join-Path $ConfigPath $ConfigSubfolder.Value) -Directory -Depth 0 -Exclude 'Tier*-Admin' | Sort-Object -Property Name)) {
+        Write-Debug "Processing configuration folder $($d.FullName)"
+
+        foreach ($f in (Get-ChildItem -LiteralPath $d.FullName -File -Include '*.config.ps1' | Sort-Object -Property Name)) {
+            try {
+                Write-Debug "   Loading configuration file $($f.Name)"
+                $dirConfig += . $f.FullName
+            }
+            catch {
+                Throw "Error reading configuration file: $_"
+            }
+        }
+    }
+    $Config[$i] = $dirConfig
+
+    $VarName = ($ConfigSubfolder.Value).Replace('-', '').Replace('.config', '')
+    New-Variable -Name $VarName -Value $Config
 }

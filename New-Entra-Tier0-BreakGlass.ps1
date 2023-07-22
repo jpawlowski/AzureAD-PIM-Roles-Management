@@ -9,7 +9,7 @@
     Also see https://learn.microsoft.com/en-us/azure/active-directory/roles/security-emergency-access
 
 .PARAMETER TenantId
-    Microsoft Entra tenant ID. Otherwise implied from configuration files, $env:TenantId or $TenantId.
+    Microsoft Entra tenant ID. Otherwise implied from configuration files or $env:AZURE_TENANT_ID.
 
 .PARAMETER UseDeviceCode
     Use device code authentication instead of a browser control.
@@ -52,4 +52,4 @@ catch {
 }
 
 Connect-MyMgGraph -Scopes $MgScopes
-New-Entra-Tier0-BreakGlass -Config $EntraT0BreakGlass
+New-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass
