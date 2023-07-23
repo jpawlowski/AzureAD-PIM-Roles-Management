@@ -18,11 +18,15 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
+$MgScopes += 'User.Read.All'
 $MgScopes += 'User.ReadWrite.All'
 $MgScopes += 'UserAuthenticationMethod.Read.All'
+$MgScopes += 'Group.Read.All'
 $MgScopes += 'Group.ReadWrite.All'
+$MgScopes += 'AdministrativeUnit.Read.All'
 $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 $MgScopes += 'Directory.Write.Restricted'
+$MgScopes += 'RoleManagement.Read.All'
 $MgScopes += 'RoleManagement.ReadWrite.Directory'
 
 function Test-Entra-Tier0-BreakGlass {

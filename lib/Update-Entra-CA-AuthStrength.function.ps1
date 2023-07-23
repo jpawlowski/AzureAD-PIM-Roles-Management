@@ -13,6 +13,7 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
+$MgScopes += 'Policy.Read.All'
 $MgScopes += 'Policy.ReadWrite.AuthenticationMethod'
 
 function Update-Entra-CA-AuthStrength {

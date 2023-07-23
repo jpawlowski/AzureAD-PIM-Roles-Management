@@ -80,13 +80,14 @@ Param (
     [switch]$Tier2,
     [string]$TenantId,
     [switch]$UseDeviceCode,
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [switch]$Force
 )
 
 $LibFiles = @(
     'Common.functions.ps1'
     'Load.config.ps1'
-    ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
+    ($Roles -or $TierAdminUnits -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass ? 'Test-Entra-Tier0-BreakGlass.function.ps1' : $null)
     ($Roles ? 'Update-Entra-RoleRules.function.ps1' : $null)
     ($AuthContext ? 'Update-Entra-CA-AuthContext.function.ps1' : $null)
     ($AuthStrength ? 'Update-Entra-CA-AuthStrength.function.ps1' : $null)
@@ -114,13 +115,19 @@ foreach ($FileName in $LibFiles) {
 
 try {
     $params = @{
-        Scopes = $MgScopes
+        ErrorAction       = 'Stop'
+        Scopes            = $MgScopes
     }
     if ($TenantId) { $params.TenantId = $TenantId }
     if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
     Connect-MyMgGraph @params
 
-    $params = @{}
+    $params = @{
+        ErrorAction = 'Stop'
+        Force       = $Force
+        Confirm     = $ConfirmPreference
+        WhatIf      = $WhatIfPreference
+    }
     if ($Tier0) { $params.Tier0 = $Tier0 }
     if ($Tier1) { $params.Tier1 = $Tier1 }
     if ($Tier2) { $params.Tier2 = $Tier2 }
@@ -159,8 +166,8 @@ try {
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
         Write-Warning "Break Glass Validation SKIPPED"
     }
-    elseif ($Roles -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
-        Test-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass
+    elseif ($Roles -or $TierAdminUnits -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
+        Test-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass -ErrorAction Stop
     }
 
     if ($Roles) {

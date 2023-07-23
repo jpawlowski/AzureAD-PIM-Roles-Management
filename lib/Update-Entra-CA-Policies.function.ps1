@@ -27,7 +27,8 @@ function Update-Entra-CA-Policies {
         [switch]$CommonCAPolicies,
         [switch]$Tier0,
         [switch]$Tier1,
-        [switch]$Tier2
+        [switch]$Tier2,
+        [switch]$Force
     )
 
     Write-Host "+++++++ CA Policies ++++++++"

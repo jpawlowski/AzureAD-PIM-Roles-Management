@@ -36,6 +36,11 @@ function Connect-MyMgGraph {
         }
     }
 
+    if ($WhatIfPreference) {
+        Write-Debug "WhatIf: Removing Write scopes from Microsoft.Graph for Read-Only output"
+        $MgScopes = $MgScopes | Where-Object -FilterScript { $_ -notlike '*Write*' }
+    }
+
     Write-Debug "Requesting the following scopes for Microsoft Graph PowerShell: `n           $(($MgScopes | Sort-Object | Get-Unique) -join "`n           ")"
 
     $reauth = $false

@@ -111,5 +111,5 @@ foreach ($ConfigSubfolder in (Get-Variable -Name '*ConfigSubfolder')) {
     $Config[$i] = $dirConfig
 
     $VarName = ($ConfigSubfolder.Value).Replace('-', '').Replace('.config', '')
-    New-Variable -Name $VarName -Value $Config
+    New-Variable -Name $VarName -Value $Config -Confirm:$false -WhatIf:$false
 }

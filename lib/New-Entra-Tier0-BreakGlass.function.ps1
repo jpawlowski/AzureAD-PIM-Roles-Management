@@ -15,11 +15,16 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
 
+$MgScopes += 'AdministrativeUnit.Read.All'
 $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 $MgScopes += 'Directory.Write.Restricted'
+$MgScopes += 'User.Read.All'
 $MgScopes += 'User.ReadWrite.All'
+$MgScopes += 'Group.Read.All'
 $MgScopes += 'Group.ReadWrite.All'
+$MgScopes += 'RoleManagement.Read.All'
 $MgScopes += 'RoleManagement.ReadWrite.Directory'
+$MgScopes += 'Policy.Read.All'
 $MgScopes += 'Policy.ReadWrite.ConditionalAccess'
 $MgScopes += 'Application.Read.All'
 

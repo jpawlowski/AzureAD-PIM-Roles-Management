@@ -13,6 +13,7 @@
 #Requires -Version 7.2
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Identity.DirectoryManagement'; ModuleVersion='2.0' }
 
+$MgScopes += 'AdministrativeUnit.Read.All'
 $MgScopes += 'AdministrativeUnit.ReadWrite.All'
 $MgScopes += 'Directory.Write.Restricted'
 
@@ -30,7 +31,8 @@ function Update-Entra-AdminUnits {
         [string[]]$Name,
         [switch]$Tier0,
         [switch]$Tier1,
-        [switch]$Tier2
+        [switch]$Tier2,
+        [switch]$Force
     )
 
     $ConfigLevels = @();
@@ -64,7 +66,7 @@ function Update-Entra-AdminUnits {
             continue
         }
 
-        if ($ConfigLevel -lt $EntraMaxAdminTier) {
+        if ($ConfigLevel -le $EntraMaxAdminTier) {
             $Subject = "Tier $ConfigLevel"
         }
         else {
@@ -158,7 +160,7 @@ function Update-Entra-AdminUnits {
 
         $list = $list | Sort-Object -Property displayName
 
-        $PercentComplete = $i / $ConfigLevel.Count * 100
+        $PercentComplete = $i / $ConfigLevels.Count * 100
         $params = @{
             Activity         = 'Working on                       '
             Status           = " $([math]::floor($PercentComplete))% Complete: $Subject"
@@ -167,8 +169,7 @@ function Update-Entra-AdminUnits {
         }
         Write-Progress @params
 
-        if ($PSCmdlet.ShouldProcess(
-                "Process a total of $($list.Count) [$Subject] Administrative Unit(s)",
+        if ($Force -or $WhatIfPreference -or $PSCmdlet.ShouldContinue(
                 "Do you confirm to process a total of $($list.Count) [$Subject] Administrative Unit(s) ?",
                 "!!! WARNING: Processing [$Subject] Microsoft Entra Administrative Units !!!"
             )) {
@@ -220,27 +221,27 @@ function Update-Entra-AdminUnits {
                     }
                 }
 
+                $BodyParameter = $ConfigItem.PSObject.copy()
+                $BodyParameter.Remove('FileOrigin')
+
                 if ($updateOnly) {
                     $params.Activity = 'Update Administrative Unit'
                     $params.Status = " $([math]::floor($PercentComplete))% Complete: $($ConfigItem.displayName)"
                     Write-Progress @params
 
                     try {
-                        $params = $ConfigItem.PSObject.copy()
-                        $params.Remove('FileOrigin')
-
-                        $diff = Compare-Object -ReferenceObject $params -DifferenceObject $obj -Property @($params.Keys) -CaseSensitive
+                        $diff = Compare-Object -ReferenceObject $BodyParameter -DifferenceObject $obj -Property @($BodyParameter.Keys) -CaseSensitive
                         if ($diff) {
                             if ($PSCmdlet.ShouldProcess(
-                                    "Update Administrative Unit $($ConfigItem.id) ($($ConfigItem.displayName))",
+                                    "[$Subject] Administrative Unit: Update $($ConfigItem.id) ($($ConfigItem.displayName))",
                                     "Do you confirm to update this Administrative Unit?",
                                     "Update Administrative Unit $($ConfigItem.id) ($($ConfigItem.displayName))"
                                 )) {
                                 Write-Verbose "[$Subject] Updating Administrative Unit $($ConfigItem.id) ($($ConfigItem.displayName))"
-                                Write-Debug "BodyParameter: $($params | Out-String)"
+                                Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
                                 $null = Update-MgBetaAdministrativeUnit `
                                     -AdministrativeUnitId $ConfigItem.Id `
-                                    -BodyParameter $params `
+                                    -BodyParameter $BodyParameter `
                                     -ErrorAction Stop `
                                     -Confirm:$false
                             }
@@ -259,18 +260,22 @@ function Update-Entra-AdminUnits {
                     Write-Progress @params
 
                     try {
-                        Write-Verbose "[$Subject] Creating Administrative Unit '$($ConfigItem.displayName)'"
-                        $params = $ConfigItem.PSObject.copy()
-                        $params.Remove('FileOrigin')
+                        if ($PSCmdlet.ShouldProcess(
+                                "[$Subject] Administrative Unit: Create '$($ConfigItem.displayName)'",
+                                "Do you confirm to create this new Administrative Unit?",
+                                "Create new Administrative Unit '$($ConfigItem.displayName)'"
+                            )) {
+                            Write-Verbose "[$Subject] Creating Administrative Unit '$($ConfigItem.displayName)'"
 
-                        Write-Debug "BodyParameter: $($params | Out-String)"
-                        $obj = New-MgBetaAdministrativeUnit `
-                            -BodyParameter $params `
-                            -ErrorAction Stop `
-                            -Confirm:$false
+                            Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
+                            $obj = New-MgBetaAdministrativeUnit `
+                                -BodyParameter $BodyParameter `
+                                -ErrorAction Stop `
+                                -Confirm:$false
 
-                        Write-Verbose "[$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
-                        $ConfigItem.id = $obj.Id
+                            Write-InformationColored -ForegroundColor Blue "[$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                            $ConfigItem.id = $obj.Id
+                        }
                     }
                     catch {
                         throw $_

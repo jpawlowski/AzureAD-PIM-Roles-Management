@@ -14,6 +14,7 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
+$MgScopes += 'RoleManagement.Read.All'
 $MgScopes += 'RoleManagement.ReadWrite.Directory'
 
 function Update-Entra-RoleRules {
