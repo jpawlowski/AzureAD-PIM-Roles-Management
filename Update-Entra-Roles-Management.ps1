@@ -164,7 +164,7 @@ try {
     }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {
-        Write-Warning "Break Glass Validation SKIPPED"
+        if (!$WhatIfPreference) { Write-Warning "Break Glass Validation SKIPPED" }
     }
     elseif ($Roles -or $TierAdminUnits -or $TierGroups -or $TierCAPolicies -or $ValidateBreakGlass) {
         Test-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass -ErrorAction Stop
