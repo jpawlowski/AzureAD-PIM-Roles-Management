@@ -62,7 +62,7 @@ function Connect-MyMgGraph {
         if ($Scopes) { $params.Scopes = $Scopes | Get-Unique }
         if ($TenantId) { $params.TenantId = $TenantId }
         if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
-        Write-Debug "Connecting to Microsoft Graph with parameters: $($params | Out-String)"
+        Write-Debug "Connecting to Microsoft Graph with parameters:`n$($params | ConvertTo-Json -Depth 10)"
         Connect-MgGraph @params
     }
     else {

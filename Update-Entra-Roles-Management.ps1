@@ -327,6 +327,40 @@ try {
         $Update = $false
         $WhitelistIDs = @()
         $WhitelistNames = @()
+        if (
+            ($TierCAPolicies.count -eq 1) -and
+            ($TierCAPolicies[0].GetType().Name -eq 'String') -and
+            ($TierCAPolicies[0] -eq 'All')
+        ) {
+            $Update = $true
+        }
+        else {
+            foreach ($item in $TierCAPolicies) {
+                if ($item.GetType().Name -eq 'String') {
+                    if ($item -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+                        $WhitelistIDs += $item
+                    }
+                    else {
+                        $WhitelistNames += $item
+                    }
+                    $Update = $true
+                }
+                elseif ($item.GetType().Name -eq 'Hashtable') {
+                    if ($item.Id) {
+                        $WhitelistIDs += $item.Id
+                        $Update = $true
+                    }
+                    elseif ($item.TemplateId) {
+                        $WhitelistIDs += $item.TemplateId
+                        $Update = $true
+                    }
+                    elseif ($item.displayName) {
+                        $WhitelistNames += $item.displayName
+                        $Update = $true
+                    }
+                }
+            }
+        }
 
         if ($Update) {
             $params.Config = $EntraCAPolicies
@@ -335,7 +369,8 @@ try {
             if ($WhitelistNames) { $params.Name = $WhitelistNames }
             Update-Entra-CA-Policies @params
             $params.Remove('TierCAPolicies')
-            $params.Remove('CommonCAPolicies')
+            $params.Remove('Id')
+            $params.Remove('Name')
         }
     }
 }

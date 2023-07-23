@@ -232,7 +232,7 @@ function Test-Entra-Tier0-BreakGlass {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account is incomplete"
             return
         }
-        $userObj = Get-MgUser -UserId $userId -Property Id, UserPrincipalName, IsResourceAccount, UserType, ExternalUserState, OnPremisesSyncEnabled, CreatedDateTime, DeletedDateTime, AccountEnabled, PasswordProfile, LastPasswordChangeDateTime, Authentication, DisplayName -ErrorAction Stop
+        $userObj = Get-MgUser -UserId $userId -Property Id, UserPrincipalName, IsResourceAccount, UserType, ExternalUserState, OnPremisesSyncEnabled, CreatedDateTime, DeletedDateTime, AccountEnabled, PasswordProfile, LastPasswordChangeDateTime, Authentication, DisplayName -ErrorAction SilentlyContinue
 
         if ($null -eq $userObj) {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account: $userId does not exist"

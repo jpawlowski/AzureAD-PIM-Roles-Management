@@ -4,13 +4,14 @@
         'TEST', # Remove line when policy is fully enabled for production
         $EntraCAPolicyTier2DisplayNamePrefix,
         (
-            'Global-Except-Member-Users-Block-' + `
+            'Member-Users-Allow-' + `
                 $EntraCAAuthContextDisplayNameSuffix + `
             ($EntraCAAuthContexts[2].default.id -replace '\D') + `
-                '-Tier2-Roles'
+                '-Tier2-Roles-Require-' + `
+                $EntraCAAuthStrengths[2].roleEnablement.displayName
         )
     ) | Join-String -Separator $DisplayNameElementSeparator
-    description   = "Block PIM role enablement for privileged roles that are assigned to the '$($EntraCAAuthContexts[2].default.displayName)' authentication context for everyone, except for domain member users with Microsoft Entra ID P2 license. DO NOT CHANGE MANUALLY!"
+    description   = "Require '$($EntraCAAuthStrengths[2].roleEnablement.displayName)' authentication methods before domain member users may enable a privileged role that is assigned to the '$($EntraCAAuthContexts[2].default.displayName)' authentication context in PIM. DO NOT CHANGE MANUALLY!"
     state         = 'enabledForReportingButNotEnforced'     # Change to 'enabled' when ready.
                                                             # As a best practise, update the ID parameter above at the same time.
                                                             # Also, update the displayName above and remove the 'TEST' prefix.
@@ -33,9 +34,9 @@
         }
     }
     grantControls = @{
-        operator        = 'AND'
-        builtInControls = @(
-            'block'
-        )
+        operator               = 'AND'
+        AuthenticationStrength = @{
+            Id = $EntraCAAuthStrengths[2].roleEnablement
+        }
     }
 }

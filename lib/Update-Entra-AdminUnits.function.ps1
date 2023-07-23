@@ -22,7 +22,6 @@ function Update-Entra-AdminUnits {
         SupportsShouldProcess,
         ConfirmImpact = 'High'
     )]
-    [OutputType([Int])]
     Param (
         [array]$Config,
         [switch]$CommonAdminUnits,
@@ -80,13 +79,13 @@ function Update-Entra-AdminUnits {
                 (-Not $ConfigItem.displayName) -or
                 (-Not $ConfigItem.description)
             ) {
-                Write-Warning "[$Subject] SKIPPED: Ignored incomplete object from file $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))"
+                Write-Warning "[$Subject] SKIPPED Administrative Unit: Ignored incomplete object from file $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))"
                 continue
             }
 
             $otherObjs = $Config[$ConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
             if (($otherObjs | Measure-Object).Count -gt 1) {
-                Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is defined for this configuration level already [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                Write-Warning "[$Subject] SKIPPED Administrative Unit: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is defined for this configuration level already [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                 continue
             }
 
@@ -95,7 +94,7 @@ function Update-Entra-AdminUnits {
             do {
                 $otherObjs = $Config[$PreviousConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
                 if (($otherObjs | Measure-Object).Count -gt 0) {
-                    Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is a duplicate from higher configuration level $PreviousConfigLevel [Files: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                    Write-Warning "[$Subject] SKIPPED Administrative Unit: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is a duplicate from higher configuration level $PreviousConfigLevel [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                     $duplicate = $true
                 }
                 $PreviousConfigLevel--
@@ -111,7 +110,7 @@ function Update-Entra-AdminUnits {
             do {
                 $otherObjs = $Config[$NextConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
                 if (($otherObjs | Measure-Object).Count -gt 0) {
-                    Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) has a duplicate at lower configuration level $NextConfigLevel [Files: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                    Write-Warning "[$Subject] SKIPPED Administrative Unit: '$($ConfigItem.displayName)' ($($ConfigItem.id)) has a duplicate at lower configuration level $NextConfigLevel [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                     $duplicate = $true
                 }
                 $NextConfigLevel++
@@ -215,7 +214,7 @@ function Update-Entra-AdminUnits {
                         continue
                     }
                     elseif ($obj) {
-                        Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                        Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the admin unit configuration file for more robust resilience instead of using the display name for updates."
                         $ConfigItem.id = $obj.Id
                         $updateOnly = $true
                     }
@@ -238,7 +237,7 @@ function Update-Entra-AdminUnits {
                                     "Update Administrative Unit $($ConfigItem.id) ($($ConfigItem.displayName))"
                                 )) {
                                 Write-Verbose "[$Subject] Updating Administrative Unit $($ConfigItem.id) ($($ConfigItem.displayName))"
-                                Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
+                                Write-Debug "BodyParameter from file $($ConfigItem.FileOrigin):`n$($BodyParameter | ConvertTo-Json -Depth 10)"
                                 $null = Update-MgBetaAdministrativeUnit `
                                     -AdministrativeUnitId $ConfigItem.Id `
                                     -BodyParameter $BodyParameter `
@@ -267,13 +266,13 @@ function Update-Entra-AdminUnits {
                             )) {
                             Write-Verbose "[$Subject] Creating Administrative Unit '$($ConfigItem.displayName)'"
 
-                            Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
+                            Write-Debug "BodyParameter from file $($ConfigItem.FileOrigin):`n$($BodyParameter | ConvertTo-Json -Depth 10)"
                             $obj = New-MgBetaAdministrativeUnit `
                                 -BodyParameter $BodyParameter `
                                 -ErrorAction Stop `
                                 -Confirm:$false
 
-                            Write-InformationColored -ForegroundColor Blue "[$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                            Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Administrative Unit $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the admin unit configuration file for more robust resilience instead of using the display name for updates."
                             $ConfigItem.id = $obj.Id
                         }
                     }
@@ -282,7 +281,7 @@ function Update-Entra-AdminUnits {
                     }
                 }
 
-                Start-Sleep -Milliseconds 25
+                Start-Sleep -Milliseconds 250
             }
         }
 

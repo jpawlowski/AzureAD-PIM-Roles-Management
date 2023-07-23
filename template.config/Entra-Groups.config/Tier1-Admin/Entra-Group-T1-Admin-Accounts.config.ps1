@@ -9,6 +9,8 @@
     GroupTypes                    = @(
         'DynamicMembership'
     )
+
+    # Using a dynamic group is more convenient and should be okay for Tier1 admin accounts
     membershipRule                = @(
         '(user.objectId -ne null) and'
         '(user.userType -eq "Member") and'
@@ -19,10 +21,11 @@
     membershipRuleProcessingState = 'On';
 
     # Make sure this group is a member of these Administrative Units
-    administrativeUnit = @(
+    administrativeUnits           = @(
         @{
-            # Id          = '00000000-0000-0000-0000-000000000000'
-            displayName = @($EntraGroupsTier0DisplayNamePrefix, 'S-Entra-Privileged-Role-Admin-Groups', 'RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+            # Id                           = '00000000-0000-0000-0000-000000000000'
+            displayName                  = @($EntraGroupsTier0DisplayNamePrefix, 'S-Entra-Privileged-Role-Admin-Groups', 'RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+            isMemberManagementRestricted = $true    # This is important to this group, so this property shall be validated
         }
     )
 }

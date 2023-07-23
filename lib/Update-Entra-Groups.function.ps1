@@ -83,13 +83,13 @@ function Update-Entra-Groups {
                 (-Not $ConfigItem.displayName) -or
                 (-Not $ConfigItem.description)
             ) {
-                Write-Warning "[$Subject] SKIPPED: Ignored incomplete object from file $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))"
+                Write-Warning "[$Subject] SKIPPED Group: Ignored incomplete object from file $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))"
                 continue
             }
 
             $otherObjs = $Config[$ConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
             if (($otherObjs | Measure-Object).Count -gt 1) {
-                Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is defined for this configuration level already [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                Write-Warning "[$Subject] SKIPPED Group: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is defined for this configuration level already [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                 continue
             }
 
@@ -98,7 +98,7 @@ function Update-Entra-Groups {
             do {
                 $otherObjs = $Config[$PreviousConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
                 if (($otherObjs | Measure-Object).Count -gt 0) {
-                    Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is a duplicate from higher configuration level $PreviousConfigLevel [Files: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                    Write-Warning "[$Subject] SKIPPED Group: '$($ConfigItem.displayName)' ($($ConfigItem.id)) is a duplicate from higher configuration level $PreviousConfigLevel [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                     $duplicate = $true
                 }
                 $PreviousConfigLevel--
@@ -114,7 +114,7 @@ function Update-Entra-Groups {
             do {
                 $otherObjs = $Config[$NextConfigLevel] | Where-Object -FilterScript { (($null -ne $_.id) -and ($_.id -eq $ConfigItem.id)) -or (($null -ne $_.displayName) -and ($_.displayName -eq $ConfigItem.displayName)) }
                 if (($otherObjs | Measure-Object).Count -gt 0) {
-                    Write-Warning "[$Subject] SKIPPED: '$($ConfigItem.displayName)' ($($ConfigItem.id)) has a duplicate at lower configuration level $NextConfigLevel [Files: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
+                    Write-Warning "[$Subject] SKIPPED Group: '$($ConfigItem.displayName)' ($($ConfigItem.id)) has a duplicate at lower configuration level $NextConfigLevel [File: $(Join-Path (Split-Path (Split-Path $ConfigItem.FileOrigin -Parent) -Leaf) ($ConfigItem.FileOrigin.Name))]"
                     $duplicate = $true
                 }
                 $NextConfigLevel++
@@ -218,7 +218,7 @@ function Update-Entra-Groups {
                         continue
                     }
                     elseif ($obj) {
-                        Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Group $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                        Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Group $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the group configuration file for more robust resilience instead of using the display name for updates."
                         $ConfigItem.id = $obj.Id
                         $updateOnly = $true
                     }
@@ -226,7 +226,7 @@ function Update-Entra-Groups {
 
                 $BodyParameter = $ConfigItem.PSObject.copy()
                 $BodyParameter.Remove('FileOrigin')
-                $BodyParameter.Remove('administrativeUnit')
+                $BodyParameter.Remove('administrativeUnits')
 
                 if ($updateOnly) {
                     $params.Activity = 'Update Group'
@@ -242,7 +242,7 @@ function Update-Entra-Groups {
                                     "Update Group $($ConfigItem.id) ($($ConfigItem.displayName))"
                                 )) {
                                 Write-Verbose "[$Subject] Updating Group $($ConfigItem.id) ($($ConfigItem.displayName))"
-                                Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
+                                Write-Debug "BodyParameter:`n$($BodyParameter | ConvertTo-Json -Depth 10)"
                                 $null = Update-MgGroup `
                                     -GroupId $ConfigItem.Id `
                                     -BodyParameter $BodyParameter `
@@ -275,21 +275,21 @@ function Update-Entra-Groups {
                                 $BodyParameter.mailNickname = $ConfigItem.mailNickname
                             }
 
-                            Write-Debug "BodyParameter: $($BodyParameter | Out-String)"
+                            Write-Debug "BodyParameter from file $($ConfigItem.FileOrigin):`n$($BodyParameter | ConvertTo-Json -Depth 10)"
                             $obj = New-MgGroup `
                                 -BodyParameter $BodyParameter `
                                 -ErrorAction Stop `
                                 -Confirm:$false
 
-                            Write-InformationColored -ForegroundColor Blue "[$Subject] Group $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                            Write-InformationColored -ForegroundColor Blue "[$Subject] Group $($ConfigItem.displayName): Add the unique object ID '$($obj.Id)' to the group configuration file for more robust resilience instead of using the display name for updates."
                             $ConfigItem.id = $obj.Id
 
-                            if ($ConfigItem.administrativeUnit) {
+                            if ($ConfigItem.administrativeUnits) {
                                 $BodyParameter = @{
                                     "@odata.id" = "https://graph.microsoft.com/beta/groups/$($ConfigItem.id)"
                                 }
 
-                                foreach ($adminUnit in $ConfigItem.administrativeUnit) {
+                                foreach ($adminUnit in $ConfigItem.administrativeUnits) {
                                     $obj = $null
                                     if (
                                         ($null -ne $adminUnit.id) -and
@@ -313,7 +313,7 @@ function Update-Entra-Groups {
                                             continue
                                         }
                                         elseif ($obj) {
-                                            Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Group $($ConfigItem.displayName): Administrative Unit $($adminUnit.displayName): Add the unique object ID '$($obj.Id)' to the configuration file for more robust resilience instead of using the display name for updates."
+                                            Write-InformationColored -ForegroundColor Blue "HINT: [$Subject] Group $($ConfigItem.displayName): Administrative Unit $($adminUnit.displayName): Add the unique object ID '$($obj.Id)' to the group configuration file for more robust resilience instead of using the display name for updates."
                                             $adminUnit.id = $obj.Id
                                             $updateOnly = $true
                                         }
@@ -333,7 +333,7 @@ function Update-Entra-Groups {
                     }
                 }
 
-                Start-Sleep -Milliseconds 25
+                Start-Sleep -Milliseconds 250
             }
         }
 

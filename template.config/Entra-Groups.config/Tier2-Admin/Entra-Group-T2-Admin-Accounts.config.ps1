@@ -9,9 +9,12 @@
     GroupTypes                    = @(
         'DynamicMembership'
     )
+
+    # Using a dynamic group is more convenient and should be okay for Tier1 admin accounts
     membershipRule                = @(
         '(user.objectId -ne null) and'
         '(user.userType -eq "Member") and'
+        '(user.userPrincipalName -notMatch "' + $Tier0AdminAccountRegex + '") and'
         '(user.userPrincipalName -notMatch "' + $Tier1AdminAccountRegex + '") and'
         '(user.userPrincipalName -notMatch "^.+#EXT#@.+\.onmicrosoft\.com$") and'   # B2B accounts could also have userType=Member, so explicitly exclude them here
         '(user.assignedPlans -any (assignedPlan.servicePlanId -eq "eec0eb4f-6444-4f95-aba0-50c24d67f998" -and assignedPlan.capabilityStatus -eq "Enabled"))'
@@ -19,10 +22,11 @@
     membershipRuleProcessingState = 'On';
 
     # Make sure this group is a member of these Administrative Units
-    administrativeUnit = @(
+    administrativeUnits           = @(
         @{
-            # Id          = '00000000-0000-0000-0000-000000000000'
-            displayName = @($EntraGroupsTier0DisplayNamePrefix, 'S-Entra-Privileged-Role-Admin-Groups', 'RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+            # Id                           = '00000000-0000-0000-0000-000000000000'
+            displayName                  = @($EntraGroupsTier0DisplayNamePrefix, 'S-Entra-Privileged-Role-Admin-Groups', 'RestrictedAdminUnit') | Join-String -Separator $DisplayNameElementSeparator
+            isMemberManagementRestricted = $true    # This is important to this group, so this property shall be validated
         }
     )
 }

@@ -30,15 +30,15 @@ Clear-Variable -Name '*ConfigSubfolder'
 
 $ConfigFiles = @(
     'Environment.config.ps1'
-    'Entra-Tier0-BreakGlass.config.ps1'
-    'Entra-AdminUnits.config.ps1'
-    'Entra-Groups.config.ps1'
+    'Entra-AdminUnits.config.ps1'                       # Must be first as other configs refer to objects from here
+    'Entra-Groups.config.ps1'                           # Must be second as other configs refer to objects from here
+    'Entra-Tier0-BreakGlass.config.ps1'                 # Must be third as other configs refer to objects from here
     'Entra-CA-AuthContexts.config.ps1'
     'Entra-CA-AuthStrengths.config.ps1'
     'Entra-CA-NamedLocations.config.ps1'
+    'Entra-Role-ManagementRulesDefaults.config.ps1'     # Must be before Role Classifications as they might refer to it
+    'Entra-Role-Classifications.config.ps1'             # Must be before CA polices at they refer to objects from here
     'Entra-CA-Policies.config.ps1'
-    'Entra-Role-Classifications.config.ps1'
-    'Entra-Role-ManagementRulesDefaults.config.ps1'
 )
 
 foreach ($ConfigFile in $ConfigFiles) {
