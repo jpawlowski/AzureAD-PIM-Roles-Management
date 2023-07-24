@@ -101,7 +101,7 @@ function Update-Entra-CA-Policies {
                 throw
             }
             if ($result.Id) {
-                if (!$WhatIfPreference) { Write-Warning "+++IMPORTANT+++   You are STRONGLY advised to complete your Break Glass CA definition by adding the unique object ID '$($result.Id)' to the configuration file before implementing Conditional Access Policies !   +++IMPORTANT+++" }
+                if (!$WhatIfPreference) { Write-Warning "+++IMPORTANT+++   You are STRONGLY advised to complete your Break Glass CA definition by adding the unique object ID '$($result.Id)' to the configuration file before implementing Conditional Access Policies !      +++IMPORTANT+++" }
                 $policy.id = $result.Id
             }
             else {

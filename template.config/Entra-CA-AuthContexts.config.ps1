@@ -51,4 +51,10 @@ $EntraCAAuthContexts = @(
             isAvailable = $true
         }
     }
+
+    #:-------------------------------------------------------------------------
+    # Common Authentication Contexts for regular user accounts
+    #
+    @{
+    }
 )

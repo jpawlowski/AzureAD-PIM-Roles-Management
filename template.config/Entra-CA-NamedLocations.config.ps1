@@ -341,4 +341,10 @@ $EntraCANamedLocations = @(
         #     )
         # }
     )
+
+    #:-------------------------------------------------------------------------
+    # Common Named Locations for regular user accounts
+    #
+    @(
+    )
 )

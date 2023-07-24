@@ -33,7 +33,6 @@ function New-Entra-Tier0-BreakGlass {
         SupportsShouldProcess,
         ConfirmImpact = 'High'
     )]
-    [OutputType([Int])]
     Param (
         [hashtable]$Config
     )

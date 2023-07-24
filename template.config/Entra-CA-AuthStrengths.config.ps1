@@ -58,6 +58,7 @@ $EntraCAAuthStrengths = @(
             allowedCombinations       = @(
                 'windowsHelloForBusiness'
                 'fido2'
+                # 'deviceBasedPush'             # Optionally required if your Tier0 users do not use FIDO2 security keys
             )
 
             combinationConfigurations = @{
@@ -93,6 +94,7 @@ $EntraCAAuthStrengths = @(
             allowedCombinations       = @(
                 'windowsHelloForBusiness'
                 'fido2'
+                # 'deviceBasedPush'             # Optionally required if your Tier0 users do not use FIDO2 security keys
             )
 
             combinationConfigurations = @{
@@ -175,8 +177,9 @@ $EntraCAAuthStrengths = @(
                 'windowsHelloForBusiness'
                 'fido2'
                 'deviceBasedPush'
-                'temporaryAccessPassOneTime'    # Required for passwordless onboarding of new Tier0 admin accounts, but only available without any active roles
-                'temporaryAccessPassMultiUse'   # Required for passwordless onboarding of new Tier0 admin accounts, but only available without any active roles
+                'microsoftAuthenticatorPush'    # Usually a good idea for dedicated Tier1 accounts to allow using password + push as a fallback method to allow people re-configure their passwordless methods before enabling a role
+                'temporaryAccessPassOneTime'    # Required for passwordless onboarding of new Tier1 admin accounts, but only available without any active roles
+                'temporaryAccessPassMultiUse'   # Required for passwordless onboarding of new Tier1 admin accounts, but only available without any active roles
             )
 
             combinationConfigurations = @{
@@ -334,4 +337,10 @@ $EntraCAAuthStrengths = @(
             )
         }
     }
+
+    #:-------------------------------------------------------------------------
+    # Common Authentication Strengths for regular user accounts
+    #
+    @(
+    )
 )

@@ -25,7 +25,6 @@ function Update-Entra-Groups {
         SupportsShouldProcess,
         ConfirmImpact = 'High'
     )]
-    [OutputType([Int])]
     Param (
         [array]$Config,
         [switch]$CommonGroups,

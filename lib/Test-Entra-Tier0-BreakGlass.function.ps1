@@ -34,7 +34,6 @@ function Test-Entra-Tier0-BreakGlass {
         SupportsShouldProcess,
         ConfirmImpact = 'High'
     )]
-    [OutputType([Int])]
     Param (
         [hashtable]$Config,
         [switch]$Repair
