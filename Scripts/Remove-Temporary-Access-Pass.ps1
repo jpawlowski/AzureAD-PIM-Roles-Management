@@ -72,7 +72,7 @@ elseif ($MissingMgScopes) {
 
 # If connection to Microsoft Graph seems okay
 if (-Not $return.Errors) {
-    $userObj = Get-MgBetaUser `
+    $userObj = Get-MgUser `
         -UserId $UserId `
         -Property @(
         'Id'
@@ -102,17 +102,6 @@ if (-Not $return.Errors) {
             Context    = Get-MgContext
         }
     }
-    else {
-        $userObj.Sponsors = (
-            Get-MgBetaUser `
-                -UserId $userObj.Id `
-                -Property Sponsors `
-                -ExpandProperty Sponsors `
-                -ErrorAction SilentlyContinue `
-                -Debug:$DebugPreference `
-                -Verbose:$VerbosePreference
-        ).Sponsors
-    }
 }
 
 # If user details could be retrieved
@@ -132,7 +121,6 @@ if (-Not $return.Errors) {
             Mail              = $userObj.manager.AdditionalProperties.mail
             DisplayName       = $userObj.manager.AdditionalProperties.displayName
         }
-        Sponsors          = $userObj.Sponsors
     }
 
     $return.Data.AuthenticationMethods = @()
