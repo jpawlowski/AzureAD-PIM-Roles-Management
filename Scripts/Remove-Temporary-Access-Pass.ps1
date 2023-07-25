@@ -142,6 +142,17 @@ if (-Not $return.Errors) {
         -Debug:$DebugPreference `
         -Verbose:$VerbosePreference
 
+    if (-Not $authMethods) {
+        $return.Errors += @{
+            Message    = $Error[0].ToString()
+            Activity   = $Error[0].CategoryInfo.Activity
+            Category   = $Error[0].CategoryInfo.Category
+            Reason     = $Error[0].CategoryInfo.Reason
+            TargetName = $Error[0].CategoryInfo.TargetName
+            Context    = Get-MgContext
+        }
+    }
+
     $foundTAP = $false
     foreach ($authMethod in $authMethods) {
         if ($authMethod.AdditionalProperties.'@odata.type' -match '^#microsoft\.graph\.(.+)AuthenticationMethod$') {
