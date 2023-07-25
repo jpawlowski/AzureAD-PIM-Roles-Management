@@ -174,7 +174,6 @@ if (-Not $return.Errors) {
         'UserType'
         'AccountEnabled'
         'UsageLocation'
-        'Manager'
     ) `
         -ExpandProperty @(
         'Manager'
@@ -210,6 +209,7 @@ if (-Not $return.Errors) {
 # If user details could be retrieved
 if (-Not $return.Errors) {
     $return.Data = @{
+        '@odata.context'  = $userObj.AdditionalProperties.'@odata.context'
         Id                = $userObj.Id
         UserPrincipalName = $userObj.UserPrincipalName
         Mail              = $userObj.Mail
