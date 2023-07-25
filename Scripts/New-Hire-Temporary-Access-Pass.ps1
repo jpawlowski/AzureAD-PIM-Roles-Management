@@ -11,10 +11,11 @@
 
 .PARAMETER StartDateTime
     The date and time when the Temporary Access Pass becomes available to use. Needs to be in Universal Time (UTC).
+    If used with -IsNewHire, the start time is corrected to begin at 06:00:00.
 
 .PARAMETER LifetimeInMinutes
     The lifetime of the Temporary Access Pass in minutes starting at StartDateTime. Must be between 10 and 43200 inclusive (equivalent to 30 days).
-    If used with -IsNewHire, a lifetime of 8 hours is implied if not explicitly set otherwise.
+    If used with -IsNewHire, a lifetime of 12 hours is implied if not explicitly set otherwise.
 
 .PARAMETER IsUsableOnce
     Determines whether the pass is limited to a one-time use. If true, the pass can be used once; if false, the pass can be used multiple times within the Temporary Access Pass lifetime.
@@ -25,6 +26,7 @@
     This allows any pre-scheduled Temporary Access Pass codes to be replaced by this script until and including the set EmployeeHireDate has reached.
     Once the EmployeeHireDate has reached, it is no longer updated by this script. This script will only continue to allow setting new
     Temporary Access Pass codes afterwards unless the user has configured other MFA methods already.
+
     If the user has configured MFA methods and lost access to the account, this script will not create any new Temporary Access Pass codes.
     Instead, the user is expected to consult Global Service Desk to run the official MFA reset process that includes extended
     identity validation of the user.
@@ -207,7 +209,7 @@ if (-Not $return.Errors) {
 
 # If user details could be retrieved
 if (-Not $return.Errors) {
-    $return.Data.User = @{
+    $return.Data = @{
         Id                = $userObj.Id
         UserPrincipalName = $userObj.UserPrincipalName
         Mail              = $userObj.Mail
@@ -386,7 +388,7 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
             -WhatIf:$WhatIfPreference
 
         $userObj.EmployeeHireDate = $EmployeeHireDate
-        $return.Data.User.EmployeeHireDate = $EmployeeHireDate
+        $return.Data.EmployeeHireDate = $EmployeeHireDate
 
         $return.Informations += @{
             message = "EmployeeHireDate: EmployeeHireDate updated to $(Get-Date $EmployeeHireDate -UFormat '+%Y-%m-%dT%H:%M:%S.000Z')"
