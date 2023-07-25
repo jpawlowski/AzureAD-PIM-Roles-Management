@@ -87,7 +87,12 @@ foreach ($MgScope in $MgScopes) {
     }
 }
 
-if ($MissingMgScopes) {
+if (-Not (Get-MgContext)) {
+    $return.Errors += @{
+        Message = "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
+    }
+}
+elseif ($MissingMgScopes) {
     $return.Errors += @{
         Message = "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
         Context = Get-MgContext
