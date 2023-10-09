@@ -74,11 +74,13 @@ foreach ($MgScope in $MgScopes) {
 
 if (-Not (Get-MgContext)) {
     $return.Errors += @{
+        Code    = 401
         Message = "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
     }
 }
 elseif ($MissingMgScopes) {
     $return.Errors += @{
+        Code    = 403
         Message = "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
         Context = Get-MgContext
     }
@@ -93,6 +95,7 @@ if (-Not $return.Errors) {
 
     if (-Not $tapConfig) {
         $return.Errors += @{
+            Code       = 403
             Message    = $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
@@ -103,6 +106,7 @@ if (-Not $return.Errors) {
     }
     elseif ($tapConfig.State -ne 'enabled') {
         $return.Errors += @{
+            Code    = 500
             message = "Temporary Access Pass authentication method is disabled for tenant $((Get-MgContext).TenantId) ."
         }
     }
@@ -110,6 +114,7 @@ if (-Not $return.Errors) {
 
 if ($StartDateTime -and ($StartDateTime.ToUniversalTime() -lt (Get-Date).ToUniversalTime().AddMinutes(1))) {
     $return.Errors += @{
+        Code    = 412
         message = 'StartDateTime: Time can not be in the past.'
     }
 }
@@ -153,6 +158,7 @@ if (-Not $return.Errors) {
     if ($null -eq $userObj) {
         $return.Data.UserId = $UserId
         $return.Errors += @{
+            Code       = 404
             Message    = $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
@@ -184,18 +190,21 @@ if (-Not $return.Errors) {
 
     if (-Not $userObj.AccountEnabled) {
         $return.Errors += @{
+            Code    = 503
             message = 'User account is disabled.'
         }
     }
 
     if ($userObj.UserType -ne 'Member') {
         $return.Errors += @{
+            Code    = 503
             message = 'User needs to be of type Member.'
         }
     }
 
     if ($userObj.UserType -match '^.+#EXT#@.+\.onmicrosoft\.com$') {
         $return.Errors += @{
+            Code    = 503
             message = 'User can not be a guest.'
         }
     }
@@ -209,6 +218,7 @@ if (-Not $return.Errors) {
 
     if (-Not $userGroups) {
         $return.Errors += @{
+            Code       = 503
             Message    = $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
@@ -257,6 +267,7 @@ if (-Not $return.Errors) {
         )
     ) {
         $return.Errors += @{
+            Code    = 503
             message = "Authentication method 'Temporary Access Pass' is not enabled for this user."
         }
     }
@@ -273,6 +284,7 @@ if (-Not $return.Errors) {
 
     if (-Not $authMethods) {
         $return.Errors += @{
+            Code       = 404
             Message    = $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
@@ -323,11 +335,15 @@ if (-Not $return.Errors) {
                     $return.Informations += @{ message = 'Simulation Mode: An existing Temporary Access Pass would have been deleted.' }
                 }
                 else {
-                    $return.Errors += @{ message = 'Deletion of existing Temporary Access Pass was aborted.' }
+                    $return.Errors += @{
+                        Code    = 500
+                        message = 'Deletion of existing Temporary Access Pass was aborted.'
+                    }
                 }
             }
             else {
                 $return.Errors += @{
+                    Code    = 503
                     message = 'A Temporary Access Pass code was already set before. It can only be displayed once it is generated.'
                 }
             }
@@ -337,6 +353,7 @@ if (-Not $return.Errors) {
             ('password' -notin $return.Data.AuthenticationMethods)
         ) {
             $return.Errors += @{
+                Code    = 503
                 message = 'This process cannot be used to request a Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
             }
         }
@@ -373,6 +390,7 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
         }
         else {
             $return.Errors += @{
+                Code       = 500
                 Message    = $Error[0].ToString()
                 Activity   = $Error[0].CategoryInfo.Activity
                 Category   = $Error[0].CategoryInfo.Category
@@ -386,7 +404,10 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
         $return.Informations += @{ message = "Simulation Mode: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())" }
     }
     else {
-        $return.Errors += @{ message = 'Creation of new Temporary Access Pass was aborted.' }
+        $return.Errors += @{
+            Code    = 412
+            message = 'Creation of new Temporary Access Pass was aborted.' 
+        }
     }
 }
 
