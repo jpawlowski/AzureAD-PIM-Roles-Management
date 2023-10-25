@@ -4,7 +4,6 @@
 
 .DESCRIPTION
     Create a Temporary Access Pass code for new hires that have not setup any Authentication Methods so far.
-    NOTE: Requires to run Connect-MgGraph command before.
 
 .PARAMETER UserId
     User account identifier. May be an Entra Identity Object ID or User Principal Name (UPN).
@@ -29,9 +28,12 @@
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0
 #>
-#Requires -Version 7.2
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
+#Requires -Version 5.1
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users.Actions'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users.Functions'; ModuleVersion='2.0' }
 
 [CmdletBinding(
     SupportsShouldProcess,
@@ -47,6 +49,10 @@ Param (
     [switch]$OutText
 )
 
+if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+    $OutJson = $true
+}
+
 $MgScopes = @(
     'User.Read.All'                             # To read user information, inlcuding EmployeeHireDate
     'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
@@ -55,17 +61,17 @@ $MgScopes = @(
 )
 $MissingMgScopes = @()
 $return = @{
-    Errors       = @()
-    Warnings     = @()
-    Informations = @()
-    Data         = @{}
+    Errors   = @()
+    Warnings = @()
+    Verbose  = @()
+    Data     = @{}
 }
 $tapConfig = $null
 $userObj = $null
 
 foreach ($MgScope in $MgScopes) {
     if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
-        Write-Debug "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
+        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
     }
     elseif ($MgScope -notin @((Get-MgContext).Scopes)) {
         $MissingMgScopes += $MgScope
@@ -73,9 +79,15 @@ foreach ($MgScope in $MgScopes) {
 }
 
 if (-Not (Get-MgContext)) {
-    $return.Errors += @{
-        Code    = 401
-        Message = "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
+    if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+        Write-Verbose (Connect-MgGraph -Identity -ContextScope Process)
+        Write-Verbose (Get-MgContext | ConvertTo-Json)
+    }
+    else {
+        $return.Errors += @{
+            Code    = 401
+            Message = "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
+        }    
     }
 }
 elseif ($MissingMgScopes) {
@@ -91,12 +103,12 @@ if (-Not $return.Errors) {
         -AuthenticationMethodConfigurationId 'temporaryAccessPass' `
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
-        -Verbose:$VerbosePreference
+        -Verbose:$false
 
     if (-Not $tapConfig) {
         $return.Errors += @{
             Code       = 403
-            Message    = $Error[0].ToString()
+            Message    = $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
             Reason     = $Error[0].CategoryInfo.Reason
@@ -153,13 +165,13 @@ if (-Not $return.Errors) {
     )`
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
-        -Verbose:$VerbosePreference
+        -Verbose:$false
 
     if ($null -eq $userObj) {
         $return.Data.UserId = $UserId
         $return.Errors += @{
             Code       = 404
-            Message    = $Error[0].ToString()
+            Message    = $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
             Reason     = $Error[0].CategoryInfo.Reason
@@ -214,12 +226,12 @@ if (-Not $return.Errors) {
         -SecurityEnabledOnly `
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
-        -Verbose:$VerbosePreference
+        -Verbose:$false
 
     if (-Not $userGroups) {
         $return.Errors += @{
             Code       = 503
-            Message    = $Error[0].ToString()
+            Message    = $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
             Reason     = $Error[0].CategoryInfo.Reason
@@ -280,12 +292,12 @@ if (-Not $return.Errors) {
         -UserId $userObj.Id `
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
-        -Verbose:$VerbosePreference
+        -Verbose:$false
 
     if (-Not $authMethods) {
         $return.Errors += @{
             Code       = 404
-            Message    = $Error[0].ToString()
+            Message    = $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString()
             Activity   = $Error[0].CategoryInfo.Activity
             Category   = $Error[0].CategoryInfo.Category
             Reason     = $Error[0].CategoryInfo.Reason
@@ -327,12 +339,12 @@ if (-Not $return.Errors) {
                         -Confirm:$false `
                         -ErrorAction SilentlyContinue `
                         -Debug:$DebugPreference `
-                        -Verbose:$VerbosePreference `
+                        -Verbose:$false `
                         -WhatIf:$WhatIfPreference
                     $return.Data.Remove('TemporaryAccessPass')
                 }
                 elseif ($WhatIfPreference) {
-                    $return.Informations += @{ message = 'Simulation Mode: An existing Temporary Access Pass would have been deleted.' }
+                    $return.Verbose += @{ message = 'Simulation Mode: An existing Temporary Access Pass would have been deleted.' }
                 }
                 else {
                     $return.Errors += @{
@@ -380,18 +392,18 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
             -Confirm:$false `
             -ErrorAction SilentlyContinue `
             -Debug:$DebugPreference `
-            -Verbose:$VerbosePreference `
+            -Verbose:$false `
             -WhatIf:$WhatIfPreference
 
         if ($tap) {
             $return.Data.TemporaryAccessPass = $tap
             if ('temporaryAccessPass' -notin $return.Data.AuthenticationMethods) { $return.Data.AuthenticationMethods += 'temporaryAccessPass' }
-            $return.Informations += @{ message = 'New Temporary Access Pass code was generated.' }
+            $return.Verbose += @{ message = 'New Temporary Access Pass code was generated.' }
         }
         else {
             $return.Errors += @{
                 Code       = 500
-                Message    = $Error[0].ToString()
+                Message    = $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString()
                 Activity   = $Error[0].CategoryInfo.Activity
                 Category   = $Error[0].CategoryInfo.Category
                 Reason     = $Error[0].CategoryInfo.Reason
@@ -401,7 +413,7 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
         }
     }
     elseif ($WhatIfPreference) {
-        $return.Informations += @{ message = "Simulation Mode: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())" }
+        $return.Verbose += @{ message = "Simulation Mode: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())" }
     }
     else {
         $return.Errors += @{
@@ -412,11 +424,11 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
 }
 
 
-if (-Not $return.Informations) { $return.Remove('Informations') } else { $return.Informations | ForEach-Object { Write-Verbose $_.message; Write-Information $_.message } }
+if (-Not $return.Verbose) { $return.Remove('Verbose') } else { $return.Verbose | ForEach-Object { Write-Verbose $_.message; Write-Information $_.message } }
 if (-Not $return.Warnings) { $return.Remove('Warnings') } else { $return.Warnings | ForEach-Object { Write-Warning $_.message } }
-if (-Not $return.Errors) { $return.Remove('Errors') } else { $return.Errors | ForEach-Object { Write-Error $_.message } }
+if (-Not $return.Errors) { $return.Remove('Errors') } else { $return.Errors | ForEach-Object { Write-Error $($_.message + ( if ($_.Reason) { $_.Reason } else { '' })) } }
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
 
-if ($OutJson) { return $($return | ConvertTo-Json -Depth 4) }
-if ($OutText) { return $return.Data.TemporaryAccessPass.TemporaryAccessPass ? $return.Data.TemporaryAccessPass.TemporaryAccessPass : $null }
+if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
+if ($OutText) { return Write-Output if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null } }
 return $return
