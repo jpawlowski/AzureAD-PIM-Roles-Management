@@ -26,7 +26,7 @@
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.0
+    Version: 1.1
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
@@ -49,7 +49,7 @@ Param (
     [switch]$OutText
 )
 
-if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
     $OutJson = $true
 }
 
@@ -58,6 +58,7 @@ $MgScopes = @(
     'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
     'UserAuthenticationMethod.ReadWrite.All'    # To update authentication methods (TAP) of the user
     'Policy.Read.All'                           # To read and validate current policy settings
+    'Directory.Read.All'                        # To read directory data and settings
 )
 $MissingMgScopes = @()
 $return = @{
@@ -69,17 +70,8 @@ $return = @{
 $tapConfig = $null
 $userObj = $null
 
-foreach ($MgScope in $MgScopes) {
-    if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
-        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
-    }
-    elseif ($MgScope -notin @((Get-MgContext).Scopes)) {
-        $MissingMgScopes += $MgScope
-    }
-}
-
 if (-Not (Get-MgContext)) {
-    if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
         Write-Verbose (Connect-MgGraph -Identity -ContextScope Process)
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
@@ -87,14 +79,26 @@ if (-Not (Get-MgContext)) {
         $return.Errors += @{
             Code    = 401
             Message = "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
-        }    
+        }
     }
 }
-elseif ($MissingMgScopes) {
-    $return.Errors += @{
-        Code    = 403
-        Message = "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
-        Context = Get-MgContext
+
+if (-Not $return.Errors) {
+    foreach ($MgScope in $MgScopes) {
+        if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
+            Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
+        }
+        elseif ($MgScope -notin @((Get-MgContext).Scopes)) {
+            $MissingMgScopes += $MgScope
+        }
+    }
+
+    if ($MissingMgScopes) {
+        $return.Errors += @{
+            Code    = 403
+            Message = "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
+            Context = Get-MgContext
+        }
     }
 }
 
@@ -168,6 +172,9 @@ if (-Not $return.Errors) {
         -Verbose:$false
 
     if ($null -eq $userObj) {
+        if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+            $return.Data.PSPrivateMetadata = $PSPrivateMetadata
+        }
         $return.Data.UserId = $UserId
         $return.Errors += @{
             Code       = 404
@@ -198,6 +205,10 @@ if (-Not $return.Errors) {
             Mail              = $userObj.manager.AdditionalProperties.mail
             DisplayName       = $userObj.manager.AdditionalProperties.displayName
         }
+    }
+
+    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+        $return.Data.PSPrivateMetadata = $PSPrivateMetadata
     }
 
     if (-Not $userObj.AccountEnabled) {
@@ -430,5 +441,5 @@ if (-Not $return.Errors) { $return.Remove('Errors') } else { $return.Errors | Fo
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
 
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
-if ($OutText) { return Write-Output if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null } }
+if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
 return $return
