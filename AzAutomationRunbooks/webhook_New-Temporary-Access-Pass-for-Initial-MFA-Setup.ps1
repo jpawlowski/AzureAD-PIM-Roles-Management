@@ -8,10 +8,12 @@ $WebhookName = 'cc5873e2-7350-4db1-b717-9eba71ec064d'
 Write-Verbose 'start'
 Write-Verbose ('object type: {0}' -f $WebhookData.gettype())
 Write-Verbose $WebhookData
-Write-Verbose "`n`n"
-Write-Verbose $WebhookData.WebhookName
-Write-Verbose $WebhookData.RequestBody
-Write-Verbose $WebhookData.RequestHeader
+if ($WebhookData.WebhookName) {
+    Write-Verbose "`n`n"
+    Write-Verbose $WebhookData.WebhookName
+    Write-Verbose $WebhookData.RequestBody
+    Write-Verbose $WebhookData.RequestHeader
+}
 Write-Verbose 'end'
 
 if ($WebhookData) {
