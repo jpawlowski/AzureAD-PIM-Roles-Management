@@ -135,7 +135,7 @@ if ($PSCmdlet.ShouldProcess(
                 (-Not $Module) -or
                 ($Module.ProvisioningState -eq 'Failed')
         ) {
-            Write-Output "   ${ModuleName}: Installing"
+            Write-Output "   Installing: ${ModuleName}"
             $null = New-AzAutomationModule `
                 -ResourceGroupName $automationAccount.ResourceGroupName `
                 -AutomationAccountName $automationAccount.AutomationAccountName `
@@ -143,7 +143,7 @@ if ($PSCmdlet.ShouldProcess(
                 -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$ModuleName"
         }
         else {
-            Write-Output "   ${ModuleName}: Installed"
+            Write-Output "   Installed: ${ModuleName}"
         }
     }
 }
@@ -163,8 +163,7 @@ if (-Not $automationAccount.Identity) {
         $automationAccount = Set-AzAutomationAccount `
             -ResourceGroupName $automationAccount.ResourceGroupName `
             -Name $automationAccount.AutomationAccountName `
-            -AssignSystemIdentity `
-            -Verbose:$Verbose
+            -AssignSystemIdentity
     }
     elseif ($WhatIfPreference) {
         Write-Verbose 'Simulation Mode: System-Assigned Managed Identity would have been enabled.'
@@ -231,7 +230,7 @@ if ($PSCmdlet.ShouldProcess(
             "ResourceId"  = $MgGraphServicePrincipal.Id
             "AppRoleId"   = $AppRole.Id
         }
-
+        Write-Output "   Assigning: $($AppRole.Value)"
         $null = New-MgServicePrincipalAppRoleAssignment `
             -ServicePrincipalId $params.PrincipalId `
             -BodyParameter $params `
@@ -245,28 +244,44 @@ else {
     Write-Verbose 'Assignment of Microsoft Graph permissions was denied.'
 }
 
-$EntraRoles = @(
-    @{
-        displayName      = 'Authentication Administrator'
-        RoleDefinitionId = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
-        DirectoryScopeId = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
-    }
-)
+if ($PSCmdlet.ShouldProcess(
+        "Assign desired Microsoft Entra roles to System-Assigned Managed Identity of $($automationAccount.AutomationAccountName)",
+        "Do you confirm to assign desired Microsoft Entra roles to $($automationAccount.AutomationAccountName) ?",
+        'Assign Microsoft Entra roles to System-Assigned Managed Identity of Azure Automation Account'
+    )) {
 
-foreach ($Role in $EntraRoles) {
-    $params = @{
-        PrincipalId      = $automationAccount.Identity.PrincipalId
-        RoleDefinitionId = $Role.RoleDefinitionId
-        Justification    = 'Automate Tier0 IAM tasks with PowerShell'
-        DirectoryScopeId = '/'
-        Action           = 'AdminAssign'
-        scheduleInfo     = @{
-            startDateTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            expiration    = @{
-                type = 'NoExpiration'
+    $EntraRoles = @(
+        @{
+            DisplayName      = 'Authentication Administrator'
+            RoleDefinitionId = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
+            DirectoryScopeId = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+        }
+    )
+
+    foreach ($Role in $EntraRoles) {
+        $params = @{
+            PrincipalId      = $automationAccount.Identity.PrincipalId
+            RoleDefinitionId = $Role.RoleDefinitionId
+            Justification    = 'Automate Tier0 IAM tasks with PowerShell'
+            DirectoryScopeId = '/'
+            Action           = 'AdminAssign'
+            scheduleInfo     = @{
+                startDateTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                expiration    = @{
+                    type = 'NoExpiration'
+                }
             }
         }
+        if ($Role.DirectoryScopeId) { $params.DirectoryScopeId = $Role.DirectoryScopeId }
+        Write-Output "   Assigning: $($Role.RoleDefinitionId) ($($Role.DisplayName))"
+        $null = New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest `
+            -BodyParameter $params `
+            -ErrorAction SilentlyContinue
     }
-    if ($Role.DirectoryScopeId) { $params.DirectoryScopeId = $Role.DirectoryScopeId }
-    New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest -BodyParameter $params
+}
+elseif ($WhatIfPreference) {
+    Write-Verbose 'Simulation Mode: Microsoft Entra roles would have been assigned.'
+}
+else {
+    Write-Verbose 'Assignment of Microsoft Entra roles was denied.'
 }
