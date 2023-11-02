@@ -202,12 +202,12 @@ if ($null -eq $userObj) {
 
 # If user details could be retrieved
 if (-Not $userObj.AccountEnabled) {
-    Write-Error 'User account is disabled.'
+    Write-Error 'User ID is disabled.'
     exit 1
 }
 
 if ($userObj.UserType -ne 'Member') {
-    Write-Error 'User needs to be of type Member.'
+    Write-Error 'User ID needs to be of type Member.'
     exit 1
 }
 
