@@ -413,7 +413,7 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
 
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
-if ($Webhook) { ResilientRemoteCall { Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Depth 4) } }
+if ($Webhook) { ResilientRemoteCall { Write-Verbose $(Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Depth 4) }) }
 if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
 
