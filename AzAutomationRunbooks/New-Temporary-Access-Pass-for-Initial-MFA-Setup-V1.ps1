@@ -149,17 +149,17 @@ if ($null -eq $userObj) {
 # If user details could be retrieved
 if (-Not $userObj.AccountEnabled) {
     Write-Error 'User account is disabled.'
-    Throw
+    exit 1
 }
 
 if ($userObj.UserType -ne 'Member') {
     Write-Error 'User needs to be of type Member.'
-    Throw
+    exit 1
 }
 
 if ($userObj.UserType -match '^.+#EXT#@.+\.onmicrosoft\.com$') {
     Write-Error 'User can not be a guest.'
-    Throw
+    exit 1
 }
 
 $return.Data = @{
@@ -229,7 +229,7 @@ if (
     )
 ) {
     Write-Error "Authentication method 'Temporary Access Pass' is not enabled for this user."
-    Throw
+    exit 1
 }
 
 # If user is a candidate for TAP generation
@@ -286,12 +286,12 @@ if ($return.Data.AuthenticationMethods) {
             }
             else {
                 Write-Error 'Deletion of existing Temporary Access Pass was aborted.'
-                Throw
+                exit 1
             }
         }
         else {
             Write-Error 'A Temporary Access Pass code was already set before. It can only be displayed once it is generated.'
-            Throw
+            exit 1
         }
     }
 
@@ -301,7 +301,7 @@ if ($return.Data.AuthenticationMethods) {
         ('password' -notin $return.Data.AuthenticationMethods)
     ) {
         Write-Error 'This process cannot be used to request a Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
-        Throw
+        exit 1
     }
 }
 
@@ -335,7 +335,7 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
         }
         else {
             Write-Error ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
-            Throw
+            exit 1
         }
     }
     elseif ($WhatIfPreference) {
@@ -343,13 +343,13 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
     }
     else {
         Write-Error 'Creation of new Temporary Access Pass was aborted.'
-        Throw
+        exit 1
     }
 }
 
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
-if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { '' }) }
+if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
 
 return $return
