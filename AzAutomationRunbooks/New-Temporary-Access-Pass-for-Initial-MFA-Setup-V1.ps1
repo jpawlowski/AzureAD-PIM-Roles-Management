@@ -17,16 +17,22 @@
 .PARAMETER IsUsableOnce
     Determines whether the pass is limited to a one-time use. If true, the pass can be used once; if false, the pass can be used multiple times within the Temporary Access Pass lifetime.
 
+.PARAMETER Webhook
+    Send return data as POST to this webhook URL.
+
 .PARAMETER OutputJson
     Output the result in JSON format
 
 .PARAMETER OutputText
     Output the Temporary Access Pass only.
 
+.PARAMETER Simulate
+    Same as -WhatIf parameter but makes it available for Azure Automation.
+
 .NOTES
-    Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup.ps1
+    Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.2
+    Version: 1.3
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
@@ -46,11 +52,46 @@ Param (
     [int32]$LifetimeInMinutes,
     [switch]$IsUsableOnce,
     [switch]$OutJson,
-    [switch]$OutText
+    [switch]$OutText,
+    [switch]$Simulate
 )
+
+Function ResilientRemoteCall {
+    param(
+        $ScriptBlock
+    )
+
+    $DoLoop = $true
+    $RetryCount = 0
+
+    do {
+        try {
+            Invoke-Command -ScriptBlock $ScriptBlock
+            write-Verbose "Invoked $ScriptBlock completed"
+            $DoLoop = $false
+        }
+        catch {
+            if ($RetryCount -gt 3) {
+                Write-Verbose "Invoked '$ScriptBlock' failed 3 times and we will not try again."
+                $DoLoop = $false
+            }
+            else {
+                Write-Verbose "Invoked '$ScriptBlock' failed, retrying in 15 seconds ..."
+                Start-Sleep -Seconds 15
+                $RetryCount += 1
+            }
+        }
+    }
+    While ($DoLoop)
+}
+
+if (-Not $WhatIfPreference -and $Simulate) {
+    $WhatIfPreference = $true
+}
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
     $OutJson = $true
+    $ProgressPreference = 'SilentlyContinue'
 }
 
 $MgScopes = @(
@@ -61,24 +102,33 @@ $MgScopes = @(
     'Directory.Read.All'                        # To read directory data and settings
 )
 $MissingMgScopes = @()
-$return = @{
-    Data = @{}
-}
+$return = @{}
 $tapConfig = $null
 $userObj = $null
 
+if (
+    ($UserId -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
+    ($UserId -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
+    ($UserId -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
+    ($UserId -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
+    ($UserId -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
+) {
+    Write-Error 'This type of user can not have a Temporary Access Pass created using this process.'
+    exit 1
+}
+
 foreach ($MgScope in $MgScopes) {
     if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
-        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
+        Write-Verbose "What If: Removed $MgScope from required Microsoft Graph scopes"
     }
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        Write-Verbose (Connect-MgGraph -Identity -ContextScope Process)
+        ResilientRemoteCall { Write-Verbose (Connect-MgGraph -Identity -ContextScope Process) }
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
-        Connect-MgGraph -Scopes $MgScopes -ContextScope Process
+        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
     }
 }
 foreach ($MgScope in $MgScopes) {
@@ -91,15 +141,17 @@ if ($MissingMgScopes) {
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
     }
     else {
-        Connect-MgGraph -Scopes $MgScopes -ContextScope Process
+        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
     }
 }
 
-$tapConfig = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration `
-    -AuthenticationMethodConfigurationId 'temporaryAccessPass' `
-    -ErrorAction SilentlyContinue `
-    -Debug:$DebugPreference `
-    -Verbose:$false
+$tapConfig = ResilientRemoteCall {
+    Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration `
+        -AuthenticationMethodConfigurationId 'temporaryAccessPass' `
+        -ErrorAction SilentlyContinue `
+        -Debug:$DebugPreference `
+        -Verbose:$false
+}
 
 if (-Not $tapConfig) {
     Throw ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
@@ -123,24 +175,26 @@ if ($LifetimeInMinutes) {
 }
 
 # If connection to Microsoft Graph seems okay
-$userObj = Get-MgUser `
-    -UserId $UserId `
-    -Property @(
-    'Id'
-    'UserPrincipalName'
-    'Mail'
-    'DisplayName'
-    'EmployeeHireDate'
-    'UserType'
-    'AccountEnabled'
-    'UsageLocation'
-) `
-    -ExpandProperty @(
-    'Manager'
-)`
-    -ErrorAction SilentlyContinue `
-    -Debug:$DebugPreference `
-    -Verbose:$false
+$userObj = ResilientRemoteCall {
+    Get-MgUser `
+        -UserId $UserId `
+        -Property @(
+        'Id'
+        'UserPrincipalName'
+        'Mail'
+        'DisplayName'
+        'EmployeeHireDate'
+        'UserType'
+        'AccountEnabled'
+        'UsageLocation'
+    ) `
+        -ExpandProperty @(
+        'Manager'
+    )`
+        -ErrorAction SilentlyContinue `
+        -Debug:$DebugPreference `
+        -Verbose:$false
+}
 
 if ($null -eq $userObj) {
     Throw ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
@@ -154,11 +208,6 @@ if (-Not $userObj.AccountEnabled) {
 
 if ($userObj.UserType -ne 'Member') {
     Write-Error 'User needs to be of type Member.'
-    exit 1
-}
-
-if ($userObj.UserType -match '^.+#EXT#@.+\.onmicrosoft\.com$') {
-    Write-Error 'User can not be a guest.'
     exit 1
 }
 
@@ -179,14 +228,16 @@ $return.Data = @{
     }
 }
 
-$userGroups = Get-MgUserMemberGroup `
-    -UserId $userObj.Id `
-    -SecurityEnabledOnly `
-    -ErrorAction SilentlyContinue `
-    -Debug:$DebugPreference `
-    -Verbose:$false
+$userGroups = ResilientRemoteCall {
+    Get-MgUserMemberGroup `
+        -UserId $userObj.Id `
+        -SecurityEnabledOnly `
+        -ErrorAction SilentlyContinue `
+        -Debug:$DebugPreference `
+        -Verbose:$false
+}
 
-if (-Not $userGroups) {
+if (-Not $userGroups -and $Error) {
     Throw ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
 }
 
@@ -228,17 +279,19 @@ if (
         )
     )
 ) {
-    Write-Error "Authentication method 'Temporary Access Pass' is not enabled for this user."
+    Write-Error "Authentication method 'Temporary Access Pass' is not enabled for this user ID."
     exit 1
 }
 
-# If user is a candidate for TAP generation
+# If user is a candidate for TAP creation
 $return.Data.AuthenticationMethods = @()
-$authMethods = Get-MgUserAuthenticationMethod `
-    -UserId $userObj.Id `
-    -ErrorAction SilentlyContinue `
-    -Debug:$DebugPreference `
-    -Verbose:$false
+$authMethods = ResilientRemoteCall {
+    Get-MgUserAuthenticationMethod `
+        -UserId $userObj.Id `
+        -ErrorAction SilentlyContinue `
+        -Debug:$DebugPreference `
+        -Verbose:$false
+}
 
 if (-Not $authMethods) {
     Throw ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
@@ -257,13 +310,16 @@ foreach ($authMethod in $authMethods) {
 
 if ($return.Data.AuthenticationMethods) {
     if ('temporaryAccessPass' -in $return.Data.AuthenticationMethods) {
+
         # If there is no other authentication methods besides password and TAP,
-        # we will assume that the TAP shall be re-newed
+        # we will assume that the TAP shall be renewed
         if (
             ('password' -in $return.Data.AuthenticationMethods) -and
             ($return.Data.AuthenticationMethods.Count -le 2)
         ) {
-            Write-Warning 'A Temporary Access Pass code was already set before.'
+            if (-Not $return.Data.TemporaryAccessPass.methodUsabilityReason -eq 'Expired') {
+                Write-Warning 'A Temporary Access Pass code was already set before.'
+            }
 
             if ($PSCmdlet.ShouldProcess(
                     "Delete existing Temporary Access Pass for $($userObj.UserPrincipalName)",
@@ -271,18 +327,20 @@ if ($return.Data.AuthenticationMethods) {
                     'Delete existing Temporary Access Pass'
                 )) {
 
-                Remove-MgUserAuthenticationTemporaryAccessPassMethod `
-                    -UserId $userObj.Id `
-                    -TemporaryAccessPassAuthenticationMethodId $return.Data.TemporaryAccessPass.Id `
-                    -Confirm:$false `
-                    -ErrorAction SilentlyContinue `
-                    -Debug:$DebugPreference `
-                    -Verbose:$false `
-                    -WhatIf:$WhatIfPreference
+                ResilientRemoteCall {
+                    Remove-MgUserAuthenticationTemporaryAccessPassMethod `
+                        -UserId $userObj.Id `
+                        -TemporaryAccessPassAuthenticationMethodId $return.Data.TemporaryAccessPass.Id `
+                        -Confirm:$false `
+                        -ErrorAction SilentlyContinue `
+                        -Debug:$DebugPreference `
+                        -Verbose:$false `
+                        -WhatIf:$WhatIfPreference
+                }
                 $return.Data.Remove('TemporaryAccessPass')
             }
             elseif ($WhatIfPreference) {
-                Write-Verbose 'Simulation Mode: An existing Temporary Access Pass would have been deleted.'
+                Write-Verbose 'What If: An existing Temporary Access Pass would have been deleted.'
             }
             else {
                 Write-Error 'Deletion of existing Temporary Access Pass was aborted.'
@@ -290,7 +348,7 @@ if ($return.Data.AuthenticationMethods) {
             }
         }
         else {
-            Write-Error 'A Temporary Access Pass code was already set before. It can only be displayed once it is generated.'
+            Write-Error 'A Temporary Access Pass code was already set before. It can only be displayed once after it has been created and cannot be renewed by this process. Instead, contact Global Service Desk to reset MFA methods.'
             exit 1
         }
     }
@@ -315,23 +373,25 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
 
     if ($PSCmdlet.ShouldProcess(
             "Create new Temporary Access Pass for $($userObj.UserPrincipalName)",
-            "Do you confirm to generate a new TAP for $($userObj.UserPrincipalName) ?",
+            "Do you confirm to create a new TAP for $($userObj.UserPrincipalName) ?",
             'New Temporary Access Pass'
         )) {
 
-        $tap = New-MgUserAuthenticationTemporaryAccessPassMethod `
-            -UserId $userObj.Id `
-            -BodyParameter $params `
-            -Confirm:$false `
-            -ErrorAction SilentlyContinue `
-            -Debug:$DebugPreference `
-            -Verbose:$false `
-            -WhatIf:$WhatIfPreference
+        $tap = ResilientRemoteCall {
+            New-MgUserAuthenticationTemporaryAccessPassMethod `
+                -UserId $userObj.Id `
+                -BodyParameter $params `
+                -Confirm:$false `
+                -ErrorAction SilentlyContinue `
+                -Debug:$DebugPreference `
+                -Verbose:$false `
+                -WhatIf:$WhatIfPreference
+        }
 
         if ($tap) {
             $return.Data.TemporaryAccessPass = $tap
             if ('temporaryAccessPass' -notin $return.Data.AuthenticationMethods) { $return.Data.AuthenticationMethods += 'temporaryAccessPass' }
-            Write-Verbose 'New Temporary Access Pass code was generated.'
+            Write-Verbose 'A new Temporary Access Pass code was created.'
         }
         else {
             Write-Error ($Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
@@ -339,16 +399,21 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
         }
     }
     elseif ($WhatIfPreference) {
-        Write-Verbose "Simulation Mode: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())"
+        Write-Verbose "What If: A new Temporary Access Pass code would have been created with the following parameters:`n$(($params | Out-String).TrimEnd())"
+        $return.WhatIf = @{
+            returnCode = 0
+            message    = 'A Temporary Access Pass code may be created for this user ID.'
+        }
     }
     else {
-        Write-Error 'Creation of new Temporary Access Pass was aborted.'
+        Write-Error 'Creation of new Temporary Access Pass code was aborted.'
         exit 1
     }
 }
 
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
+if ($Webhook) { ResilientRemoteCall { Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Depth 4) } }
 if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
 
