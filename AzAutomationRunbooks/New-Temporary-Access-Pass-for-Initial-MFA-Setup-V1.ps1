@@ -82,8 +82,7 @@ Function ResilientRemoteCall {
                 $RetryCount += 1
             }
         }
-    }
-    While ($DoLoop)
+    } While ($DoLoop)
 }
 
 if (-Not $WhatIfPreference -and $Simulate) {

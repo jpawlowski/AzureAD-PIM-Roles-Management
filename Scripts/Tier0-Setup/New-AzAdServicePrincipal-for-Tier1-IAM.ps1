@@ -107,6 +107,7 @@ if ($PSCmdlet.ShouldProcess(
 
     $Scope = "/subscriptions/$($automationAccount.SubscriptionId)/resourceGroups/$($automationAccount.ResourceGroupName)/providers/Microsoft.Automation/automationAccounts/$($automationAccount.AutomationAccountName)"
     $AzRoles = @(
+        # 'Reader'      # Might sometimes be required
         'Automation Job Operator'
     )
 
