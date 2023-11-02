@@ -31,7 +31,7 @@ if ($WebhookData) {
 
     # Call child runbook using online execution
     # https://learn.microsoft.com/en-us/azure/automation/automation-child-runbooks#call-a-child-runbook-by-using-inline-execution
-    .\New-Temporary-Access-Pass-for-Initial-MFA-Setup.ps1 `
+    .\New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1 `
         -UserId $obj.UserPrincipalName `
         -Confirm:$false `
         -OutJson
