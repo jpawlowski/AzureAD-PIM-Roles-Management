@@ -67,27 +67,32 @@ $return = @{
 $tapConfig = $null
 $userObj = $null
 
+foreach ($MgScope in $MgScopes) {
+    if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
+        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
+    }
+}
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
         Write-Verbose (Connect-MgGraph -Identity -ContextScope Process)
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
-        Throw "Run 'Connect-MgGraph' first. The following scopes are required for this script to run:`n`n$($MissingMgScopes -join "`n")"
+        Connect-MgGraph -Scopes $MgScopes -ContextScope Process
     }
 }
-
 foreach ($MgScope in $MgScopes) {
-    if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
-        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
-    }
-    elseif ($MgScope -notin @((Get-MgContext).Scopes)) {
+    if ($MgScope -notin @((Get-MgContext).Scopes)) {
         $MissingMgScopes += $MgScope
     }
 }
-
 if ($MissingMgScopes) {
-    Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
+    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+        Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
+    }
+    else {
+        Connect-MgGraph -Scopes $MgScopes -ContextScope Process
+    }
 }
 
 $tapConfig = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration `
