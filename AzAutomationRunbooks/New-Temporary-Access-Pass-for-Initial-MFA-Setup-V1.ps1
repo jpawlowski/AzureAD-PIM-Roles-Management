@@ -68,7 +68,7 @@ Function ResilientRemoteCall {
     do {
         try {
             Invoke-Command -ScriptBlock $ScriptBlock
-            write-Verbose "Invoked $ScriptBlock completed"
+            Write-Verbose "Invoked $ScriptBlock completed"
             $DoLoop = $false
         }
         catch {
