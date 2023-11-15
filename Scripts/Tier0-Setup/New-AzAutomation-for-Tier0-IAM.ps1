@@ -26,10 +26,13 @@
 .PARAMETER Tags
     Tags
 
+.PARAMETER AuthenticationAdministratorDirectoryScopeID
+    Scope ID to limit access for the Authentication Administrator role, e.g. '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+
 .NOTES
     Filename: New-AzAutomation-for-Tier0-IAM.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.0
+    Version: 1.1
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
@@ -56,7 +59,8 @@ Param (
     [Parameter(Position = 4, mandatory = $true)]
     [string]$Location,
     [string]$Plan,
-    [System.Collections.Generic.Dictionary[string, object]]$Tags
+    [System.Collections.Generic.Dictionary[string, object]]$Tags,
+    [string]$AuthenticationAdministratorDirectoryScopeID = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
 )
 
 if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -68,7 +72,6 @@ if (
     ($TenantId -ne (Get-AzContext).Tenant)
 ) {
     Connect-AzAccount `
-        -UseDeviceAuthentication `
         -TenantId $TenantId `
         -Subscription $Subscription `
         -Scope Process `
@@ -103,7 +106,7 @@ if (-Not $automationAccount) {
         $automationAccount = New-AzAutomationAccount @Params
     }
     elseif ($WhatIfPreference) {
-        Write-Verbose 'Simulation Mode: A new Azure Automation account would have been created.'
+        Write-Verbose 'What If: A new Azure Automation account would have been created.'
     }
     else {
         Write-Verbose 'Creation of new Azure Automation account was aborted.'
@@ -148,7 +151,7 @@ if ($PSCmdlet.ShouldProcess(
     }
 }
 elseif ($WhatIfPreference) {
-    Write-Verbose 'Simulation Mode: PowerShell modules would have been installed.'
+    Write-Verbose 'What If: PowerShell modules would have been installed.'
 }
 else {
     Write-Verbose 'Installation of PowerShell modules was denied.'
@@ -166,7 +169,7 @@ if (-Not $automationAccount.Identity) {
             -AssignSystemIdentity
     }
     elseif ($WhatIfPreference) {
-        Write-Verbose 'Simulation Mode: System-Assigned Managed Identity would have been enabled.'
+        Write-Verbose 'What If: System-Assigned Managed Identity would have been enabled.'
     }
     else {
         Write-Verbose 'Enablement of System-Assigned Managed Identity was aborted.'
@@ -196,7 +199,6 @@ if ($PSCmdlet.ShouldProcess(
 
     if (-Not (Get-MgContext)) {
         Connect-MgGraph `
-            -DeviceCode `
             -Scopes $MgScopes `
             -ContextScope Process `
             -Verbose:$Verbose
@@ -238,7 +240,7 @@ if ($PSCmdlet.ShouldProcess(
     }
 }
 elseif ($WhatIfPreference) {
-    Write-Verbose 'Simulation Mode: Microsoft Graph permissions would have been assigned.'
+    Write-Verbose 'What If: Microsoft Graph permissions would have been assigned.'
 }
 else {
     Write-Verbose 'Assignment of Microsoft Graph permissions was denied.'
@@ -254,7 +256,7 @@ if ($PSCmdlet.ShouldProcess(
         @{
             DisplayName      = 'Authentication Administrator'
             RoleDefinitionId = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
-            DirectoryScopeId = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+            DirectoryScopeId = $AuthenticationAdministratorDirectoryScopeID
         }
     )
 
@@ -280,7 +282,7 @@ if ($PSCmdlet.ShouldProcess(
     }
 }
 elseif ($WhatIfPreference) {
-    Write-Verbose 'Simulation Mode: Microsoft Entra roles would have been assigned.'
+    Write-Verbose 'What If: Microsoft Entra roles would have been assigned.'
 }
 else {
     Write-Verbose 'Assignment of Microsoft Entra roles was denied.'
