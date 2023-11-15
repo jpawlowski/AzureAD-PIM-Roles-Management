@@ -52,7 +52,6 @@ if (
     ($TenantId -ne (Get-AzContext).Tenant)
 ) {
     Connect-AzAccount `
-        -UseDeviceAuthentication `
         -TenantId $TenantId `
         -Subscription $Subscription `
         -Scope Process
@@ -91,7 +90,7 @@ if (-Not $ServicePrincipal) {
         Write-Output ('Client Secret: ' + $ServicePrincipal.PasswordCredentials.SecretText)
     }
     elseif ($WhatIfPreference) {
-        Write-Verbose 'Simulation Mode: A new Microsoft Entra Service Principal would have been created.'
+        Write-Verbose 'What If: A new Microsoft Entra Service Principal would have been created.'
     }
     else {
         Write-Verbose 'Creation of new Microsoft Entra Service Principal was aborted.'
@@ -107,7 +106,7 @@ if ($PSCmdlet.ShouldProcess(
 
     $Scope = "/subscriptions/$($automationAccount.SubscriptionId)/resourceGroups/$($automationAccount.ResourceGroupName)/providers/Microsoft.Automation/automationAccounts/$($automationAccount.AutomationAccountName)"
     $AzRoles = @(
-        # 'Reader'      # Might sometimes be required
+        'Reader'
         'Automation Job Operator'
     )
 
