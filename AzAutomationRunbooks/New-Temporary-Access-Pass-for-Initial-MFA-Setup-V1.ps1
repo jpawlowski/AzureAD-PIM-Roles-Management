@@ -175,6 +175,8 @@ if ($LifetimeInMinutes) {
 }
 
 # If connection to Microsoft Graph seems okay
+#
+
 $userObj = ResilientRemoteCall {
     Get-MgUser `
         -UserId $UserId `
@@ -201,6 +203,8 @@ if ($null -eq $userObj) {
 }
 
 # If user details could be retrieved
+#
+
 if (-Not $userObj.AccountEnabled) {
     Write-Error 'User ID is disabled.'
     exit 1
@@ -242,6 +246,8 @@ if (-Not $userGroups -and $Error) {
 }
 
 if (
+
+    # User is excluded from Authentication Method
     (
         ($null -ne $tapConfig.ExcludeTargets) -and
         ($tapConfig.ExcludeTargets | Where-Object -FilterScript {
@@ -249,6 +255,8 @@ if (
             ($_.id -in $userGroups)
         })
     ) -or
+
+    # User is excluded from Authentication Method in AdditionalProperties
     (
         ($null -ne $tapConfig.AdditionalProperties.excludeTargets) -and
         ($tapConfig.AdditionalProperties.excludeTargets | Where-Object -FilterScript {
@@ -256,6 +264,9 @@ if (
             ($_.id -in $userGroups)
         })
     ) -or
+
+    # User is not part of a group that is allowed to use this Authentication Method,
+    # or 'All Users' is not set
     (
         -Not (
         ($null -ne $tapConfig.IncludeTargets) -and
@@ -284,6 +295,8 @@ if (
 }
 
 # If user is a candidate for TAP creation
+#
+
 $return.Data.AuthenticationMethods = @()
 $authMethods = ResilientRemoteCall {
     Get-MgUserAuthenticationMethod `
@@ -364,6 +377,8 @@ if ($return.Data.AuthenticationMethods) {
 }
 
 # If user can have a new TAP
+#
+
 if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
     $params = @{}
 
