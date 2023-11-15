@@ -38,11 +38,11 @@
     Output the Temporary Access Pass only.
 
 .NOTES
-    Filename: New-Hire-Temporary-Access-Pass.ps1
+    Filename: New-Hire-Temporary-Access-Pass-V0.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0
 #>
-#Requires -Version 7.2
+#Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
@@ -375,7 +375,7 @@ if (-Not $return.Errors) {
                     $return.Data.Remove('TemporaryAccessPass')
                 }
                 elseif ($WhatIfPreference) {
-                    $return.Informations += @{ message = 'Simulation Mode: An existing Temporary Access Pass would have been deleted.' }
+                    $return.Informations += @{ message = 'What If: An existing Temporary Access Pass would have been deleted.' }
                 }
                 else {
                     $return.Errors += @{ message = 'Deletion of existing Temporary Access Pass was aborted.' }
@@ -428,7 +428,7 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
         }
     }
     elseif ($WhatIfPreference) {
-        $return.Informations += @{ message = "Simulation Mode: EmployeeHireDate would have been updated to $(Get-Date $EmployeeHireDate -UFormat '+%Y-%m-%dT%H:%M:%S.000Z')." }
+        $return.Informations += @{ message = "What If: EmployeeHireDate would have been updated to $(Get-Date $EmployeeHireDate -UFormat '+%Y-%m-%dT%H:%M:%S.000Z')." }
     }
     else {
         $return.Errors += @{ message = 'Update of EmployeeHireDate was aborted.' }
@@ -475,7 +475,7 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
         }
     }
     elseif ($WhatIfPreference) {
-        $return.Informations += @{ message = "Simulation Mode: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())" }
+        $return.Informations += @{ message = "What If: A new Temporary Access Pass would have been generated with the following parameters:`n$(($BodyParameter | Out-String).TrimEnd())" }
     }
     else {
         $return.Errors += @{ message = 'Creation of new Temporary Access Pass was aborted.' }

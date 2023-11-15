@@ -16,11 +16,11 @@
     Output the Temporary Access Pass only.
 
 .NOTES
-    Filename: Remove-Temporary-Access-Pass.ps1
+    Filename: Remove-Temporary-Access-Pass-V0.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0
 #>
-#Requires -Version 7.2
+#Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 
@@ -165,7 +165,7 @@ if (-Not $return.Errors) {
                     $return.Informations += @{ message = "Temporary Access Pass with ID $($authMethod.Id) was deleted." }
                 }
                 elseif ($WhatIfPreference) {
-                    $return.Informations += @{ message = "Simulation Mode: Existing Temporary Access Pass with ID $($authMethod.Id) would have been deleted." }
+                    $return.Informations += @{ message = "What If: Existing Temporary Access Pass with ID $($authMethod.Id) would have been deleted." }
                 }
                 else {
                     $return.Errors += @{ message = 'Deletion of existing Temporary Access Pass was aborted.' }
