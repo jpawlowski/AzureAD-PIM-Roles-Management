@@ -26,8 +26,8 @@
 .PARAMETER Tags
     Tags
 
-.PARAMETER AuthenticationAdministratorDirectoryScopeID
-    Scope ID to limit access for the Authentication Administrator role, e.g. '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+.PARAMETER DirectoryScopeID
+    Scope ID to limit access for Microsoft Entra roles, e.g. '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
 
 .NOTES
     Filename: New-AzAutomation-for-Tier0-IAM.ps1
@@ -60,7 +60,7 @@ Param (
     [string]$Location,
     [string]$Plan,
     [System.Collections.Generic.Dictionary[string, object]]$Tags,
-    [string]$AuthenticationAdministratorDirectoryScopeID = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+    [string]$DirectoryScopeID = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
 )
 
 if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -256,7 +256,7 @@ if ($PSCmdlet.ShouldProcess(
         @{
             DisplayName      = 'Authentication Administrator'
             RoleDefinitionId = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
-            DirectoryScopeId = $AuthenticationAdministratorDirectoryScopeID
+            DirectoryScopeId = $DirectoryScopeID
         }
     )
 
