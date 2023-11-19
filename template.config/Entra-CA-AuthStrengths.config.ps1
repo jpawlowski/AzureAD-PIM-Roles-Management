@@ -11,7 +11,7 @@ $EntraCAAuthStrengths = @(
     # Dedicated custom Authentication Strength policies are required to be created for full Tier separation.
     #
     @{
-        account             = @{
+        account                = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = @($EntraCAAuthStrengthDisplayNamePrefix, 'Tier0-Admin-Account', $EntraCAAuthStrengthDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
             description               = 'Authentication methods for users with no Tier0 Microsoft Entra ID Roles activated. DO NOT CHANGE MANUALLY!'
@@ -167,7 +167,7 @@ $EntraCAAuthStrengths = @(
     #
     @{
         # Only required if you are using dedicated accounts for Tier1 admins (highly recommended!)
-        account             = @{
+        account                = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = @($EntraCAAuthStrengthDisplayNamePrefix, 'Tier1-Admin-Account', $EntraCAAuthStrengthDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
             description               = 'Authentication methods for users with no Tier1 Microsoft Entra ID Roles activated. DO NOT CHANGE MANUALLY!'
@@ -206,6 +206,8 @@ $EntraCAAuthStrengths = @(
                 }
             }
         }
+
+        # Only required if you are using dedicated accounts for Tier1 admins (highly recommended!)
         activeRole             = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = @($EntraCAAuthStrengthDisplayNamePrefix, 'Tier1-Admin-Role', $EntraCAAuthStrengthDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
@@ -242,6 +244,7 @@ $EntraCAAuthStrengths = @(
                 }
             }
         }
+
         roleEnablement         = @{
             # id = ''   # This is tenant specific and may be added after initial creation to use GUID instead of name
             displayName               = @($EntraCAAuthStrengthDisplayNamePrefix, 'Tier1-Admin-PIM', $EntraCAAuthStrengthDisplayNameSuffix) | Join-String -Separator $DisplayNameElementSeparator
