@@ -68,15 +68,15 @@ function Update-Entra-CA-AuthStrength {
         Write-Progress @params
 
         if ($PSCmdlet.ShouldProcess(
-                "Update a total of $($ConfigLevels[$ConfigLevel].Count) Authentication Stength policies in [Tier $ConfigLevel]",
-                "Do you confirm to create new or update a total of $($ConfigLevels[$ConfigLevel].Count) Authentication Strength policies for Tier ${tier}?",
+                "Update a total of $($Config[$ConfigLevel].Count) Authentication Stength policies in [Tier $ConfigLevel]",
+                "Do you confirm to create new or update a total of $($Config[$ConfigLevel].Count) Authentication Strength policies for Tier $ConfigLevel?",
                 "!!! WARNING: Create and/or update [Tier $ConfigLevel] Microsoft Entra Conditional Access Authentication Strengths !!!"
             )) {
             $j = 0
-            foreach ($key in $ConfigLevels[$ConfigLevel].Keys) {
+            foreach ($key in $Config[$ConfigLevel].Keys) {
                 $j++
 
-                $PercentComplete = $j / $ConfigLevels[$ConfigLevel].Count * 100
+                $PercentComplete = $j / $Config[$ConfigLevel].Count * 100
                 $params = @{
                     Id               = 1
                     ParentId         = 0
@@ -86,7 +86,7 @@ function Update-Entra-CA-AuthStrength {
                     CurrentOperation = 'EntraCAAuthStrengthCreateOrUpdate'
                 }
 
-                foreach ($authStrength in $ConfigLevels[$ConfigLevel][$key]) {
+                foreach ($authStrength in $Config[$ConfigLevel][$key]) {
 
                     $updateOnly = $false
                     if ($authStrength.id) {
