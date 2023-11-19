@@ -67,9 +67,9 @@ CmdletBinding(
 ]
 Param (
     [string[]]$Roles,
-    [string[]]$AuthContext,
-    [string[]]$AuthStrength,
-    [string[]]$NamedLocations,
+    [switch]$AuthContext,
+    [switch]$AuthStrength,
+    [switch]$NamedLocations,
     [switch]$ValidateBreakGlass,
     [switch]$SkipBreakGlassValidation,
     [string[]]$TierAdminUnits,
@@ -115,8 +115,8 @@ foreach ($FileName in $LibFiles) {
 
 try {
     $params = @{
-        ErrorAction       = 'Stop'
-        Scopes            = $MgScopes
+        ErrorAction = 'Stop'
+        Scopes      = $MgScopes
     }
     if ($TenantId) { $params.TenantId = $TenantId }
     if ($UseDeviceCode) { $params.UseDeviceCode = $UseDeviceCode }
@@ -133,34 +133,22 @@ try {
     if ($Tier2) { $params.Tier2 = $Tier2 }
 
     if ($NamedLocations) {
-        $Update = $false
-        $WhitelistIDs = @()
-        $WhitelistNames = @()
-
-        if ($Update) {
-            $params.Config = $EntraCANamedLocations
-            Update-Entra-CA-NamedLocations @params
-        }
+        $lParams = $params
+        $lParams.Remove('Force')
+        $lParams.Config = $EntraCANamedLocations
+        Update-Entra-CA-NamedLocations @lParams
     }
     if ($AuthStrength) {
-        $Update = $false
-        $WhitelistIDs = @()
-        $WhitelistNames = @()
-
-        if ($Update) {
-            $params.Config = $EntraCAAuthStrengths
-            Update-Entra-CA-AuthStrength @params
-        }
+        $lParams = $params
+        $lParams.Remove('Force')
+        $lParams.Config = $EntraCAAuthStrengths
+        Update-Entra-CA-AuthStrength @lParams
     }
     if ($AuthContext) {
-        $Update = $false
-        $WhitelistIDs = @()
-        $WhitelistNames = @()
-
-        if ($Update) {
-            $params.Config = $EntraCAAuthContexts
-            Update-Entra-CA-AuthContext @params
-        }
+        $lParams = $params
+        $lParams.Remove('Force')
+        $lParams.Config = $EntraCAAuthContexts
+        Update-Entra-CA-AuthContext @lParams
     }
 
     if ($SkipBreakGlassValidation -and !$ValidateBreakGlass) {

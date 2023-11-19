@@ -7,5 +7,5 @@ $EntraGroupsTier2DisplayNamePrefix = @($EntraGroupsDisplayNamePrefix, 'T2') | Jo
 
 $EntraGroupsConfigSubfolder = 'Entra-Groups.config'
 
-$Tier0AdminAccountRegex = '^A0C_.+@' + [regex]::Escape($TenantName) + '$'
-$Tier1AdminAccountRegex = '^A1C_.+@' + [regex]::Escape($TenantName) + '$'
+$Tier0AdminAccountRegex = '^A0C-.+@' + [regex]::Escape($TenantName) + '$'
+$Tier1AdminAccountRegex = '^A1C-.+@' + [regex]::Escape($TenantName) + '$'

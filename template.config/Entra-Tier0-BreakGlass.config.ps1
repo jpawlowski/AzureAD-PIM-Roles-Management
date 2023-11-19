@@ -31,8 +31,8 @@ $EntraTier0BreakGlass = @{
                 'softwareOath'     # Allows a shared secret, e.g. using a password manager with TOTP support, or printout for temporal setup of a TOTP generator app
             )
             directoryRoles        = @(
-                '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
-                'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
+                '62e90394-69f5-4237-9190-012177145e10'     # Global Administrator
+                # 'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
             )
         }
 
@@ -60,8 +60,8 @@ $EntraTier0BreakGlass = @{
                 # 'softwareOath'   # Replace fido2AuthenticationMethod with TOTP to use a shared secret with decreased security level
             )
             directoryRoles        = @(
-                '62e90394-69f5-4237-9190-012177145e10'   # Global Administrator
-                'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
+                '62e90394-69f5-4237-9190-012177145e10'     # Global Administrator
+                # 'e8611ab8-c189-46e8-94e1-60213ab1f814'   # Privileged Role Administrator
             )
         }
     )
