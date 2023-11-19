@@ -496,15 +496,27 @@ function Test-Entra-Tier0-BreakGlass {
 
     $groupOwners = Get-MgGroupOwner -GroupId $groupObj.Id -ErrorAction Stop
     foreach ($groupOwner in $groupOwners) {
-        Remove-MgGroupOwnerByRef -GroupId $Config.group.id -DirectoryObjectId $groupOwner.Id -Confirm:$false
-        Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed suspicious group owner $($groupOwner.Id)"
+        if ($groupMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+            Write-Error "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Restricted Admin Unit in use: Suspicious group owner $($groupOwner.Id) MUST be removed manually to continue!"
+            return
+        }
+        else {
+            Remove-MgGroupOwnerByRef -GroupId $Config.group.id -DirectoryObjectId $groupOwner.Id -Confirm:$false
+            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed suspicious group owner $($groupOwner.Id)"
+        }
     }
 
     $groupMembers = Get-MgGroupMember -GroupId $groupObj.Id -ErrorAction Stop
     foreach ($groupMember in $groupMembers) {
         if ($groupMember.Id -notin $breakGlassAccountIds) {
-            Remove-MgGroupMemberByRef -GroupId $Config.group.id -DirectoryObjectId $groupMember.Id -Confirm:$false
-            Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
+            if ($groupMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+                Write-Error "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Restricted Admin Unit in use: Unexpected group member $($groupMember.Id) MUST be removed manually to continue!"
+                return
+            }
+            else {
+                Remove-MgGroupMemberByRef -GroupId $Config.group.id -DirectoryObjectId $groupMember.Id -Confirm:$false
+                Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
+            }
         }
     }
 
