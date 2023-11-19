@@ -70,7 +70,7 @@ $EntraTier0BreakGlass = @{
     # Role-enabled Break Glass Group containing all Break Glass Accounts
     #
     # The group MUST be created manually before with role-assignment capability.
-    # The group CAN NOT be onboarded to Privileged Identityentity Management.
+    # The group CAN NOT be onboarded to Privileged Identity Management.
     # The group object ID MUST be given here.
     # The script will only ensure all break glass accounts are member of this group.
     # The script will also REMOVE any other account from that group.
