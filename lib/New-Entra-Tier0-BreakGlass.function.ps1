@@ -124,13 +124,6 @@ function New-Entra-Tier0-BreakGlass {
                 -ErrorAction Stop `
                 -Confirm:$false
             Write-Output "Created new Break Glass Group: '$($groupObj.displayName)' ($($groupObj.Id))"
-            if ($null -ne $adminUnitObj) {
-                $params = @{
-                    "@odata.id" = "https://graph.microsoft.com/beta/groups/$($groupObj.Id)"
-                }
-                $null = New-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnitObj.Id -BodyParameter $params -ErrorAction Stop
-                Write-Output "   Added to Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
-            }
         }
     }
     else {
@@ -212,6 +205,17 @@ function New-Entra-Tier0-BreakGlass {
                         "@odata.id" = "https://graph.microsoft.com/beta/users/$($userObj.Id)"
                     }
                     $null = New-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnitObj.Id -BodyParameter $params -ErrorAction Stop
+
+                    $params = @{
+                        "@odata.id" = "https://graph.microsoft.com/beta/groups/$($groupObj.Id)"
+                    }
+                    $null = New-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnitObj.Id -BodyParameter $params -ErrorAction Stop
+                    Write-Output "Added Break Glass Group '$($groupObj.displayName)' ($($groupObj.Id)) to Administrative Unit: '$($adminUnitObj.displayName)' ($($adminUnitObj.Id))"
+                    if ($adminUnitObj.IsMemberManagementRestricted) {
+                        Write-Output "                      HINT: Management Restriction requires temporary removal"
+                        Write-Output "                            of the group from this administrative unit, for example,"
+                        Write-Output "                            to add/remove users."
+                    }
                 }
 
                 Write-Output ''

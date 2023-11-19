@@ -121,53 +121,66 @@ function Test-Entra-Tier0-BreakGlass {
         return
     }
     if ($groupObj.SecurityEnabled -ne $true) {
-        Write-Error "Break Glass Group $($Config.group.id): Must be a security group"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Must be a security group"
         return
     }
     if ($groupObj.MailEnabled -ne $false) {
-        Write-Error "Break Glass Group $($Config.group.id): Can not be mail-enabled"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Can not be mail-enabled"
         return
     }
     if ($groupObj.GroupTypes.Count -ne 0) {
-        Write-Error "Break Glass Group $($Config.group.id): Can not have any specific group type"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Can not have any specific group type"
         return
     }
     if (
         ($null -ne $groupObj.MembershipRuleProcessingState) -or
         ($null -ne $groupObj.MembershipRule)
     ) {
-        Write-Error "Break Glass Group $($Config.group.id): Can not have dynamic membership rules"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Can not have dynamic membership rules"
         return
     }
     if (
         ($Config.group.isAssignableToRole -eq $true) -and
         ($groupObj.IsAssignableToRole -ne $true)
     ) {
-        Write-Error "Break Glass Group $($Config.group.id): Must be re-created with role-assignment capability enabled"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Must be re-created with role-assignment capability enabled"
         return
     }
     if (
         ($null -ne $Config.group.visibility) -and
         ($Config.group.visibility -ne $groupObj.visibility)
     ) {
-        Write-Error "Break Glass Group $($Config.group.id): Visibility must be $($Config.group.visibility)"
+        Write-Error "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Visibility must be $($Config.group.visibility)"
         return
+    }
+    $groupMemberOfAdminUnit = Get-MgGroupMemberOfAsAdministrativeUnit -DirectoryObjectId $adminUnitObj.Id -GroupId $groupObj.Id -ErrorAction SilentlyContinue
+    if (-Not $groupMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+        Write-Warning "Break Glass Group $($groupObj.id) ($($groupObj.DisplayName)): Not a member of defined Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)). To complete GROUP PROTECTION, please manually add group to admin unit!"
     }
     if (
         ($null -ne $Config.group.displayName) -and
         ($groupObj.DisplayName -ne $Config.group.displayName)
     ) {
         if ($Repair) {
-            if ($PSCmdlet.ShouldProcess(
-                "Update display name of Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName))",
-                'Confirm updating the display name of the Break Glass Group?',
-                "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
-            )) {
+            if ($groupMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+                Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Restricted Admin Unit in use: Display name can not be corrected to '$($Config.group.displayName)' automatically."
+            }
+            elseif ($PSCmdlet.ShouldProcess(
+                    "Update display name of Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName))",
+                    'Confirm updating the display name of the Break Glass Group?',
+                    "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
+                )) {
                 Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating display name"
                 Update-MgGroup -GroupId $groupObj.Id -DisplayName $Config.group.displayName -ErrorAction Continue -Confirm:$false
                 if ($?) {
                     $groupObj.DisplayName = $Config.group.displayName
                 }
+            }
+            elseif ($WhatIfPreference) {
+                Write-Verbose "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Display name would have been updated"
+            }
+            else {
+                Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Display name update was denied"
             }
         }
         else {
@@ -179,16 +192,25 @@ function Test-Entra-Tier0-BreakGlass {
         ($groupObj.Description -ne $Config.group.description)
     ) {
         if ($Repair) {
-            if ($PSCmdlet.ShouldProcess(
-                "Update description of Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName))",
-                'Confirm updating the description of the Break Glass Group?',
-                "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
-            )) {
+            if ($groupMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+                Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Restricted Admin Unit in use: Description can not be corrected automatically."
+            }
+            elseif ($PSCmdlet.ShouldProcess(
+                    "Update description of Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName))",
+                    'Confirm updating the description of the Break Glass Group?',
+                    "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
+                )) {
                 Write-Output "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Updating description"
                 Update-MgGroup -GroupId $groupObj.Id -Description $Config.group.description -ErrorAction Continue -Confirm:$false
                 if ($?) {
                     $groupObj.Description = $Config.group.Description
                 }
+            }
+            elseif ($WhatIfPreference) {
+                Write-Verbose "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Description would have been updated"
+            }
+            else {
+                Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Description update was denied"
             }
         }
         else {
@@ -284,99 +306,123 @@ function Test-Entra-Tier0-BreakGlass {
             Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Temporary password must be changed to permanent password first"
             return
         }
+
+        $userMemberOfAdminUnit = Get-MgUserMemberOfAsAdministrativeUnit -DirectoryObjectId $adminUnitObj.Id -UserId $userObj.Id -ErrorAction SilentlyContinue
+        if (-Not $userMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Not a member of defined Break Glass Admin Unit $($adminUnitObj.Id) ($($adminUnitObj.DisplayName)). To complete ACCOUNT PROTECTION, please manually add account to admin unit!"
+        }
+
         if (
             ($null -ne $account.displayName) -and
             ($userObj.DisplayName -ne $account.displayName)
         ) {
-            Write-Verbose "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)): Updating display name"
-            if ($PSCmdlet.ShouldProcess($userObj.Id)) {
+            if ($userMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+                Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)): Restricted Admin Unit in use: Display name can not be corrected to '$($account.displayName)' automatically."
+            }
+            elseif ($PSCmdlet.ShouldProcess(
+                    "Update display name of $($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName))",
+                    'Confirm updating the display name of the Break Glass Account?',
+                    "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Updating display name"
+                )) {
+                Write-Output "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)): Updating display name"
                 Update-MgUser -UserID $userObj.Id -DisplayName $account.displayName -ErrorAction Continue
                 $userObj.DisplayName = $account.displayName
             }
-        }
-
-        $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction Stop
-        foreach ($authMethodId in $account.authenticationMethods) {
-            $authMethodOdataType = '#microsoft.graph.' + $authMethodId + 'AuthenticationMethod'
-            if ($authMethodOdataType -notin $authMethods.AdditionalProperties.'@odata.type') {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethodId"
-                return
+            elseif ($WhatIfPreference) {
+                Write-Verbose "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Display name would have been updated"
+            }
+            else {
+                Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Display name update was denied"
             }
         }
-        foreach ($authMethod in $authMethods) {
-            $authMethodId = $null
-            if ($authMethod.AdditionalProperties.'@odata.type' -match '^#microsoft\.graph\.(.+)AuthenticationMethod$') {
-                $authMethodId = $Matches[1]
-            }
-            if (!$authMethodId -or ($authMethodId -notin $account.authenticationMethods)) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
-                return
-            }
-            if ($authMethodId -eq 'password') { continue }
 
-            $authMethodConf = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId $authMethodId -ErrorAction Stop
-            if ($authMethodConf.State -ne 'enabled') {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Authentication Method $authMethodId is currently not enabled for this tenant"
-                return
+        if ($userMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
+            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Restricted Admin Unit in use: Skipping validation of Authentication Methods. Regular manual control procedures apply!"
+        }
+        else {
+            $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction Stop
+            foreach ($authMethodId in $account.authenticationMethods) {
+                $authMethodOdataType = '#microsoft.graph.' + $authMethodId + 'AuthenticationMethod'
+                if ($authMethodOdataType -notin $authMethods.AdditionalProperties.'@odata.type') {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Authentication Method: $authMethodId"
+                    return
+                }
             }
+            foreach ($authMethod in $authMethods) {
+                $authMethodId = $null
+                if ($authMethod.AdditionalProperties.'@odata.type' -match '^#microsoft\.graph\.(.+)AuthenticationMethod$') {
+                    $authMethodId = $Matches[1]
+                }
+                if (!$authMethodId -or ($authMethodId -notin $account.authenticationMethods)) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Unexpected active Authentication Method: $($authMethod.AdditionalProperties.'@odata.type')"
+                    return
+                }
+                if ($authMethodId -eq 'password') { continue }
 
-            $isBreakGlassGroupExcluded = $false
-            if (
-                (
+                $authMethodConf = Get-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId $authMethodId -ErrorAction Stop
+                if ($authMethodConf.State -ne 'enabled') {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Authentication Method $authMethodId is currently not enabled for this tenant"
+                    return
+                }
+
+                $isBreakGlassGroupExcluded = $false
+                if (
+                    (
                     ($null -eq $authMethodConf.ExcludeTargets) -and
                     ($null -eq $authMethodConf.AdditionalProperties.excludeTargets)
-                ) -or
-                (
+                    ) -or
+                    (
                     ($null -ne $authMethodConf.ExcludeTargets) -and
                     ($authMethodConf.ExcludeTargets | Where-Object -FilterScript {
                         ($_.targetType -eq 'group') -and
                         ($_.id -eq $groupObj.Id)
-                    })
-                ) -or
-                (
+                        })
+                    ) -or
+                    (
                     ($null -ne $authMethodConf.AdditionalProperties.excludeTargets) -and
                     ($authMethodConf.AdditionalProperties.excludeTargets | Where-Object -FilterScript {
                         ($_.targetType -eq 'group') -and
                         ($_.id -eq $groupObj.Id)
-                    })
-                )
-            ) {
-                $isBreakGlassGroupExcluded = $true
-            }
+                        })
+                    )
+                ) {
+                    $isBreakGlassGroupExcluded = $true
+                }
 
-            $isBreakGlassGroupIncluded = $false
-            if (
-                (
+                $isBreakGlassGroupIncluded = $false
+                if (
+                    (
                     ($null -ne $authMethodConf.IncludeTargets) -and
                     ($authMethodConf.IncludeTargets | Where-Object -FilterScript {
                         ($_.targetType -eq 'group') -and
-                        (
+                            (
                             ($_.id -eq 'all_users') -or
                             ($_.id -eq $groupObj.Id)
-                        )
-                    })
-                ) -or
-                (
+                            )
+                        })
+                    ) -or
+                    (
                     ($null -ne $authMethodConf.AdditionalProperties.includeTargets) -and
                     ($authMethodConf.AdditionalProperties.includeTargets | Where-Object -FilterScript {
                         ($_.targetType -eq 'group') -and
-                        (
+                            (
                             ($_.id -eq 'all_users') -or
                             ($_.id -eq $groupObj.Id)
-                        )
-                    })
-                )
-            ) {
-                $isBreakGlassGroupIncluded = $true
-            }
+                            )
+                        })
+                    )
+                ) {
+                    $isBreakGlassGroupIncluded = $true
+                }
 
-            if ($isBreakGlassGroupExcluded) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must not be excluded to use Authentication Method $authMethodId"
-                return
-            }
-            if (!$isBreakGlassGroupIncluded) {
-                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must be included to use Authentication Method $authMethodId"
-                return
+                if ($isBreakGlassGroupExcluded) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must not be excluded to use Authentication Method $authMethodId"
+                    return
+                }
+                if (!$isBreakGlassGroupIncluded) {
+                    Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Break Glass group must be included to use Authentication Method $authMethodId"
+                    return
+                }
             }
         }
 
@@ -409,9 +455,24 @@ function Test-Entra-Tier0-BreakGlass {
 
         $groupMemberOf = Get-MgUserMemberGroup -UserId $userObj.Id -SecurityEnabledOnly:$true -Confirm:$false -ErrorAction Stop
         if ($groupObj.Id -notin $groupMemberOf) {
-            if ($PSCmdlet.ShouldProcess($groupObj.Id)) {
-                Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
+            if (($userMemberOfAdminUnit -or $groupMemberOfAdminUnit) -and $adminUnitObj.isMemberManagementRestricted) {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Restricted Admin Unit in use: Missing Break Glass Group membership can not be corrected automatically."
+                return
+            }
+            elseif ($PSCmdlet.ShouldProcess(
+                    "Add $($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.DisplayName)) to Break Glass Group $($groupObj.DisplayName)",
+                    'Confirm adding Break Glass Account to Break Glass Group?',
+                    "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Adding to Break Glass Group $($groupObj.DisplayName)"
+                )) {
+                Write-Verbose "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Added to Break Glass Group $($groupObj.DisplayName)"
                 New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id -ErrorAction Stop
+            }
+            elseif ($WhatIfPreference) {
+                Write-Verbose "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Would have been added to Break Glass Group $($groupObj.DisplayName)"
+            }
+            else {
+                Write-Error "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Missing Break Glass Group membership MUST be fixed to continue."
+                return
             }
         }
 
