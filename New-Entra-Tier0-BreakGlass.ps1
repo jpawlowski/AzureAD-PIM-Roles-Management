@@ -51,5 +51,5 @@ catch {
     Throw "Error loading file: $_"
 }
 
-Connect-MyMgGraph -Scopes $MgScopes
+Connect-MyMgGraph -Scopes $MgScopes -TenantId $TenantId
 New-Entra-Tier0-BreakGlass -Config $EntraTier0BreakGlass

@@ -33,7 +33,10 @@ function Connect-MyMgGraph {
         }
         else {
             Write-Error "Missing `$env:AZURE_TENANT_ID environment variable or -TenantId parameter"
+            exit 1
         }
+    } else {
+        Write-Debug "Connecting to tenant $TenantId"
     }
 
     if ($WhatIfPreference) {
