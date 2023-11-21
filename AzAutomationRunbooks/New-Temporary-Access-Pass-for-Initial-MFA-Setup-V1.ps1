@@ -325,7 +325,7 @@ if ($return.Data.AuthenticationMethods) {
     if ('temporaryAccessPass' -in $return.Data.AuthenticationMethods) {
 
         # If there is no other authentication methods besides password and TAP,
-        # we will assume that the TAP shall be renewed
+        # we will assume that the TAP shall be deleted for renewal
         if (
             ('password' -in $return.Data.AuthenticationMethods) -and
             ($return.Data.AuthenticationMethods.Count -le 2)
