@@ -32,7 +32,7 @@
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.3
+    Version: 1.4
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
@@ -361,7 +361,12 @@ if ($return.Data.AuthenticationMethods) {
             }
         }
         else {
-            Write-Error 'A Temporary Access Pass code was already set before. It can only be displayed once after it has been created and cannot be renewed by this process. Instead, contact Global Service Desk to reset MFA methods.'
+            if ($return.Data.TemporaryAccessPass.methodUsabilityReason -eq 'Expired') {
+                Write-Error 'An expired Temporary Access Pass code was found. However, this process cannot be used to renew the Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
+            }
+            else {
+                Write-Error 'An active Temporary Access Pass code was already set before. It can only be displayed once after it has been created and cannot be renewed by this process. Instead, contact Global Service Desk to reset MFA methods.'
+            }
             exit 1
         }
     }
