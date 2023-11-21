@@ -365,7 +365,7 @@ if ($return.Data.AuthenticationMethods) {
                 Write-Error 'An expired Temporary Access Pass code was found. However, this process cannot be used to renew the Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
             }
             else {
-                Write-Error 'An active Temporary Access Pass code has already been found. It can only be displayed once after it has been created and cannot be renewed by this process. Instead, contact Global Service Desk to reset MFA methods.'
+                Write-Error 'An active Temporary Access Pass code has already been found. It can only be displayed once after it has been created and cannot be renewed by this process because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
             }
             exit 1
         }
