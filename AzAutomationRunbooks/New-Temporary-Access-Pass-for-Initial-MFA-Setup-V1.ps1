@@ -32,7 +32,7 @@
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.5
+    Version: 1.5.1
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
