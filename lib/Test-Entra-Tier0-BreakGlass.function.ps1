@@ -89,8 +89,8 @@ function Test-Entra-Tier0-BreakGlass {
 
     $params = @{
         Activity         = 'Break Glass Validation'
-        Status           = " 25% Complete: User Group"
-        PercentComplete  = 25
+        Status           = " 20% Complete: User Group"
+        PercentComplete  = 20
         CurrentOperation = 'BreakGlassCheck'
     }
     Write-Progress @params
@@ -222,8 +222,8 @@ function Test-Entra-Tier0-BreakGlass {
 
     $params = @{
         Activity         = 'Break Glass Validation'
-        Status           = " 50% Complete: User Accounts"
-        PercentComplete  = 50
+        Status           = " 40% Complete: User Accounts"
+        PercentComplete  = 40
         CurrentOperation = 'BreakGlassCheck'
     }
     Write-Progress @params
@@ -337,7 +337,7 @@ function Test-Entra-Tier0-BreakGlass {
         }
 
         if ($userMemberOfAdminUnit -and $adminUnitObj.isMemberManagementRestricted) {
-            Write-Warning "$($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Restricted Admin Unit in use: Skipping validation of Authentication Methods. Regular manual control procedures apply!"
+            Write-Output "INFORMATION: $($validBreakGlassCount + 1). Break Glass Account $($userObj.Id) ($($userObj.userPrincipalName)): Restricted Admin Unit in use: Skipping validation of Authentication Methods. Regular manual control procedures do apply!"
         }
         else {
             $authMethods = Get-MgUserAuthenticationMethod -UserId $userObj.Id -ErrorAction Stop
@@ -488,8 +488,8 @@ function Test-Entra-Tier0-BreakGlass {
 
     $params = @{
         Activity         = 'Break Glass Validation'
-        Status           = " 75% Complete: Remove suspicious owners and unexpected members from User Group"
-        PercentComplete  = 75
+        Status           = " 60% Complete: Remove suspicious owners and unexpected members from User Group"
+        PercentComplete  = 60
         CurrentOperation = 'BreakGlassCheck'
     }
     Write-Progress @params
@@ -517,6 +517,77 @@ function Test-Entra-Tier0-BreakGlass {
                 Remove-MgGroupMemberByRef -GroupId $Config.group.id -DirectoryObjectId $groupMember.Id -Confirm:$false
                 Write-Warning "Break Glass Group $($groupObj.Id) ($($groupObj.DisplayName)): Removed unexpected group member $($groupMember.Id)"
             }
+        }
+    }
+
+    $params = @{
+        Activity         = 'Break Glass Validation'
+        Status           = " 80% Complete: Conditional Access for Break Glass"
+        PercentComplete  = 80
+        CurrentOperation = 'BreakGlassCheck'
+    }
+    Write-Progress @params
+
+    foreach ($policy in $Config.caPolicies) {
+        if (
+            ($null -ne $policy.id) -and
+            ($policy.id -notmatch '^00000000-') -and
+            ($policy.id -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')
+        ) {
+            Write-Debug "Detected Break Glass CA Policy object ID: $($policy.id)"
+        }
+        elseif ($policy.displayName) {
+            $result = Get-MgIdentityConditionalAccessPolicy -All -Filter "displayName eq '$($policy.displayName)'"
+            if (($result | Measure-Object).Count -gt 1) {
+                Write-Error "Break Glass CA Policy displayName is not unique!"
+                return
+            }
+            if ($result.Id) {
+                Write-Warning "Break Glass Conditional Access Policy $($result.DisplayName): You are STRONGLY advised to complete your Break Glass CA definition by adding the unique object ID '$($result.Id)' to the configuration file before implementing other Conditional Access Policies !"
+                $policy.Id = $result.Id
+            }
+            else {
+                Write-Error "FATAL: Could not find defined Break Glass CA Policy '$($policy.displayName)' ! You may run New-Entra-Tier0-BreakGlass.ps1 to create it."
+                return
+            }
+        }
+        else {
+            Write-Error "FATAL: Break Glass CA Policy definition in configuration file is incomplete."
+            return
+        }
+
+        $result = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $policy.Id -ErrorAction SilentlyContinue
+        if ($null -eq $result.Id) {
+            Write-Error "FATAL: Could not find defined Break Glass CA Policy with ID $($policy.id) ($($policy.displayName)) that is defined in configuration file."
+            return
+        }
+        if ($policy.State -ne $result.State) {
+            if ($Repair) {
+                if ($PSCmdlet.ShouldProcess(
+                        "Update enablement state of Break Glass Conditional Access policy $($policy.Id) ($($policy.DisplayName))",
+                        'Confirm updating the enablement state of this Break Glass Conditional Access policy?',
+                        "Break Glass Conditional Access policy $($policy.Id) ($($policy.DisplayName)): Updating enablement state to '$($policy.State)'"
+                    )) {
+                    Write-Output "Break Glass Conditional Access policy $($policy.Id) ($($policy.DisplayName)): Updating enablement state to '$($policy.State)'"
+                    Update-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $result.Id -State $policy.State -ErrorAction Stop
+                    $result.State = $policy.State
+                }
+                elseif ($WhatIfPreference) {
+                    Write-Verbose "Break Glass Group $($policy.Id) ($($policy.DisplayName)): Enablement state would have been updated"
+                }
+                else {
+                    Write-Warning "Break Glass Group $($policy.Id) ($($policy.DisplayName)): Enablement state update was denied"
+                }
+            }
+            else {
+                Write-Warning "Break Glass Conditional Access Policy $($result.DisplayName): Current enablement state '$($result.State)' differs from desired state '$($policy.State)'. You may run Repair-Entra-Tier0-BreakGlass.ps1 to fix this."
+            }
+        }
+        if ($result.DisplayName -notmatch 'ReportOnly' -and ('enabled' -ne $result.State)) {
+            Write-Warning "Break Glass Conditional Access Policy $($result.DisplayName): Policy still in state '$($result.State)', set to 'enabled' before production use. Make sure your Break Glass Accounts were properly configured with required authentication methods before!"
+        }
+        elseif ($result.DisplayName -match 'ReportOnly' -and ('enabledForReportingButNotEnforced' -ne $result.State)) {
+            Write-Warning "Break Glass Conditional Access Policy $($result.DisplayName): Policy still in state '$($result.State)', set to 'enabledForReportingButNotEnforced' before production use."
         }
     }
 

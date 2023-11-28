@@ -124,10 +124,12 @@ $EntraTier0BreakGlass = @{
             description            = 'Monitor Backup Tier0 Break Glass account, but do not protect. DO NOT CHANGE!'
             state                  = 'enabledForReportingButNotEnforced'   # keep this state, it is for monitoring the backup Break Glass account only
             grantControls          = @{
-                operator        = 'OR'
-                builtInControls = @(
-                    "mfa"
-                )
+                operator               = 'OR'
+                AuthenticationStrength = @{
+                    Id = '00000000-0000-0000-0000-000000000002'     # Built-in Multi-Factor Authentication Strength
+                    # Id = '00000000-0000-0000-0000-000000000003'   # Built-in Passwordless MFA Strength
+                    # Id = '00000000-0000-0000-0000-000000000004'   # Built-in Phishing Resistant MFA Strength
+                }
             }
             breakGlassIncludeUsers = @( 'backup' )
             breakGlassExcludeUsers = @( 'none' )
