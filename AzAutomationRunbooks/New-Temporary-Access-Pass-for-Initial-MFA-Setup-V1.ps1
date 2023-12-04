@@ -32,7 +32,7 @@
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.5.1
+    Version: 1.5.2
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
@@ -362,10 +362,22 @@ if ($return.Data.AuthenticationMethods) {
         }
         else {
             if ($return.Data.TemporaryAccessPass.methodUsabilityReason -eq 'Expired') {
-                Write-Error 'An expired Temporary Access Pass code was found. However, this process cannot be used to renew the Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
+                Write-Error (
+                    "An expired Temporary Access Pass code was found. `n" + `
+                        'However, this process cannot be used to renew the Temporary Access Pass code because you have already configured other multi-factor authentication methods. ' + `
+                        'Note that a Temporary Access Pass is only required during the initial onboarding process. ' + `
+                        'You can then use your existing access to register additional methods, for example a security key. ' + `
+                        'However, if you later lose access to all your multi-factor authentication methods, this self-service process cannot be used to recover. ' + `
+                        'In this case, please contact the Global Service Desk who will help you reset your MFA methods.'
+                )
             }
             else {
-                Write-Error 'An active Temporary Access Pass code has already been found. It can only be displayed once after it has been created and cannot be renewed by this process because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
+                Write-Error (
+                    "An active Temporary Access Pass code has already been found. `n" + `
+                        'It can only be displayed once after it has been created. ' + `
+                        'As you have already configured other methods of multi-factor authentication, a new Temporary Access Pass can no longer be created via this self-service process. ' + `
+                        'In this case, please contact the Global Service Desk who will help you reset your MFA methods.'
+                )
             }
             exit 1
         }
@@ -376,7 +388,13 @@ if ($return.Data.AuthenticationMethods) {
         ($return.Data.AuthenticationMethods.Count -gt 1) -or
         ('password' -notin $return.Data.AuthenticationMethods)
     ) {
-        Write-Error 'This process cannot be used to request a Temporary Access Pass code because other multifactor authentication methods are already configured. Instead, contact Global Service Desk to reset MFA methods.'
+        Write-Error (
+            'This process cannot be used to request a Temporary Access Pass code as you have already configured other multi-factor authentication methods. ' + `
+                'Note that a Temporary Access Pass is only required during the initial onboarding process. ' + `
+                'You can then use your existing access to register additional methods, for example a security key. ' + `
+                'However, if you later lose access to all your multi-factor authentication methods, this self-service process cannot be used to recover. ' + `
+                'In this case, please contact the Global Service Desk who will help you reset your MFA methods.'
+        )
         exit 1
     }
 }
