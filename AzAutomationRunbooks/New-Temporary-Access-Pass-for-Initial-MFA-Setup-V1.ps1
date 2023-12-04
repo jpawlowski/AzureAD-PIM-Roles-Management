@@ -389,7 +389,7 @@ if ($return.Data.AuthenticationMethods) {
         ('password' -notin $return.Data.AuthenticationMethods)
     ) {
         Write-Error (
-            'This process cannot be used to request a Temporary Access Pass code as you have already configured other multi-factor authentication methods. ' + `
+            "This process cannot be used to request a Temporary Access Pass code as you have already configured other multi-factor authentication methods. `n" + `
                 'Note that a Temporary Access Pass is only required during the initial onboarding process. ' + `
                 'You can then use your existing access to register additional methods, for example a security key. ' + `
                 'However, if you later lose access to all your multi-factor authentication methods, this self-service process cannot be used to recover. ' + `
