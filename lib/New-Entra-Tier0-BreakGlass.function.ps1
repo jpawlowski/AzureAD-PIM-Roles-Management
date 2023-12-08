@@ -180,6 +180,9 @@ function New-Entra-Tier0-BreakGlass {
                     ForceChangePasswordNextSignIn        = $true
                     ForceChangePasswordNextSignInWithMfa = $true
                 } `
+                    -PasswordPolicies @{
+                    DisablePasswordExpiration = $true
+                } `
                     -ErrorAction Stop `
                     -Confirm:$false
                 $null = New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id -ErrorAction Stop
