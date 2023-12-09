@@ -32,7 +32,7 @@
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.5.2
+    Version: 1.5.3
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
@@ -124,11 +124,12 @@ foreach ($MgScope in $MgScopes) {
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        ResilientRemoteCall { Write-Verbose (Connect-MgGraph -Identity -ContextScope Process) }
+        $null = ResilientRemoteCall { Write-Verbose (Connect-MgGraph -NoWelcome -Identity -ContextScope Process) }
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
-        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
+        Write-Information 'Opening connection to Microsoft Graph ...'
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
 foreach ($MgScope in $MgScopes) {
@@ -141,7 +142,8 @@ if ($MissingMgScopes) {
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
     }
     else {
-        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
+        Write-Information 'Re-authentication to Microsoft Graph for missing scopes ...'
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
 
@@ -211,7 +213,7 @@ if (-Not $userObj.AccountEnabled) {
 }
 
 if ($userObj.UserType -ne 'Member') {
-    Write-Error 'User ID needs to be of type Member.'
+    Write-Error 'User ID must be of type Member.'
     exit 1
 }
 
@@ -452,7 +454,7 @@ if ($WhatIfPreference -or (-Not $return.Data.TemporaryAccessPass)) {
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
 if ($Webhook) { ResilientRemoteCall { Write-Verbose $(Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Depth 4)) } }
-if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
+if ($OutText) { return Write-Output $(if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
 
 return $return

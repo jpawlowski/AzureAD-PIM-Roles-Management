@@ -101,6 +101,7 @@ $MgScopes = @(
     'Directory.ReadWrite.All'                   # To read and write directory data
     'User.Read.All'                             # To read user information, inlcuding EmployeeHireDate
     'Directory.Read.All'                        # To read directory data
+    'OnPremDirectorySynchronization.Read.All'   # To read directory sync data
 )
 $MissingMgScopes = @()
 $return = @{}
@@ -119,7 +120,7 @@ if (
     ($ReferralUserId -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
     ($ReferralUserId -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
 ) {
-    Write-Error 'This type of user can not have a Tier 0 administrator account created.'
+    Write-Error 'This type of user can not have a Tier 0 Cloud Administrator account created.'
     exit 1
 }
 
@@ -130,11 +131,12 @@ foreach ($MgScope in $MgScopes) {
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        ResilientRemoteCall { Write-Verbose (Connect-MgGraph -Identity -ContextScope Process) }
+        $null = ResilientRemoteCall { Write-Verbose (Connect-MgGraph -NoWelcome -Identity -ContextScope Process) }
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
-        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
+        Write-Information 'Opening connection to Microsoft Graph ...'
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
 foreach ($MgScope in $MgScopes) {
@@ -147,51 +149,49 @@ if ($MissingMgScopes) {
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
     }
     else {
-        ResilientRemoteCall { Connect-MgGraph -Scopes $MgScopes -ContextScope Process }
+        Write-Information 'Re-authentication to Microsoft Graph for missing scopes ...'
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
 
 # If connection to Microsoft Graph seems okay
 #
+$userProperties = @(
+    'Id'
+    'UserPrincipalName'
+    'Mail'
+    'MailNickname'
+    'DisplayName'
+    'GivenName'
+    'Surname'
+    'EmployeeId'
+    'EmployeeHireDate'
+    'EmployeeLeaveDateTime'
+    'EmployeeOrgData'
+    'EmployeeType'
+    'UserType'
+    'AccountEnabled'
+    'OnPremisesSamAccountName'
+    'OnPremisesSyncEnabled'
+    'CompanyName'
+    'Department'
+    'StreetAddress'
+    'City'
+    'PostalCode'
+    'State'
+    'Country'
+    'UsageLocation'
+    'OfficeLocation'
+)
+$userExpandPropeties = @(
+    'Manager'
+)
 
 $refUserObj = ResilientRemoteCall {
     Get-MgUser `
         -UserId $ReferralUserId `
-        -Property @(
-        'Id'
-        'UserPrincipalName'
-        'Mail'
-        'ShowInAddressList'
-        'DisplayName'
-        'GivenName'
-        'Surname'
-        'JobTitle'
-        'PreferredName'
-        'EmployeeId'
-        'EmployeeHireDate'
-        'EmployeeLeaveDateTime'
-        'EmployeeOrgData'
-        'EmployeeType'
-        'UserType'
-        'AccountEnabled'
-        'OnPremisesSamAccountName'
-        'OnPremisesSyncEnabled'
-        'PreferredLanguage'
-        'CompanyName'
-        'Department'
-        'StreetAddress'
-        'City'
-        'PostalCode'
-        'State'
-        'Country'
-        'UsageLocation'
-        'OfficeLocation'
-        'MobilePhone'
-        'FaxNumber'
-    ) `
-        -ExpandProperty @(
-        'Manager'
-    )`
+        -Property $userProperties `
+        -ExpandProperty $userExpandPropeties `
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
         -Verbose:$false
@@ -205,45 +205,47 @@ if ($null -eq $refUserObj) {
 # If user details could be retrieved
 #
 
-if ($null -ne $refUserObj.DeletedDateTime) {
-    Write-Error 'Referral User ID is deleted. A Tier 0 administrator account can only be set up for active accounts.'
-    exit 1
-}
-
 if (-Not $refUserObj.AccountEnabled) {
-    Write-Error 'Referral User ID is disabled. A Tier 0 administrator account can only be set up for active accounts.'
+    Write-Error 'Referral User ID is disabled. A Tier 0 Cloud Administrator account can only be set up for active accounts.'
     exit 1
 }
 
 if ($refUserObj.UserType -ne 'Member') {
-    Write-Error 'Referral User ID needs to be of type Member.'
+    Write-Error 'Referral User ID must be of type Member.'
     exit 1
 }
 
 $timeNow = Get-Date
 
 if ($null -ne $refUserObj.EmployeeHireDate -and ($timeNow.ToUniversalTime() -lt $refUserObj.EmployeeHireDate)) {
-    Write-Error "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Tier 0 administrator account can only be set up for active employees."
+    Write-Error "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Tier 0 Cloud Administrator account can only be set up for active employees."
     exit 1
 }
 
-if ($null -ne $refUserObj.EmployeeLeaveDateTime -and ($timeNow.ToUniversalTime() -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-30))) {
-    Write-Error "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Tier 0 administrator account can only be set up a maximum of 30 days before the planned leaving date."
+if ($null -ne $refUserObj.EmployeeLeaveDateTime -and ($timeNow.ToUniversalTime() -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))) {
+    Write-Error "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Tier 0 Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
     exit 1
 }
 
 $tenant = ResilientRemoteCall { Get-MgOrganization }
 $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 
+if ($true -eq $tenant.OnPremisesSyncEnabled -and ($true -ne $refUserObj.OnPremisesSyncEnabled)) {
+    Write-Error "Referral User ID must be a hybrid identity synced from on-premises directory."
+    exit 1
+}
+
 if (
     ((Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name).State -ne 'Connected') -or
     ((Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name).tokenStatus -ne 'Active')
 ) {
+    Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ForEach-Object { Disconnect-ExchangeOnline -ConnectionId $_.ConnectionId -Confirm:$false }
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        ResilientRemoteCall { Write-Verbose (Connect-ExchangeOnline -ShowBanner:$false -ManagedIdentity -Organization $tenantDomain.Name) }
+        $null = ResilientRemoteCall { Write-Verbose (Connect-ExchangeOnline -ShowBanner:$false -ManagedIdentity -Organization $tenantDomain.Name) }
         Write-Verbose (Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ConvertTo-Json)
     }
     else {
+        Write-Information 'Opening connection to Exchange Online ...'
         ResilientRemoteCall { Connect-ExchangeOnline -ShowBanner:$false -Organization $tenantDomain.Name }
     }
 }
@@ -257,32 +259,87 @@ $refUserExObj = ResilientRemoteCall {
 }
 
 if ($null -eq $refUserExObj) {
-    Write-Error 'Referral User ID needs to have a mailbox.'
+    Write-Error 'Referral User ID must have a mailbox.'
     exit 1
 }
 
 if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUserExObj.RecipientTypeDetails) {
-    Write-Error "Referral User ID mailbox must to be of type UserMailbox. Admin accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+    Write-Error "Referral User ID mailbox must be of type UserMailbox. Tier 0 Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
     exit 1
 }
 
-$BodyParams = @{}
-$BodyParams.Manager = $refUserObj.Id
-$BodyParams.UserPrincipalName = 'A0C-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
-$BodyParams.DisplayName = 'A0C-' + $refUserObj.DisplayName
-$BodyParams.GivenName = 'A0C-' + $refUserObj.GivenName
-$BodyParams.AccountEnabled = $true
-$BodyParams.MailNickname = (New-Guid).Guid.Substring(0, 10)
-$BodyParams.PasswordProfile = @{
-    Password                             = Get-RandomPassword -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
-    ForceChangePasswordNextSignIn        = $false
-    ForceChangePasswordNextSignInWithMfa = $false
+$BodyParamsNull = @{
+    JobTitle = $null
 }
-$BodyParams.PasswordPolicy = @{
-    DisablePasswordExpiration = $true
+$BodyParams = @{
+    MailNickname      = 'A0C-' + $refUserObj.MailNickname
+    EmployeeType      = 'Tier 0 Cloud Administrator'
+    UserPrincipalName = 'A0C-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
+    PasswordProfile   = @{
+        Password                             = Get-RandomPassword -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
+        ForceChangePasswordNextSignIn        = $false
+        ForceChangePasswordNextSignInWithMfa = $false
+    }
+    PasswordPolicies  = 'DisablePasswordExpiration'
 }
-if ($null -ne $refUserObj.EmployeeHireDate) { $BodyParams.EmployeeHireDate = $refUserObj.EmployeeHireDate }
-if ($null -ne $refUserObj.EmployeeLeaveDateTime) { $BodyParams.EmployeeHireDate = $refUserObj.EmployeeLeaveDateTime }
+if (-Not [string]::IsNullOrEmpty($refUserObj.DisplayName)) {
+    $BodyParams.DisplayName = 'A0C-' + $refUserObj.DisplayName
+}
+if (-Not [string]::IsNullOrEmpty($refUserObj.GivenName)) {
+    $BodyParams.GivenName = 'A0C-' + $refUserObj.GivenName
+}
+ForEach ($property in $userProperties) {
+    if (
+        ($null -eq $BodyParams.$property) -and
+        ($property -notin @('Id', 'Mail', 'UserType')) -and
+        ($property -notmatch '^OnPremises')
+    ) {
+        # Empty or null values require special handling as of today
+        if ([string]::IsNullOrEmpty($refUserObj.$property)) {
+            $BodyParamsNull.$property = $null
+        }
+        else {
+            $BodyParams.$property = $refUserObj.$property
+        }
+    }
+}
+
+$deletedUserList = ResilientRemoteCall {
+    Invoke-MGGraphRequest `
+        -OutputType PSObject `
+        -Method GET `
+        -Headers @{ 'ConsistencyLevel' = 'eventual' } `
+        -Uri "https://graph.microsoft.com/beta/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')" `
+        -Debug:$DebugPreference `
+        -Verbose:$false
+}
+
+if ($deletedUserList.'@odata.count' -gt 0) {
+    foreach ($deletedUserObj in $deletedUserList.Value) {
+        Write-Warning "Admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was already existing for referral user $($refUserObj.UserPrincipalName), but was deleted on $($deletedUserObj.DeletedDateTime) Universal Time. Account will be permanently deleted for account re-creation."
+        $mboxObj = ResilientRemoteCall {
+            Get-EXOMailbox `
+                -ExternalDirectoryObjectId $deletedUserObj.Id `
+                -SoftDeletedMailbox
+        }
+        ResilientRemoteCall {
+            Invoke-MGGraphRequest `
+                -OutputType PSObject `
+                -Method DELETE `
+                -Uri "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)" `
+                -Debug:$DebugPreference `
+                -Verbose:$false
+        }
+        if ($mboxObj) {
+            ResilientRemoteCall {
+                Remove-Mailbox `
+                    -Identity $mboxObj.Identity `
+                    -PermanentlyDelete `
+                    -Confirm:$false
+            }
+        }
+    }
+}
 
 $existingUserObj = ResilientRemoteCall {
     Get-MgUser `
@@ -297,16 +354,23 @@ if ($null -ne $existingUserObj) {
     Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) with information from $($refUserObj.UserPrincipalName)"
     $BodyParams.Remove('UserPrincipalName')
     $BodyParams.Remove('AccountEnabled')
-    $BodyParams.Remove('MailNickname')
     $BodyParams.Remove('PasswordProfile')
-    if ($BodyParams.PasswordPolicy.DisablePasswordExpiration) { $BodyParams.PasswordPolicies = 'DisablePasswordExpiration' }
-    $BodyParams.Remove('PasswordPolicy')
     $null = ResilientRemoteCall {
         Update-MgUser `
             -UserId $existingUserObj.Id `
             -BodyParameter $BodyParams `
-            -ErrorAction SilentlyContinue `
             -Confirm:$false
+    }
+    if ($BodyParamsNull.Count -gt 0) {
+        $null = ResilientRemoteCall {
+            Invoke-MgGraphRequest `
+                -OutputType PSObject `
+                -Method PATCH `
+                -Uri "https://graph.microsoft.com/v1.0/users/$($existingUserObj.Id)" `
+                -Body $BodyParamsNull `
+                -Debug:$DebugPreference `
+                -Verbose:$false
+        }
     }
     $userObj = ResilientRemoteCall {
         Get-MgUser `
@@ -326,17 +390,24 @@ else {
 }
 
 if ($null -eq $userObj) {
-    Write-Error ("Could not create administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
+    Write-Error ("Could not create Tier 0 Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
     exit 1
 }
 
-Write-Verbose "Created administrator account $($BodyParams.UserPrincipalName))"
+$NewManager = @{
+    '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
+}
+$null = ResilientRemoteCall {
+    Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager
+}
+
+Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id))"
 
 # Wait for licenses
 $DoLoop = $true
-$RetryCount = 0
+$RetryCount = 1
 $MaxRetry = 30
-$WaitSec = 15
+$WaitSec = 7
 
 do {
     $userLicObj = ResilientRemoteCall {
@@ -345,13 +416,13 @@ do {
     if ($null -ne $userLicObj) {
         $DoLoop = $false
     }
-    elseif ($RetryCount -gt $MaxRetry) {
-        Write-Error "Group-based licensing timeout (group-based licensing did not assign a license?). Deleting unfinished administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
+    elseif ($RetryCount -ge $MaxRetry) {
+        Write-Error "Group-based licensing timeout (group-based licensing did not assign a license?). Deleting unfinished Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
         $userObj = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
                 -ErrorAction SilentlyContinue `
-                -Confirm:$false -WhatIf #TODO
+                -Confirm:$false
         }
         $DoLoop = $false
         exit 1
@@ -365,7 +436,7 @@ do {
 
 # Wait for mailbox
 $DoLoop = $true
-$RetryCount = 0
+$RetryCount = 1
 $MaxRetry = 60
 $WaitSec = 15
 
@@ -380,13 +451,13 @@ do {
     if ($null -ne $userExObj) {
         $DoLoop = $false
     }
-    elseif ($RetryCount -gt $MaxRetry) {
-        Write-Error "Mailbox creation timeout (group-based licensing did not assign a license?). Deleting unfinished administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
+    elseif ($RetryCount -ge $MaxRetry) {
+        Write-Error "Mailbox creation timeout (group-based licensing did not assign a license?). Deleting unfinished Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
         $userObj = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
                 -ErrorAction SilentlyContinue `
-                -Confirm:$false -WhatIf #TODO
+                -Confirm:$false
         }
         $DoLoop = $false
         exit 1
@@ -398,67 +469,29 @@ do {
     }
 } While ($DoLoop)
 
-Set-Mailbox `
-    -Identity $userExObj.Identity `
-    -ForwardingAddress $refUserExObj.Identity `
-    -ForwardingSmtpAddress $null `
-    -DeliverToMailboxAndForward $false `
-    -WarningAction SilentlyContinue
+$null = ResilientRemoteCall {
+    Set-Mailbox `
+        -Identity $userExObj.Identity `
+        -ForwardingAddress $refUserExObj.Identity `
+        -ForwardingSmtpAddress $null `
+        -DeliverToMailboxAndForward $false `
+        -HiddenFromAddressListsEnabled $true `
+        -WarningAction SilentlyContinue
+}
 
-$userExMbObj = Get-Mailbox -Identity $userExObj.Identity
+$userExMbObj = ResilientRemoteCall {
+    Get-Mailbox -Identity $userExObj.Identity
+}
 $userObj = ResilientRemoteCall {
     Get-MgUser `
         -UserId $userObj.Id `
-        -Property @(
-        'Id'
-        'UserPrincipalName'
-        'Mail'
-        'ShowInAddressList'
-        'DisplayName'
-        'GivenName'
-        'Surname'
-        'JobTitle'
-        'PreferredName'
-        'EmployeeId'
-        'EmployeeHireDate'
-        'EmployeeLeaveDateTime'
-        'EmployeeOrgData'
-        'EmployeeType'
-        'UserType'
-        'AccountEnabled'
-        'OnPremisesSamAccountName'
-        'OnPremisesSyncEnabled'
-        'PreferredLanguage'
-        'CompanyName'
-        'Department'
-        'StreetAddress'
-        'City'
-        'PostalCode'
-        'State'
-        'Country'
-        'UsageLocation'
-        'OfficeLocation'
-        'MobilePhone'
-        'FaxNumber'
-    ) `
-        -ExpandProperty @(
-        'Manager'
-    )`
-        -ErrorAction SilentlyContinue `
+        -Property $userProperties `
+        -ExpandProperty $userExpandPropeties `
         -Debug:$DebugPreference `
         -Verbose:$false
 }
 
 $return.Data = @{
-    '@odata.context'           = $userObj.AdditionalProperties.'@odata.context'
-    Id                         = $userObj.Id
-    UserPrincipalName          = $userObj.UserPrincipalName
-    Mail                       = $userObj.Mail
-    DisplayName                = $userObj.DisplayName
-    EmployeeHireDate           = $userObj.EmployeeHireDate
-    EmployeeLeaveDateTime      = $userObj.EmployeeLeaveDateTime
-    UserType                   = $userObj.UserType
-    AccountEnabled             = $userObj.AccountEnabled
     Manager                    = @{
         Id                = $userObj.Manager.Id
         UserPrincipalName = $userObj.manager.AdditionalProperties.userPrincipalName
@@ -469,11 +502,16 @@ $return.Data = @{
     ForwardingSMTPAddress      = $userExMbObj.ForwardingSMTPAddress
     DeliverToMailboxandForward = $userExMbObj.DeliverToMailboxandForward
 }
+ForEach ($property in $userProperties) {
+    if ($null -eq $return.Data.$property) {
+        $return.Data.$property = $userObj.$property
+    }
+}
 
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
 if ($Webhook) { ResilientRemoteCall { Write-Verbose $(Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Depth 4)) } }
-if ($OutText) { return Write-Output (if ($return.Data.TemporaryAccessPass.TemporaryAccessPass) { $return.Data.TemporaryAccessPass.TemporaryAccessPass } else { $null }) }
+if ($OutText) { return Write-Output $(if ($return.Data.UserPrincipalName) { $return.Data.UserPrincipalName } else { $null }) }
 if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Depth 4) }
 
 return $return
