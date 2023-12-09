@@ -67,6 +67,39 @@ Function ResilientRemoteCall {
         }
     } While ($DoLoop)
 }
+function Send-FailMail {
+    $to = "email@domain.com"
+    $from = "FromEmail@domain.com"
+    $bcc = $from
+    $subject = "Employee Photo - $photo - Failed to Update"
+    $type = "html"
+    $template = "C:\temp\PhotoFailMail.html"
+    $params = @{
+        Message         = @{
+            Subject       = $subject
+            Body          = @{
+                ContentType = $type
+                Content     = $template
+            }
+            ToRecipients  = @(
+                @{
+                    EmailAddress = @{
+                        Address = $to
+                    }
+                }
+            )
+            BccRecipients = @(
+                @{
+                    EmailAddress = @{
+                        Address = $bcc
+                    }
+                }
+            )
+        }
+        SaveToSentItems = "true"
+    }  
+    Send-MgUserMail -UserId $from -BodyParameter $params
+}
 function Get-RandomCharacter($length, $characters) {
     if ($length -lt 1) { return '' }
     $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
@@ -399,6 +432,12 @@ $NewManager = @{
 }
 $null = ResilientRemoteCall {
     Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager
+}
+
+$null = ResilientRemoteCall {
+    Set-MgUserPhotoContent `
+        -UserId $userObj.Id `
+        -InFile 'Tier0-Admin.png'
 }
 
 Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id))"
