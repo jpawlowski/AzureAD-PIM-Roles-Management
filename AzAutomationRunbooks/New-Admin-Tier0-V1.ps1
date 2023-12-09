@@ -442,6 +442,8 @@ $null = ResilientRemoteCall {
 
 Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id))"
 
+#TODO: Add to group if group is not dynamic
+
 # Wait for licenses
 $DoLoop = $true
 $RetryCount = 1
