@@ -1,18 +1,61 @@
 <#
 .SYNOPSIS
-    Create a dedicated cloud native account for administrative purposes in Tier 0
+    Create or update a dedicated cloud native account for administrative purposes in Tier 0
 
 .DESCRIPTION
     Create a dedicated cloud native account for administrative purposes that can perform privileged tasks in Tier 0, Tier 1, and Tier 2.
+    User Principal Name and mail address of the admin account will use the initial .onmicrosoft.com domain of the respective Entra ID tenant.
+    The admin account will be referred to the main user account from ReferralUserId by using the manager property as well as using the same Employee information (if set).
+    To identify as a Tier 0 Cloud Administrator account, the EmployeeType property will be used so that it can be used as an alternative to the UPN naming convention.
+    Also, extensionAttribute15 will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'A0C__' is added.
+    Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
+
+    Following conditions must be met to create a Tier 0 Cloud Administrator account:
+
+         1. A free license with Exchange Online plan must be available.
+         2. Referral user ID must exist.
+         3. Referral user ID must be an ordinary user account.
+         4. Referral user ID must not use a onmicrosoft.com subdomain.
+         5. Referral user ID must be enabled.
+         6. Referral user ID must be of directory type Member.
+         7. Referral user ID must have a manager.
+         8. If Referral user ID has EmployeeHireDate, the date and time must be reached.
+         9. If Referral user ID has EmployeeLeaveDateTime, the current date and time must be at least 45 days before.
+        10. If tenant has on-premises directory sync enabled, referral user ID must be a hybrid user account.
+        11. Referral user ID must have a mailbox of type UserMailbox.
+
+    In case an existing Tier 0 Cloud Administrator account was found for referral user ID, it must by a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
+    If an existing Tier 0 Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
+    The user part of the Tier 0 Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, or Mail Nickname.
 
 .PARAMETER ReferralUserId
     User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
 
+.PARAMETER LicenseSkuPartNumber
+    License assigned to the user. The license SkuPartNumber must contain an Exchange Online service plan to generate a mailbox for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
+    If GroupId is also provided, group-based licensing is implied and license assignment will only be monitored before continuing.
+    This parameter has a default value for Exchange Online Kiosk license (SkuPartNumber EXCHANGEDESKLESS) and only Exchange license plan will be enabled in it.
+    If environment variable $env:avTier0AdminLicenseSkuPartNumber is set, it will be used and takes precedence.
+    In Azure Automation, automation variable avTier0AdminLicenseSkuPartNumber will be used and takes precedence.
+
+.PARAMETER GroupId
+    Entra Group Object ID where the user shall be added. If the group is dynamic, group membership update will only be monitored before continuing.
+    If environment variable $env:avTier0AdminGroupId is set, it will be used and takes precedence.
+    In Azure Automation, automation variable avTier0AdminGroupId will be used and takes precedence.
+
+.PARAMETER UserPhotoUrl
+    URL of an image that shall be set as default photo for the user. Must be HTTPS and use image/png or image/jpeg as Content-Type in HTTP return header.
+    If environment variable $env:avTier0AdminUserPhotoUrl is set, it will be used and takes precedence.
+    In Azure Automation, automation variable avTier0AdminUserPhotoUrl will be used and takes precedence.
+
 .PARAMETER Webhook
-    Send return data as POST to this webhook URL.
+    Send return data in JSON format as POST to this webhook URL.
+    If not set, environment variable $env:avTier0AdminWebhook will be used instead.
+    If not set and run in Azure Automation, automation variable avTier0AdminWebhook will be used instead.
 
 .PARAMETER OutputJson
-    Output the result in JSON format
+    Output the result in JSON format.
+    This is automatically implied when running in Azure Automation and no Webhook parameter was set.
 
 .PARAMETER OutputText
     Output the generated User Principal Name only.
@@ -22,7 +65,18 @@
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.0.1
 #>
+#TODO:
+#- Variable for extension attribute
+#- Parallel run check
+#- Check refUser for extensionAttribute and EmployeeType
+#- Send email
+#- find existing account not only by UPN but also extensionAttribute and EmployeeType
+#- WhatIf support
+#- Progress support
+#- Only update account if there is actual changes to it and report that changes had to be made --> a continuous monitoring and enforcement of the account state shall be possible via scheduled task
 #Requires -Version 5.1
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
+#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
@@ -35,6 +89,9 @@
 Param (
     [Parameter(Position = 0, mandatory = $true)]
     [string]$ReferralUserId,
+    [string]$LicenseSkuPartNumber,
+    [string]$GroupId,
+    [string]$UserPhotoUrl,
     [switch]$Webhook,
     [switch]$OutJson,
     [switch]$OutText
@@ -67,7 +124,7 @@ Function ResilientRemoteCall {
         }
     } While ($DoLoop)
 }
-function Send-FailMail {
+Function Send-FailMail {
     $to = "email@domain.com"
     $from = "FromEmail@domain.com"
     $bcc = $from
@@ -97,22 +154,22 @@ function Send-FailMail {
             )
         }
         SaveToSentItems = "true"
-    }  
+    }
     Send-MgUserMail -UserId $from -BodyParameter $params
 }
-function Get-RandomCharacter($length, $characters) {
+Function Get-RandomCharacter($length, $characters) {
     if ($length -lt 1) { return '' }
     $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
     $private:ofs = ''
     return [string]$characters[$random]
 }
-function Get-ScrambleString([string]$inputString) {
+Function Get-ScrambleString([string]$inputString) {
     $characterArray = $inputString.ToCharArray()
     $scrambledStringArray = $characterArray | Get-Random -Count $characterArray.Length
     $outputString = -join $scrambledStringArray
     return $outputString
 }
-function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
+Function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
     if ($null -eq $lowerChars) { $lowerChars = 8 }
     if ($null -eq $upperChars) { $upperChars = 8 }
     if ($null -eq $numbers) { $numbers = 8 }
@@ -125,19 +182,113 @@ function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
 }
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+    $null = ResilientRemoteCall { Write-Verbose (Connect-AzAccount -Identity -Scope Process) }
+    Write-Verbose (Get-AzContext | ConvertTo-Json)
+
+    $tmpLicenseSkuPartNumber = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminLicenseSkuPartNumber' -ErrorAction SilentlyContinue }
+    if ($tmpLicenseSkuPartNumber.Value) {
+        if ($LicenseSkuPartNumber) {
+            Write-Warning 'Ignored LicenseSkuPartNumber parameter from job request input and replaced by Azure Automation variable.'
+        }
+        else {
+            Write-Verbose 'Using LicenseSkuPartNumber from Azure Automation variable.'
+        }
+        Set-Variable LicenseSkuPartNumber -Option Constant -Value $tmpLicenseSkuPartNumber.Value
+    }
+    else {
+        Set-Variable LicenseSkuPartNumber -Option Constant -Value 'EXCHANGEDESKLESS'
+        Write-Verbose "Using LicenseSkuPartNumber built-in default value $LicenseSkuPartNumber."
+    }
+    $tmpGroupId = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminGroupId' -ErrorAction SilentlyContinue }
+    if ($tmpGroupId.Value) {
+        if ($GroupId) {
+            Write-Warning 'Ignored GroupId parameter from job request input and replaced by Azure Automation variable.'
+        }
+        else {
+            Write-Verbose 'Using GroupId from Azure Automation variable.'
+        }
+        Set-Variable GroupId -Option Constant -Value $tmpGroupId.Value
+    }
+    $tmpUserPhotoUrl = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminUserPhotoUrl' -ErrorAction SilentlyContinue }
+    if ($tmpUserPhotoUrl.Value) {
+        if ($UserPhotoUrl) {
+            Write-Warning 'Ignored UserPhotoUrl parameter from job request input and replaced by Azure Automation variable.'
+        }
+        else {
+            Write-Verbose 'Using UserPhotoUrl from Azure Automation variable.'
+        }
+        Set-Variable UserPhotoUrl -Option Constant -Value $tmpUserPhotoUrl.Value
+    }
+    if (-Not $Webhook) {
+        $tmpWebhook = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminWebhook' -ErrorAction SilentlyContinue }
+        if ($tmpWebhook.Value) {
+            Write-Verbose 'Using Webhook from Azure Automation variable.'
+            Set-Variable Webhook -Option Constant -Value $tmpWebhook.Value
+        }
+    }
+
     if (-Not $Webhook) { $OutJson = $true }
     $ProgressPreference = 'SilentlyContinue'
 }
+else {
+    if ($env:avTier0AdminLicenseSkuPartNumber) {
+        if ($LicenseSkuPartNumber) {
+            Write-Warning 'Ignored LicenseSkuPartNumber parameter and replaced by environment variable.'
+        }
+        else {
+            Write-Verbose 'Using LicenseSkuPartNumber from environment variable.'
+        }
+        $LicenseSkuPartNumber = $env:avTier0AdminLicenseSkuPartNumber
+    }
+    else {
+        $LicenseSkuPartNumber = 'EXCHANGEDESKLESS'
+        Write-Verbose "Using LicenseSkuPartNumber built-in default value $LicenseSkuPartNumber."
+    }
+    if ($env:avTier0AdminGroupId) {
+        if ($GroupId) {
+            Write-Warning 'Ignored GroupId parameter and replaced by environment variable.'
+        }
+        else {
+            Write-Verbose 'Using GroupId from environment variable.'
+        }
+        $GroupId = $env:avTier0AdminGroupId
+    }
+    if ($env:avTier0AdminUserPhotoUrl) {
+        if ($UserPhotoUrl) {
+            Write-Warning 'Ignored UserPhotoUrl parameter and replaced by environment variable.'
+        }
+        else {
+            Write-Verbose 'Using UserPhotoUrl from environment variable.'
+        }
+        $UserPhotoUrl = $env:avTier0AdminUserPhotoUrl
+    }
+    if (-Not $Webhook -and $env:avTier0AdminWebhook) {
+        Write-Verbose 'Using Webhook from environment variable.'
+        $Webhook = $env:avTier0AdminWebhook
+    }
+}
+
+if ($GroupId -and ($GroupId -notmatch '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$')) {
+    Throw "Malformed UUID for GroupId: $GroupId"
+}
+if ($UserPhotoUrl -and ($UserPhotoUrl -notmatch '^https:\/\/.+(?:\.png|\.jpg|\.jpeg)$')) {
+    Throw "Malformed URL for UserPhotoUrl: $UserPhotoUrl"
+}
+if ($Webhook -and ($Webhook -notmatch '^https:\/\/.+$')) {
+    Throw "Malformed URL for Webhook: $Webhook"
+}
 
 $MgScopes = @(
-    'User.ReadWrite.All'                        # To read and write user information, inlcuding EmployeeHireDate
+    'User.ReadWrite.All'                        # To read and write user information, including EmployeeHireDate
     'Directory.ReadWrite.All'                   # To read and write directory data
-    'User.Read.All'                             # To read user information, inlcuding EmployeeHireDate
+    'User.Read.All'                             # To read user information, including EmployeeHireDate
     'Directory.Read.All'                        # To read directory data
+    'Organization.Read.All'                     # To read organization data, e.g. licenses
     'OnPremDirectorySynchronization.Read.All'   # To read directory sync data
 )
 $MissingMgScopes = @()
 $return = @{}
+$groupObj = $null
 $refUserObj = $null
 $refUserExObj = $null
 $existingUserObj = $null
@@ -145,17 +296,6 @@ $userObj = $null
 $userLicObj = $null
 $userExObj = $null
 $userExMbObj = $null
-
-if (
-    ($ReferralUserId -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
-    ($ReferralUserId -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
-    ($ReferralUserId -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
-    ($ReferralUserId -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
-    ($ReferralUserId -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
-) {
-    Write-Error 'This type of user can not have a Tier 0 Cloud Administrator account created.'
-    exit 1
-}
 
 foreach ($MgScope in $MgScopes) {
     if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
@@ -168,7 +308,7 @@ if (-Not (Get-MgContext)) {
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
-        Write-Information 'Opening connection to Microsoft Graph ...'
+        Write-Verbose 'Opening connection to Microsoft Graph ...'
         ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
@@ -182,13 +322,80 @@ if ($MissingMgScopes) {
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
     }
     else {
-        Write-Information 'Re-authentication to Microsoft Graph for missing scopes ...'
+        Write-Verbose 'Re-authentication to Microsoft Graph for missing scopes ...'
         ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
     }
 }
 
 # If connection to Microsoft Graph seems okay
 #
+
+if ($GroupId) {
+    $groupObj = ResilientRemoteCall {
+        Get-MgGroup `
+            -GroupId $GroupId `
+            -ExpandProperty 'Owners' `
+            -ErrorAction SilentlyContinue
+    }
+
+    if (-Not $groupObj) {
+        Throw "GroupId $($GroupId) does not exist."
+    }
+    if (-Not $groupObj.SecurityEnabled) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be security-enabled to be used for Tier 0 administration."
+    }
+    if ($groupObj.OnPremisesSyncEnabled) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be synced from on-premises directory to be used for Tier 0 administration."
+    }
+    if (
+        $groupObj.GroupType -and
+        ($groupObj.GroupType -contains 'Unified')
+    ) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be a Microsoft 365 Group to be used for Tier 0 administration."
+    }
+    if ($groupObj.MailEnabled) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be mail-enabled to be used for Tier 0 administration."
+    }
+    if ('Private' -ne $groupObj.Visibility) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must have Private visibility to be used for Tier 0 administration."
+    }
+    #TODO check for restricted admin unit of group
+    if (-Not $groupObj.IsAssignableToRole) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): must be role-enabled or protected by a Restricted Management Administrative Unit to be used for Tier 0 administration."
+    }
+    if ($groupObj.Owners) {
+        foreach ($owner in $groupObj.Owners) {
+            Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Removing unwanted group owner $($owner.Id)"
+            $null = ResilientRemoteCall {
+                Remove-MgGroupOwnerByRef -GroupId $groupObj.Id -DirectoryObjectId $owner.Id
+            }
+        }
+    }
+
+    $GroupDescription = 'Tier 0 Cloud Administrators'
+    if (-Not $groupObj.Description) {
+        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Adding missing description for Tier 0 identification"
+        $null = ResilientRemoteCall {
+            Update-MgGroup -GroupId -Description $GroupDescription
+        }
+    }
+    elseif ($groupObj.Description -ne $GroupDescription) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): The description does not clearly identify this group as a Tier 0 Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier 0 management, set the description property to '$GroupDescription'."
+    }
+}
+
+$License = ResilientRemoteCall {
+    Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+}
+
+if (-Not $License) {
+    Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant."
+}
+
+if (-Not ($License.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') })) {
+    Throw "License SkuPartNumber $LicenseSkuPartNumber does not contain an Exchange Online service."
+}
+
 $userProperties = @(
     'Id'
     'UserPrincipalName'
@@ -206,6 +413,7 @@ $userProperties = @(
     'AccountEnabled'
     'OnPremisesSamAccountName'
     'OnPremisesSyncEnabled'
+    'OnPremisesExtensionAttributes'
     'CompanyName'
     'Department'
     'StreetAddress'
@@ -235,8 +443,24 @@ if ($null -eq $refUserObj) {
     exit 1
 }
 
-# If user details could be retrieved
+# If referral user details could be retrieved
 #
+
+if (
+    ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
+    ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
+    ($refUserObj.UserPrincipalName -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
+    ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
+    ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
+) {
+    Write-Error 'This type of user name can not have a Tier 0 Cloud Administrator account created.'
+    exit 1
+}
+
+if (($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$') {
+    Write-Error "Referral User ID must not use a onmicrosoft.com subdomain."
+    exit 1
+}
 
 if (-Not $refUserObj.AccountEnabled) {
     Write-Error 'Referral User ID is disabled. A Tier 0 Cloud Administrator account can only be set up for active accounts.'
@@ -245,6 +469,13 @@ if (-Not $refUserObj.AccountEnabled) {
 
 if ($refUserObj.UserType -ne 'Member') {
     Write-Error 'Referral User ID must be of type Member.'
+    exit 1
+}
+
+if (
+    (-Not $refUserObj.Manager) -or (-Not $refUserObj.Manager.Id)
+) {
+    Write-Error 'Referral User ID must have manager property set.'
     exit 1
 }
 
@@ -272,7 +503,7 @@ if (
     ((Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name).State -ne 'Connected') -or
     ((Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name).tokenStatus -ne 'Active')
 ) {
-    Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ForEach-Object { Disconnect-ExchangeOnline -ConnectionId $_.ConnectionId -Confirm:$false }
+    Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ForEach-Object { Disconnect-ExchangeOnline -ConnectionId $_.ConnectionId -Confirm:$false -InformationAction SilentlyContinue }
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
         $null = ResilientRemoteCall { Write-Verbose (Connect-ExchangeOnline -ShowBanner:$false -ManagedIdentity -Organization $tenantDomain.Name) }
         Write-Verbose (Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ConvertTo-Json)
@@ -304,22 +535,47 @@ if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUser
 $BodyParamsNull = @{
     JobTitle = $null
 }
+$AdminPrefix = 'A0C'
 $BodyParams = @{
-    MailNickname      = 'A0C-' + $refUserObj.MailNickname
-    EmployeeType      = 'Tier 0 Cloud Administrator'
-    UserPrincipalName = 'A0C-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
-    PasswordProfile   = @{
+    OnPremisesExtensionAttributes = @{
+        extensionAttribute1  = $null
+        extensionAttribute2  = $null
+        extensionAttribute3  = $null
+        extensionAttribute4  = $null
+        extensionAttribute5  = $null
+        extensionAttribute6  = $null
+        extensionAttribute7  = $null
+        extensionAttribute8  = $null
+        extensionAttribute9  = $null
+        extensionAttribute10 = $null
+        extensionAttribute11 = $null
+        extensionAttribute12 = $null
+        extensionAttribute13 = $null
+        extensionAttribute14 = $null
+        extensionAttribute15 = $null
+    }
+    EmployeeType                  = 'Tier 0 Cloud Administrator'
+    UserPrincipalName             = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
+    Mail                          = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
+    MailNickname                  = $AdminPrefix + '-' + $refUserObj.MailNickname
+    PasswordProfile               = @{
         Password                             = Get-RandomPassword -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
         ForceChangePasswordNextSignIn        = $false
         ForceChangePasswordNextSignInWithMfa = $false
     }
-    PasswordPolicies  = 'DisablePasswordExpiration'
+    PasswordPolicies              = 'DisablePasswordExpiration'
+}
+if ([string]::IsNullOrEmpty($refUserObj.OnPremisesExtensionAttributes.extensionAttribute15)) {
+    $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = $AdminPrefix
+}
+else {
+    $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = $AdminPrefix + '__' + $refUserObj.OnPremisesExtensionAttributes.extensionAttribute15
 }
 if (-Not [string]::IsNullOrEmpty($refUserObj.DisplayName)) {
-    $BodyParams.DisplayName = 'A0C-' + $refUserObj.DisplayName
+    $BodyParams.DisplayName = $AdminPrefix + '-' + $refUserObj.DisplayName
 }
 if (-Not [string]::IsNullOrEmpty($refUserObj.GivenName)) {
-    $BodyParams.GivenName = 'A0C-' + $refUserObj.GivenName
+    $BodyParams.GivenName = $AdminPrefix + '-' + $refUserObj.GivenName
 }
 ForEach ($property in $userProperties) {
     if (
@@ -338,7 +594,7 @@ ForEach ($property in $userProperties) {
 }
 
 $deletedUserList = ResilientRemoteCall {
-    Invoke-MGGraphRequest `
+    Invoke-MgGraphRequest `
         -OutputType PSObject `
         -Method GET `
         -Headers @{ 'ConsistencyLevel' = 'eventual' } `
@@ -353,10 +609,11 @@ if ($deletedUserList.'@odata.count' -gt 0) {
         $mboxObj = ResilientRemoteCall {
             Get-EXOMailbox `
                 -ExternalDirectoryObjectId $deletedUserObj.Id `
-                -SoftDeletedMailbox
+                -SoftDeletedMailbox `
+                -ErrorAction SilentlyContinue
         }
         ResilientRemoteCall {
-            Invoke-MGGraphRequest `
+            Invoke-MgGraphRequest `
                 -OutputType PSObject `
                 -Method DELETE `
                 -Uri "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)" `
@@ -374,17 +631,39 @@ if ($deletedUserList.'@odata.count' -gt 0) {
     }
 }
 
+$duplicatesObj = ResilientRemoteCall {
+    Get-MgUser `
+        -ConsistencyLevel eventual `
+        -Count userCount `
+        -OrderBy UserPrincipalName `
+        -Filter "`
+        startsWith(UserPrincipalName, '$(($BodyParams.UserPrincipalName).Split('@')[0])@') or `
+        startsWith(Mail, '$(($BodyParams.Mail).Split('@')[0])@') or `
+        DisplayName eq '$($BodyParams.DisplayName)' or `
+        MailNickname eq '$($BodyParams.MailNickname)' or `
+        proxyAddresses/any(x:x eq 'smtp:$($BodyParams.Mail)') `
+    "
+}
+if ($userCount -gt 1) {
+    Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
+}
+
 $existingUserObj = ResilientRemoteCall {
     Get-MgUser `
         -UserId $BodyParams.UserPrincipalName `
+        -Property $userProperties `
+        -ExpandProperty $userExpandPropeties `
         -ErrorAction SilentlyContinue `
         -Debug:$DebugPreference `
         -Verbose:$false
 }
 
 if ($null -ne $existingUserObj) {
-    Write-Warning "Admin account $($existingUserObj.UserPrincipalName) is already existing for referral user $($refUserObj.UserPrincipalName)"
-    Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) with information from $($refUserObj.UserPrincipalName)"
+    if ($existingUserObj.OnPremisesSyncEnabled) {
+        Write-Error "Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) synced from on-premises is already existing for referral user $($refUserObj.UserPrincipalName) ($($refUserObj.Id)). Manual intervention is required to resolve this conflict."
+        exit 1
+    }
+    Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     $BodyParams.Remove('UserPrincipalName')
     $BodyParams.Remove('AccountEnabled')
     $BodyParams.Remove('PasswordProfile')
@@ -395,6 +674,7 @@ if ($null -ne $existingUserObj) {
             -Confirm:$false
     }
     if ($BodyParamsNull.Count -gt 0) {
+        # Workaround as properties cannot be nulled using Update-MgUser at the moment ...
         $null = ResilientRemoteCall {
             Invoke-MgGraphRequest `
                 -OutputType PSObject `
@@ -414,35 +694,196 @@ if ($null -ne $existingUserObj) {
     }
 }
 else {
+    if ($License.ConsumedUnits -ge $License.Enabled) {
+        Throw "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses. Purchase additional licenses to create new Tier 0 Administrator accounts."
+    }
+
     $userObj = ResilientRemoteCall {
         New-MgUser `
             -BodyParameter $BodyParams `
             -ErrorAction SilentlyContinue `
             -Confirm:$false
     }
+
+    # Wait for user provisioning consistency
+    $DoLoop = $true
+    $RetryCount = 1
+    $MaxRetry = 30
+    $WaitSec = 7
+    $newUserId = $userObj.Id
+
+    do {
+        $userObj = ResilientRemoteCall {
+            Get-MgUser `
+                -ConsistencyLevel eventual `
+                -CountVariable CountVar `
+                -Filter "Id eq '$newUserId'" `
+                -ErrorAction SilentlyContinue `
+                -Debug:$DebugPreference `
+                -Verbose:$false
+        }
+        if ($null -ne $userObj) {
+            $DoLoop = $false
+        }
+        elseif ($RetryCount -ge $MaxRetry) {
+            $userObj = ResilientRemoteCall {
+                Remove-MgUser `
+                    -UserId $newUserId `
+                    -ErrorAction SilentlyContinue `
+                    -Confirm:$false
+            }
+            $DoLoop = $false
+            Throw "User provisioning consistency timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+        }
+        else {
+            $RetryCount += 1
+            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for user provisioning consistency ..."
+            Start-Sleep -Seconds $WaitSec
+        }
+    } While ($DoLoop)
+
+    Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
 }
 
 if ($null -eq $userObj) {
-    Write-Error ("Could not create Tier 0 Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
+    Write-Error ("Could not create or update Tier 0 Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
     exit 1
 }
 
-$NewManager = @{
-    '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
-}
-$null = ResilientRemoteCall {
-    Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager
+if (
+    (-Not $existingUserObj) -or
+    ($existingUserObj.Manager.Id -ne $refUserObj.Id)
+) {
+    if (-Not $existingUserObj) {
+        Write-Warning "Correcting Manager reference to $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+    }
+    $NewManager = @{
+        '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
+    }
+    $null = ResilientRemoteCall {
+        Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager
+    }
 }
 
-$null = ResilientRemoteCall {
-    Set-MgUserPhotoContent `
-        -UserId $userObj.Id `
-        -InFile 'Tier0-Admin.png'
+if ($UserPhotoUrl) {
+    Write-Verbose "Retrieving user photo from URL '$($UserPhotoUrl)'"
+    $null = Invoke-WebRequest `
+        -UseBasicParsing `
+        -Method GET `
+        -Uri $UserPhotoUrl `
+        -TimeoutSec 3 `
+        -RetryIntervalSec 5 `
+        -MaximumRetryCount 3 `
+        -OutVariable UserPhoto
+    if (
+        (-Not $UserPhoto) -or
+        ($UserPhoto.StatusCode -ne 200) -or
+        (-Not $UserPhoto.Content)
+    ) {
+        Write-Error "Unable to download photo from URL '$($UserPhotoUrl)'"
+        exit 1
+    }
+    if (
+        ($UserPhoto.Headers.'Content-Type' -ne 'image/png') -and
+        ($UserPhoto.Headers.'Content-Type' -ne 'image/jpeg')
+    ) {
+        Write-Error "Photo from URL '$($UserPhotoUrl)' must have Content-Type 'image/png' or 'image/jpeg'."
+        exit 1
+    }
+    if (-Not $existingUserObj) {
+        Write-Verbose 'Waiting for user provisioning before uploading user photo'
+        Start-Sleep -Seconds 20
+    }
+    Write-Verbose 'Updating user photo'
+    $null = ResilientRemoteCall {
+        Set-MgUserPhotoContent `
+            -InFile nonExistat.lat `
+            -UserId $userObj.Id `
+            -Data ([System.IO.MemoryStream]::new($UserPhoto.Content))
+    }
 }
 
-Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id))"
+$userLicObj = ResilientRemoteCall {
+    Get-MgUserLicenseDetail -UserId $userObj.Id
+}
+if (-Not ($userLicObj | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber)) {
+    if ($License.ConsumedUnits -ge $License.Enabled) {
+        Throw "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses. Purchase additional licenses to update $($userObj.UserPrincipalName)."
+    }
 
-#TODO: Add to group if group is not dynamic
+    if (-Not $groupObj) {
+        Write-Verbose "Implying direct license assignment is required as no GroupId was provided for group-based licensing."
+        $disabledPlans = $License.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
+        $addLicenses = @(
+            @{
+                SkuId         = $License.SkuId
+                DisabledPlans = $disabledPlans
+            }
+        )
+        $null = ResilientRemoteCall {
+            Set-MgUserLicense `
+                -UserId $userObj.Id `
+                -AddLicenses $addLicenses `
+                -RemoveLicenses @()
+        }
+    }
+}
+elseif ($groupObj) {
+    #TODO remove any direct license assignment to enforce group-based licensing
+}
+
+if ($groupObj) {
+    if (
+        $groupObj.GroupType -NotContains 'DynamicMembership' -or
+        ($groupObj.MembershipRuleProcessingState -ne 'On')
+    ) {
+        $groupMembership = ResilientRemoteCall {
+            Get-MgGroupMember `
+                -ConsistencyLevel eventual `
+                -GroupId $groupObj.Id `
+                -CountVariable CountVar `
+                -Filter "Id eq '$($userObj.Id)'"
+        }
+        if (-Not $groupMembership) {
+            Write-Verbose "Implying manually adding user to static group $($groupObj.DisplayName) ($($groupObj.Id))"
+            New-MgGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id
+        }
+    }
+
+    # Wait for group membership
+    $DoLoop = $true
+    $RetryCount = 1
+    $MaxRetry = 30
+    $WaitSec = 7
+
+    do {
+        $groupMembership = ResilientRemoteCall {
+            Get-MgGroupMember `
+                -ConsistencyLevel eventual `
+                -GroupId $groupObj.Id `
+                -CountVariable CountVar `
+                -Filter "Id eq '$($userObj.Id)'"
+        }
+        if ($null -ne $groupMembership) {
+            $DoLoop = $false
+        }
+        elseif ($RetryCount -ge $MaxRetry) {
+            $userObj = ResilientRemoteCall {
+                Remove-MgUser `
+                    -UserId $userObj.Id `
+                    -ErrorAction SilentlyContinue `
+                    -Confirm:$false
+            }
+            $DoLoop = $false
+            Throw "Group assignment timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+        }
+        else {
+            $RetryCount += 1
+            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange license assignment ..."
+            Start-Sleep -Seconds $WaitSec
+        }
+    } While ($DoLoop)
+}
 
 # Wait for licenses
 $DoLoop = $true
@@ -454,11 +895,11 @@ do {
     $userLicObj = ResilientRemoteCall {
         Get-MgUserLicenseDetail -UserId $userObj.Id
     }
+    #TODO check for actual Exchange service plan
     if ($null -ne $userLicObj) {
         $DoLoop = $false
     }
     elseif ($RetryCount -ge $MaxRetry) {
-        Write-Error "Group-based licensing timeout (group-based licensing did not assign a license?). Deleting unfinished Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
         $userObj = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
@@ -466,7 +907,7 @@ do {
                 -Confirm:$false
         }
         $DoLoop = $false
-        exit 1
+        Throw "License assignment timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
     }
     else {
         $RetryCount += 1
@@ -493,7 +934,6 @@ do {
         $DoLoop = $false
     }
     elseif ($RetryCount -ge $MaxRetry) {
-        Write-Error "Mailbox creation timeout (group-based licensing did not assign a license?). Deleting unfinished Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) ..."
         $userObj = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
@@ -501,7 +941,7 @@ do {
                 -Confirm:$false
         }
         $DoLoop = $false
-        exit 1
+        Throw "Mailbox creation timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
     }
     else {
         $RetryCount += 1

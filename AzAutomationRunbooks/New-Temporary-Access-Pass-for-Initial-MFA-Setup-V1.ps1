@@ -18,10 +18,11 @@
     Determines whether the pass is limited to a one-time use. If true, the pass can be used once; if false, the pass can be used multiple times within the Temporary Access Pass lifetime.
 
 .PARAMETER Webhook
-    Send return data as POST to this webhook URL.
+    Send return data in JSON format as POST to this webhook URL.
 
 .PARAMETER OutputJson
-    Output the result in JSON format
+    Output the result in JSON format.
+    This is automatically implied when running in Azure Automation and no Webhook parameter was set.
 
 .PARAMETER OutputText
     Output the Temporary Access Pass only.
@@ -95,7 +96,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
 }
 
 $MgScopes = @(
-    'User.Read.All'                             # To read user information, inlcuding EmployeeHireDate
+    'User.Read.All'                             # To read user information, including EmployeeHireDate
     'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
     'UserAuthenticationMethod.ReadWrite.All'    # To update authentication methods (TAP) of the user
     'Policy.Read.All'                           # To read and validate current policy settings

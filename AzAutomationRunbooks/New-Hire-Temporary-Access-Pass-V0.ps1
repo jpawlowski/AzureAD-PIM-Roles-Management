@@ -63,7 +63,7 @@ Param (
 )
 
 $MgScopes = @(
-    'User.Read.All'                             # To read user information, inlcuding EmployeeHireDate
+    'User.Read.All'                             # To read user information, including EmployeeHireDate
     'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
     'UserAuthenticationMethod.ReadWrite.All'    # To update authentication methods (TAP) of the user
     'Policy.Read.All'                           # To read and validate current policy settings
