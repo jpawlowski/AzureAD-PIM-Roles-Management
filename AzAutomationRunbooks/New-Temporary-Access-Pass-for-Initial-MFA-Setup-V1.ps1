@@ -30,6 +30,9 @@
 .PARAMETER Simulate
     Same as -WhatIf parameter but makes it available for Azure Automation.
 
+.PARAMETER Version
+    Print version information.
+
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
