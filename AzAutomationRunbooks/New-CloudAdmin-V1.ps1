@@ -66,10 +66,14 @@
     Version: 0.0.1
 #>
 #TODO:
+#- research if Desired State Provisioning could be used?
+#- Add multi tier support
+#- Multiple licenses support
+#- variable for dedicated account yes/no per tier
 #- Variable for extension attribute
 #- Parallel run check
 #- Check refUser for extensionAttribute and EmployeeType
-#- Send email
+#- Send emails were applicable
 #- find existing account not only by UPN but also extensionAttribute and EmployeeType
 #- WhatIf support
 #- Progress support
@@ -89,10 +93,12 @@
 Param (
     [Parameter(Position = 0, mandatory = $true)]
     [string]$ReferralUserId,
+    [Parameter(mandatory = $true)]
+    [ValidateRange(0, 2)][int]$Tier,
     [string]$LicenseSkuPartNumber,
     [string]$GroupId,
     [string]$UserPhotoUrl,
-    [switch]$Webhook,
+    [string]$Webhook,
     [switch]$OutJson,
     [switch]$OutText
 )
@@ -285,6 +291,7 @@ $MgScopes = @(
     'Directory.Read.All'                        # To read directory data
     'Organization.Read.All'                     # To read organization data, e.g. licenses
     'OnPremDirectorySynchronization.Read.All'   # To read directory sync data
+    'RoleManagement.ReadWrite.Directory'        # To update role-assignable groups
 )
 $MissingMgScopes = @()
 $return = @{}
@@ -344,8 +351,8 @@ if ($GroupId) {
     if (-Not $groupObj.SecurityEnabled) {
         Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be security-enabled to be used for Tier 0 administration."
     }
-    if ($groupObj.OnPremisesSyncEnabled) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be synced from on-premises directory to be used for Tier 0 administration."
+    if ($null -ne $groupObj.OnPremisesSyncEnabled) {
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must never be synced from on-premises directory to be used for Tier 0 administration."
     }
     if (
         $groupObj.GroupType -and
@@ -356,18 +363,26 @@ if ($GroupId) {
     if ($groupObj.MailEnabled) {
         Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be mail-enabled to be used for Tier 0 administration."
     }
-    if ('Private' -ne $groupObj.Visibility) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must have Private visibility to be used for Tier 0 administration."
-    }
     #TODO check for restricted admin unit of group
     if (-Not $groupObj.IsAssignableToRole) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): must be role-enabled or protected by a Restricted Management Administrative Unit to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be role-enabled or protected by a Restricted Management Administrative Unit to be used for Tier 0 administration."
     }
+    if ('Private' -ne $groupObj.Visibility) {
+        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Correcting visibility to Private for Tier 0 administration."
+        $null = ResilientRemoteCall {
+            Set-MgGroup `
+                -GroupId $groupObj.Id `
+                -Visibility 'Private'
+        }
+    }
+    #TODO check for assigned roles and remove them
     if ($groupObj.Owners) {
         foreach ($owner in $groupObj.Owners) {
             Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Removing unwanted group owner $($owner.Id)"
             $null = ResilientRemoteCall {
-                Remove-MgGroupOwnerByRef -GroupId $groupObj.Id -DirectoryObjectId $owner.Id
+                Remove-MgGroupOwnerByRef `
+                    -GroupId $groupObj.Id `
+                    -DirectoryObjectId $owner.Id
             }
         }
     }
@@ -659,8 +674,8 @@ $existingUserObj = ResilientRemoteCall {
 }
 
 if ($null -ne $existingUserObj) {
-    if ($existingUserObj.OnPremisesSyncEnabled) {
-        Write-Error "Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) synced from on-premises is already existing for referral user $($refUserObj.UserPrincipalName) ($($refUserObj.Id)). Manual intervention is required to resolve this conflict."
+    if ($null -ne $existingUserObj.OnPremisesSyncEnabled) {
+        Write-Error "Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises for referral user $($refUserObj.UserPrincipalName) ($($refUserObj.Id)). Manual deletion of this cloud object is required to resolve this conflict."
         exit 1
     }
     Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
@@ -754,7 +769,7 @@ if (
     (-Not $existingUserObj) -or
     ($existingUserObj.Manager.Id -ne $refUserObj.Id)
 ) {
-    if (-Not $existingUserObj) {
+    if ($existingUserObj) {
         Write-Warning "Correcting Manager reference to $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     }
     $NewManager = @{
@@ -762,44 +777,6 @@ if (
     }
     $null = ResilientRemoteCall {
         Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager
-    }
-}
-
-if ($UserPhotoUrl) {
-    Write-Verbose "Retrieving user photo from URL '$($UserPhotoUrl)'"
-    $null = Invoke-WebRequest `
-        -UseBasicParsing `
-        -Method GET `
-        -Uri $UserPhotoUrl `
-        -TimeoutSec 3 `
-        -RetryIntervalSec 5 `
-        -MaximumRetryCount 3 `
-        -OutVariable UserPhoto
-    if (
-        (-Not $UserPhoto) -or
-        ($UserPhoto.StatusCode -ne 200) -or
-        (-Not $UserPhoto.Content)
-    ) {
-        Write-Error "Unable to download photo from URL '$($UserPhotoUrl)'"
-        exit 1
-    }
-    if (
-        ($UserPhoto.Headers.'Content-Type' -ne 'image/png') -and
-        ($UserPhoto.Headers.'Content-Type' -ne 'image/jpeg')
-    ) {
-        Write-Error "Photo from URL '$($UserPhotoUrl)' must have Content-Type 'image/png' or 'image/jpeg'."
-        exit 1
-    }
-    if (-Not $existingUserObj) {
-        Write-Verbose 'Waiting for user provisioning before uploading user photo'
-        Start-Sleep -Seconds 20
-    }
-    Write-Verbose 'Updating user photo'
-    $null = ResilientRemoteCall {
-        Set-MgUserPhotoContent `
-            -InFile nonExistat.lat `
-            -UserId $userObj.Id `
-            -Data ([System.IO.MemoryStream]::new($UserPhoto.Content))
     }
 }
 
@@ -895,8 +872,10 @@ do {
     $userLicObj = ResilientRemoteCall {
         Get-MgUserLicenseDetail -UserId $userObj.Id
     }
-    #TODO check for actual Exchange service plan
-    if ($null -ne $userLicObj) {
+    if (
+        ($null -ne $userLicObj) -and
+        ($userLicObj.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ProvisioningStatus -eq 'Success') -and ($_.ServicePlanName -Match 'EXCHANGE') })
+    ) {
         $DoLoop = $false
     }
     elseif ($RetryCount -ge $MaxRetry) {
@@ -970,6 +949,41 @@ $userObj = ResilientRemoteCall {
         -ExpandProperty $userExpandPropeties `
         -Debug:$DebugPreference `
         -Verbose:$false
+}
+
+if ($UserPhotoUrl) {
+    Write-Verbose "Retrieving user photo from URL '$($UserPhotoUrl)'"
+    $null = Invoke-WebRequest `
+        -UseBasicParsing `
+        -Method GET `
+        -Uri $UserPhotoUrl `
+        -TimeoutSec 3 `
+        -RetryIntervalSec 5 `
+        -MaximumRetryCount 3 `
+        -ErrorAction SilentlyContinue `
+        -OutVariable UserPhoto
+    if (
+        (-Not $UserPhoto) -or
+        ($UserPhoto.StatusCode -ne 200) -or
+        (-Not $UserPhoto.Content)
+    ) {
+        Write-Warning "Unable to download photo from URL '$($UserPhotoUrl)'"
+    }
+    elseif (
+        ($UserPhoto.Headers.'Content-Type' -ne 'image/png') -and
+        ($UserPhoto.Headers.'Content-Type' -ne 'image/jpeg')
+    ) {
+        Write-Warning "Photo from URL '$($UserPhotoUrl)' must have Content-Type 'image/png' or 'image/jpeg'."
+    }
+    else {
+        Write-Verbose 'Updating user photo'
+        $null = ResilientRemoteCall {
+            Set-MgUserPhotoContent `
+                -InFile nonExistat.lat `
+                -UserId $userObj.Id `
+                -Data ([System.IO.MemoryStream]::new($UserPhoto.Content))
+        }
+    }
 }
 
 $return.Data = @{

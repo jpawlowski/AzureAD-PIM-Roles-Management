@@ -52,7 +52,7 @@ Param (
     [datetime]$StartDateTime,
     [int32]$LifetimeInMinutes,
     [switch]$IsUsableOnce,
-    [switch]$Webhook,
+    [string]$Webhook,
     [switch]$OutJson,
     [switch]$OutText,
     [switch]$Simulate
