@@ -35,6 +35,7 @@
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.5.3
 #>
+
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
@@ -55,8 +56,15 @@ Param (
     [string]$Webhook,
     [switch]$OutJson,
     [switch]$OutText,
-    [switch]$Simulate
+    [switch]$Simulate,
+    [switch]$Version
 )
+
+if ($Version) {
+    (Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet
+    exit
+}
+Write-Verbose $(((Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet.Alert.Text) )
 
 Function ResilientRemoteCall {
     param(

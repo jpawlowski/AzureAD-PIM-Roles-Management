@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-    Create or update a dedicated cloud native account for administrative purposes in Tier 0
+    Create or update a dedicated cloud native account for administrative purposes in Tier 0, 1, or 2
 
 .DESCRIPTION
-    Create a dedicated cloud native account for administrative purposes that can perform privileged tasks in Tier 0, Tier 1, and Tier 2.
+    Create a dedicated cloud native account for administrative purposes that can perform privileged tasks in Tier 0, Tier 1, and/or Tier 2.
     User Principal Name and mail address of the admin account will use the initial .onmicrosoft.com domain of the respective Entra ID tenant.
     The admin account will be referred to the main user account from ReferralUserId by using the manager property as well as using the same Employee information (if set).
-    To identify as a Tier 0 Cloud Administrator account, the EmployeeType property will be used so that it can be used as an alternative to the UPN naming convention.
-    Also, extensionAttribute15 will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'A0C__' is added.
+    To identify as a Cloud Administrator account, the EmployeeType property will be used so that it can be used as an alternative to the UPN naming convention.
+    Also, extensionAttribute15 will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'AxC__' is added where 'x' represents the respective Tier level.
     Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
 
-    Following conditions must be met to create a Tier 0 Cloud Administrator account:
+    Following conditions must be met to create a Cloud Administrator account:
 
          1. A free license with Exchange Online plan must be available.
          2. Referral user ID must exist.
@@ -24,9 +24,9 @@
         10. If tenant has on-premises directory sync enabled, referral user ID must be a hybrid user account.
         11. Referral user ID must have a mailbox of type UserMailbox.
 
-    In case an existing Tier 0 Cloud Administrator account was found for referral user ID, it must by a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
-    If an existing Tier 0 Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
-    The user part of the Tier 0 Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, or Mail Nickname.
+    In case an existing Cloud Administrator account was found for referral user ID, it must by a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
+    If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
+    The user part of the Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
 
 .PARAMETER ReferralUserId
     User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
@@ -60,12 +60,17 @@
 .PARAMETER OutputText
     Output the generated User Principal Name only.
 
+.PARAMETER Version
+    Print version information.
+
 .NOTES
-    Filename: New-Admin-Tier0-V1.ps1
+    Filename: New-CloudAdministrator-Account-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.0.1
 #>
+
 #TODO:
+#-admin prefix separator as variable
 #- research if Desired State Provisioning could be used?
 #- Add multi tier support
 #- Multiple licenses support
@@ -78,6 +83,7 @@
 #- WhatIf support
 #- Progress support
 #- Only update account if there is actual changes to it and report that changes had to be made --> a continuous monitoring and enforcement of the account state shall be possible via scheduled task
+
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
 #Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
@@ -100,8 +106,15 @@ Param (
     [string]$UserPhotoUrl,
     [string]$Webhook,
     [switch]$OutJson,
-    [switch]$OutText
+    [switch]$OutText,
+    [switch]$Version
 )
+
+if ($Version) {
+    (Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet
+    exit
+}
+Write-Verbose $(((Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet.Alert.Text) )
 
 Function ResilientRemoteCall {
     param(
@@ -191,7 +204,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     $null = ResilientRemoteCall { Write-Verbose (Connect-AzAccount -Identity -Scope Process) }
     Write-Verbose (Get-AzContext | ConvertTo-Json)
 
-    $tmpLicenseSkuPartNumber = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminLicenseSkuPartNumber' -ErrorAction SilentlyContinue }
+    $tmpLicenseSkuPartNumber = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminLicenseSkuPartNumber" -ErrorAction SilentlyContinue }
     if ($tmpLicenseSkuPartNumber.Value) {
         if ($LicenseSkuPartNumber) {
             Write-Warning 'Ignored LicenseSkuPartNumber parameter from job request input and replaced by Azure Automation variable.'
@@ -205,7 +218,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         Set-Variable LicenseSkuPartNumber -Option Constant -Value 'EXCHANGEDESKLESS'
         Write-Verbose "Using LicenseSkuPartNumber built-in default value $LicenseSkuPartNumber."
     }
-    $tmpGroupId = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminGroupId' -ErrorAction SilentlyContinue }
+    $tmpGroupId = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminGroupId" -ErrorAction SilentlyContinue }
     if ($tmpGroupId.Value) {
         if ($GroupId) {
             Write-Warning 'Ignored GroupId parameter from job request input and replaced by Azure Automation variable.'
@@ -215,7 +228,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         }
         Set-Variable GroupId -Option Constant -Value $tmpGroupId.Value
     }
-    $tmpUserPhotoUrl = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminUserPhotoUrl' -ErrorAction SilentlyContinue }
+    $tmpUserPhotoUrl = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminUserPhotoUrl" -ErrorAction SilentlyContinue }
     if ($tmpUserPhotoUrl.Value) {
         if ($UserPhotoUrl) {
             Write-Warning 'Ignored UserPhotoUrl parameter from job request input and replaced by Azure Automation variable.'
@@ -226,7 +239,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         Set-Variable UserPhotoUrl -Option Constant -Value $tmpUserPhotoUrl.Value
     }
     if (-Not $Webhook) {
-        $tmpWebhook = ResilientRemoteCall { Get-AzAutomationVariable -Name 'avTier0AdminWebhook' -ErrorAction SilentlyContinue }
+        $tmpWebhook = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminWebhook" -ErrorAction SilentlyContinue }
         if ($tmpWebhook.Value) {
             Write-Verbose 'Using Webhook from Azure Automation variable.'
             Set-Variable Webhook -Option Constant -Value $tmpWebhook.Value
@@ -237,40 +250,40 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     $ProgressPreference = 'SilentlyContinue'
 }
 else {
-    if ($env:avTier0AdminLicenseSkuPartNumber) {
+    if (Get-ChildItem -Path env:"avTier${Tier}AdminLicenseSkuPartNumber" -ErrorAction SilentlyContinue) {
         if ($LicenseSkuPartNumber) {
             Write-Warning 'Ignored LicenseSkuPartNumber parameter and replaced by environment variable.'
         }
         else {
             Write-Verbose 'Using LicenseSkuPartNumber from environment variable.'
         }
-        $LicenseSkuPartNumber = $env:avTier0AdminLicenseSkuPartNumber
+        $LicenseSkuPartNumber = (Get-ChildItem -Path env:"avTier${Tier}AdminLicenseSkuPartNumber").Value
     }
     else {
         $LicenseSkuPartNumber = 'EXCHANGEDESKLESS'
         Write-Verbose "Using LicenseSkuPartNumber built-in default value $LicenseSkuPartNumber."
     }
-    if ($env:avTier0AdminGroupId) {
+    if (Get-ChildItem -Path env:"avTier${Tier}AdminGroupId" -ErrorAction SilentlyContinue) {
         if ($GroupId) {
             Write-Warning 'Ignored GroupId parameter and replaced by environment variable.'
         }
         else {
             Write-Verbose 'Using GroupId from environment variable.'
         }
-        $GroupId = $env:avTier0AdminGroupId
+        $GroupId = (Get-ChildItem -Path env:"avTier${Tier}AdminGroupId").Value
     }
-    if ($env:avTier0AdminUserPhotoUrl) {
+    if (Get-ChildItem -Path env:"avTier${Tier}AdminUserPhotoUrl" -ErrorAction SilentlyContinue) {
         if ($UserPhotoUrl) {
             Write-Warning 'Ignored UserPhotoUrl parameter and replaced by environment variable.'
         }
         else {
             Write-Verbose 'Using UserPhotoUrl from environment variable.'
         }
-        $UserPhotoUrl = $env:avTier0AdminUserPhotoUrl
+        $UserPhotoUrl = (Get-ChildItem -Path env:"avTier${Tier}AdminUserPhotoUrl").Value
     }
-    if (-Not $Webhook -and $env:avTier0AdminWebhook) {
+    if (-Not $Webhook -and (Get-ChildItem -Path env:"avTier${Tier}AdminWebhook" -ErrorAction SilentlyContinue)) {
         Write-Verbose 'Using Webhook from environment variable.'
-        $Webhook = $env:avTier0AdminWebhook
+        $Webhook = (Get-ChildItem -Path env:"avTier${Tier}AdminWebhook").Value
     }
 }
 
@@ -349,26 +362,26 @@ if ($GroupId) {
         Throw "GroupId $($GroupId) does not exist."
     }
     if (-Not $groupObj.SecurityEnabled) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be security-enabled to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be security-enabled to be used for Cloud Administration."
     }
     if ($null -ne $groupObj.OnPremisesSyncEnabled) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must never be synced from on-premises directory to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
     }
     if (
         $groupObj.GroupType -and
         ($groupObj.GroupType -contains 'Unified')
     ) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be a Microsoft 365 Group to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
     }
     if ($groupObj.MailEnabled) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be mail-enabled to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
     }
     #TODO check for restricted admin unit of group
     if (-Not $groupObj.IsAssignableToRole) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be role-enabled or protected by a Restricted Management Administrative Unit to be used for Tier 0 administration."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be role-enabled or protected by a Restricted Management Administrative Unit to be used for Cloud Administration."
     }
     if ('Private' -ne $groupObj.Visibility) {
-        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Correcting visibility to Private for Tier 0 administration."
+        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Correcting visibility to Private for Cloud Administration."
         $null = ResilientRemoteCall {
             Set-MgGroup `
                 -GroupId $groupObj.Id `
@@ -387,15 +400,15 @@ if ($GroupId) {
         }
     }
 
-    $GroupDescription = 'Tier 0 Cloud Administrators'
+    $GroupDescription = "Tier $Tier Cloud Administrators"
     if (-Not $groupObj.Description) {
-        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Adding missing description for Tier 0 identification"
+        Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Adding missing description for Tier $Tier identification"
         $null = ResilientRemoteCall {
             Update-MgGroup -GroupId -Description $GroupDescription
         }
     }
     elseif ($groupObj.Description -ne $GroupDescription) {
-        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): The description does not clearly identify this group as a Tier 0 Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier 0 management, set the description property to '$GroupDescription'."
+        Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
     }
 }
 
@@ -408,7 +421,7 @@ if (-Not $License) {
 }
 
 if (-Not ($License.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') })) {
-    Throw "License SkuPartNumber $LicenseSkuPartNumber does not contain an Exchange Online service."
+    Throw "License SkuPartNumber $LicenseSkuPartNumber does not contain an Exchange Online service plan."
 }
 
 $userProperties = @(
@@ -468,7 +481,7 @@ if (
     ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
     ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
 ) {
-    Write-Error 'This type of user name can not have a Tier 0 Cloud Administrator account created.'
+    Write-Error "This type of user name can not have a Cloud Administrator account created."
     exit 1
 }
 
@@ -478,7 +491,7 @@ if (($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$
 }
 
 if (-Not $refUserObj.AccountEnabled) {
-    Write-Error 'Referral User ID is disabled. A Tier 0 Cloud Administrator account can only be set up for active accounts.'
+    Write-Error 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
     exit 1
 }
 
@@ -497,12 +510,12 @@ if (
 $timeNow = Get-Date
 
 if ($null -ne $refUserObj.EmployeeHireDate -and ($timeNow.ToUniversalTime() -lt $refUserObj.EmployeeHireDate)) {
-    Write-Error "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Tier 0 Cloud Administrator account can only be set up for active employees."
+    Write-Error "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
     exit 1
 }
 
 if ($null -ne $refUserObj.EmployeeLeaveDateTime -and ($timeNow.ToUniversalTime() -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))) {
-    Write-Error "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Tier 0 Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+    Write-Error "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
     exit 1
 }
 
@@ -543,14 +556,14 @@ if ($null -eq $refUserExObj) {
 }
 
 if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUserExObj.RecipientTypeDetails) {
-    Write-Error "Referral User ID mailbox must be of type UserMailbox. Tier 0 Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+    Write-Error "Referral User ID mailbox must be of type UserMailbox. Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
     exit 1
 }
 
 $BodyParamsNull = @{
     JobTitle = $null
 }
-$AdminPrefix = 'A0C'
+$AdminPrefix = "A${Tier}C"
 $BodyParams = @{
     OnPremisesExtensionAttributes = @{
         extensionAttribute1  = $null
@@ -569,7 +582,7 @@ $BodyParams = @{
         extensionAttribute14 = $null
         extensionAttribute15 = $null
     }
-    EmployeeType                  = 'Tier 0 Cloud Administrator'
+    EmployeeType                  = "Tier $Tier Cloud Administrator"
     UserPrincipalName             = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
     Mail                          = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
     MailNickname                  = $AdminPrefix + '-' + $refUserObj.MailNickname
@@ -710,7 +723,7 @@ if ($null -ne $existingUserObj) {
 }
 else {
     if ($License.ConsumedUnits -ge $License.Enabled) {
-        Throw "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses. Purchase additional licenses to create new Tier 0 Administrator accounts."
+        Throw "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses. Purchase additional licenses to create new Cloud Administrator accounts."
     }
 
     $userObj = ResilientRemoteCall {
@@ -757,11 +770,11 @@ else {
         }
     } While ($DoLoop)
 
-    Write-Verbose "Created Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+    Write-Verbose "Created Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
 }
 
 if ($null -eq $userObj) {
-    Write-Error ("Could not create or update Tier 0 Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
+    Write-Error ("Could not create or update Tier $Tier Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
     exit 1
 }
 
@@ -852,7 +865,7 @@ if ($groupObj) {
                     -Confirm:$false
             }
             $DoLoop = $false
-            Throw "Group assignment timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+            Throw "Group assignment timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
         }
         else {
             $RetryCount += 1
@@ -886,7 +899,7 @@ do {
                 -Confirm:$false
         }
         $DoLoop = $false
-        Throw "License assignment timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+        Throw "License assignment timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
     }
     else {
         $RetryCount += 1
@@ -920,7 +933,7 @@ do {
                 -Confirm:$false
         }
         $DoLoop = $false
-        Throw "Mailbox creation timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+        Throw "Mailbox creation timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
     }
     else {
         $RetryCount += 1
