@@ -31,6 +31,9 @@
 .PARAMETER ReferralUserId
     User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
 
+.PARAMETER Tier
+    The Tier level where the Cloud Administrator account shall be created.
+
 .PARAMETER LicenseSkuPartNumber
     License assigned to the user. The license SkuPartNumber must contain an Exchange Online service plan to generate a mailbox for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
     If GroupId is also provided, group-based licensing is implied and license assignment will only be monitored before continuing.
@@ -72,7 +75,6 @@
 #TODO:
 #-admin prefix separator as variable
 #- research if Desired State Provisioning could be used?
-#- Add multi tier support
 #- Multiple licenses support
 #- variable for dedicated account yes/no per tier
 #- Variable for extension attribute
