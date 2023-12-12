@@ -172,7 +172,7 @@ if ($PSCmdlet.ShouldProcess(
                 $AzPSModule.ProvisioningState -ne 'Succeeded'
             )
         ) {
-            Write-Output "   Installing: $($Module.Name)"
+            Write-Output "   Creating : $($Module.Name)"
             $null = New-AzAutomationModule `
                 -ResourceGroupName $automationAccount.ResourceGroupName `
                 -AutomationAccountName $automationAccount.AutomationAccountName `
@@ -180,7 +180,7 @@ if ($PSCmdlet.ShouldProcess(
                 -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.Name)"
         }
         else {
-            Write-Output "   Installed: $($Module.Name)"
+            Write-Output "   Succeeded: $($Module.Name)"
         }
     }
 }
@@ -276,21 +276,19 @@ if ($PSCmdlet.ShouldProcess(
 
         # Office 365 Exchange Online
         '00000002-0000-0ff1-ce00-000000000000' = @{
-            AppRoles               = @(
+            AppRoles = @(
                 'Exchange.ManageAsApp'
                 'full_access_as_app'
                 'MailboxSettings.ReadWrite'
                 'Organization.Read.All'
                 'User.Read.All'
             )
-            Oauth2PermissionScopes = @{
-                Admin = @(
-                    'Organization.Read.All'
-                    'User.Read.All'
-                )
-                # '<User-ObjectId>' = @(
-                # )
-            }
+            # Oauth2PermissionScopes = @{
+            #     Admin = @(
+            #     )
+            #     '<User-ObjectId>' = @(
+            #     )
+            # }
         }
     }
 
