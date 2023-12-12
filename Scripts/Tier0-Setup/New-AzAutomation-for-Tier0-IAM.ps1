@@ -122,36 +122,36 @@ if ($PSCmdlet.ShouldProcess(
 
     $PSGalleryModules = @(
         @{
-            ModuleName    = 'PackageManagement'
-            ModuleVersion = '1.4.8.1'
+            Name    = 'PackageManagement'
+            Version = '1.4.8.1'
         }
         @{
-            ModuleName    = 'PowerShellGet'
-            ModuleVersion = '2.2.5'
+            Name    = 'PowerShellGet'
+            Version = '2.2.5'
         }
         @{
-            ModuleName    = 'Microsoft.Graph.Authentication'
-            ModuleVersion = '2.0'
+            Name    = 'Microsoft.Graph.Authentication'
+            Version = '2.0'
         }
         @{
-            ModuleName    = 'Microsoft.Graph.Identity.SignIns'
-            ModuleVersion = '2.0'
+            Name    = 'Microsoft.Graph.Identity.SignIns'
+            Version = '2.0'
         }
         @{
-            ModuleName    = 'Microsoft.Graph.Users'
-            ModuleVersion = '2.0'
+            Name    = 'Microsoft.Graph.Users'
+            Version = '2.0'
         }
         @{
-            ModuleName    = 'Microsoft.Graph.Users.Actions'
-            ModuleVersion = '2.0'
+            Name    = 'Microsoft.Graph.Users.Actions'
+            Version = '2.0'
         }
         @{
-            ModuleName    = 'Microsoft.Graph.Users.Functions'
-            ModuleVersion = '2.0'
+            Name    = 'Microsoft.Graph.Users.Functions'
+            Version = '2.0'
         }
         @{
-            ModuleName    = 'ExchangeOnlineManagement'
-            ModuleVersion = '3.0'
+            Name    = 'ExchangeOnlineManagement'
+            Version = '3.0'
         }
     )
 
@@ -160,27 +160,27 @@ if ($PSCmdlet.ShouldProcess(
         -AutomationAccountName $automationAccount.AutomationAccountName
 
     foreach ($Module in $PSGalleryModules) {
-        $AzPSModule = $AzPSModules | Where-Object Name -eq $Module.ModuleName
+        $AzPSModule = $AzPSModules | Where-Object Name -eq $Module.Name
 
         if (
                 (-Not $AzPSModule) -or
                 ($AzPSModule.ProvisioningState -eq 'Failed') -or
             (
-                $Module.ModuleVersion -and
-                ([System.Version]$AzPSModule.ModuleVersion -lt [System.Version]$Module.ModuleVersion) -and
+                $Module.Version -and
+                ([System.Version]$AzPSModule.Version -lt [System.Version]$Module.Version) -and
                 $AzPSModule.ProvisioningState -ne 'Creating' -and
                 $AzPSModule.ProvisioningState -ne 'Succeeded'
             )
         ) {
-            Write-Output "   Installing: $($Module.ModuleName)"
+            Write-Output "   Installing: $($Module.Name)"
             $null = New-AzAutomationModule `
                 -ResourceGroupName $automationAccount.ResourceGroupName `
                 -AutomationAccountName $automationAccount.AutomationAccountName `
-                -Name $Module.ModuleName `
-                -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.ModuleName)"
+                -Name $Module.Name `
+                -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.Name)"
         }
         else {
-            Write-Output "   Installed: $($Module.ModuleName)"
+            Write-Output "   Installed: $($Module.Name)"
         }
     }
 }
