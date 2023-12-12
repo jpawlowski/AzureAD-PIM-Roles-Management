@@ -155,11 +155,12 @@ if ($PSCmdlet.ShouldProcess(
         }
     )
 
+    $AzPSModules = Get-AzAutomationModule `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $automationAccount.AutomationAccountName
+
     foreach ($Module in $PSGalleryModules) {
-        $AzPSModule = Get-AzAutomationModule `
-            -ResourceGroupName $ResourceGroupName `
-            -AutomationAccountName $automationAccount.AutomationAccountName `
-            -Name $Module.ModuleName
+        $AzPSModule = $AzPSModules | Where-Object Name -eq $Module.ModuleName
 
         if (
                 (-Not $AzPSModule) -or
@@ -167,7 +168,8 @@ if ($PSCmdlet.ShouldProcess(
             (
                 $Module.ModuleVersion -and
                 ([System.Version]$AzPSModule.ModuleVersion -lt [System.Version]$Module.ModuleVersion) -and
-                $AzPSModule.ProvisioningState -ne 'Creating'
+                $AzPSModule.ProvisioningState -ne 'Creating' -and
+                $AzPSModule.ProvisioningState -ne 'Succeeded'
             )
         ) {
             Write-Output "   Installing: $($Module.ModuleName)"
@@ -251,12 +253,6 @@ if ($PSCmdlet.ShouldProcess(
     $AppPermissions = @{
         # Microsoft Graph
         '00000003-0000-0000-c000-000000000000' = @{
-            # Oauth2PermissionScopes = @{
-            #     Admin             = @(
-            #     )
-            #     '<User-ObjectId>' = @(
-            #     )
-            # }
             AppRoles = @(
                 'Directory.Read.All'
                 'Directory.ReadWrite.All'
@@ -270,10 +266,23 @@ if ($PSCmdlet.ShouldProcess(
                 'UserAuthenticationMethod.Read.All'
                 'UserAuthenticationMethod.ReadWrite.All'
             )
+            # Oauth2PermissionScopes = @{
+            #     Admin             = @(
+            #     )
+            #     '<User-ObjectId>' = @(
+            #     )
+            # }
         }
 
         # Office 365 Exchange Online
         '00000002-0000-0ff1-ce00-000000000000' = @{
+            AppRoles               = @(
+                'Exchange.ManageAsApp'
+                'full_access_as_app'
+                'MailboxSettings.ReadWrite'
+                'Organization.Read.All'
+                'User.Read.All'
+            )
             Oauth2PermissionScopes = @{
                 Admin = @(
                     'Organization.Read.All'
@@ -282,13 +291,6 @@ if ($PSCmdlet.ShouldProcess(
                 # '<User-ObjectId>' = @(
                 # )
             }
-            AppRoles               = @(
-                'Exchange.ManageAsApp'
-                'full_access_as_app'
-                'MailboxSettings.ReadWrite'
-                'Organization.Read.All'
-                'User.Read.All'
-            )
         }
     }
 
@@ -300,16 +302,41 @@ if ($PSCmdlet.ShouldProcess(
         else {
             $ServicePrincipal = Get-MgServicePrincipal -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' DisplayName eq '$($_.key)'"
         }
-        Write-Output "   $($ServicePrincipal.DisplayName)"
-        $PermissionGrants = Get-MgOauth2PermissionGrant -All -Filter "ClientId eq '$($ManagedIdentity.Id)' and ResourceId eq '$($ServicePrincipal.Id)'"
+        Write-Output "   $($ServicePrincipal.DisplayName.ToUpper())"
         $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $ManagedIdentity.Id | Where-Object ResourceId -eq $ServicePrincipal.Id
+        $PermissionGrants = Get-MgOauth2PermissionGrant -All -Filter "ClientId eq '$($ManagedIdentity.Id)' and ResourceId eq '$($ServicePrincipal.Id)'"
 
         $Permissions = $_.Value
         $Permissions.GetEnumerator() | ForEach-Object {
             $Permission = $_.value
 
+            if ($_.Key -eq 'AppRoles') {
+                Write-Output "      Application:"
+
+                foreach ($Permission in ($_.Value | Select-Object -Unique | Sort-Object)) {
+                    $AppRole = $ServicePrincipal.AppRoles | Where-Object { $_.Value -eq $Permission }
+                    if ($null -eq $AppRole) {
+                        Write-Error "$($ServicePrincipal.DisplayName): No App Role found with name $Permission"
+                    }
+                    else {
+                        Write-Output "         - $($AppRole.Value)`n           $($AppRole.DisplayName)"
+                    }
+
+                    if (-Not ($AppRoleAssignments | Where-Object AppRoleId -eq $AppRole.Id)) {
+                        $params = @{
+                            PrincipalId = $ManagedIdentity.Id
+                            ResourceId  = $ServicePrincipal.Id
+                            AppRoleId   = $AppRole.Id
+                        }
+                        $null = New-MgServicePrincipalAppRoleAssignment `
+                            -ServicePrincipalId $ManagedIdentity.Id `
+                            -BodyParameter $params
+                    }
+                }
+            }
+
             if ($_.Key -eq 'Oauth2PermissionScopes') {
-                Write-Output "      Delegated"
+                Write-Output "      Delegated:"
 
                 $_.Value.GetEnumerator() | ForEach-Object {
                     $ClientId = $ManagedIdentity.Id
@@ -325,7 +352,7 @@ if ($PSCmdlet.ShouldProcess(
                             Write-Error "$($ServicePrincipal.DisplayName): No OAuth Permission found with name $Permission"
                         }
                         else {
-                            Write-Output "            $($OAuth2Permission.Value)`n               ($(if ($PrincipalId -eq 'Admin') { $OAuth2Permission.AdminConsentDisplayName } else { $OAuth2Permission.UserConsentDisplayName }))"
+                            Write-Output "            - $($OAuth2Permission.Value)`n              $(if ($PrincipalId -eq 'Admin') { $OAuth2Permission.AdminConsentDisplayName } else { $OAuth2Permission.UserConsentDisplayName })"
                             $scopes += $OAuth2Permission.Value
                         }
                     }
@@ -351,33 +378,8 @@ if ($PSCmdlet.ShouldProcess(
                             if ($PrincipalId -ne 'Admin') {
                                 $params.PrincipalId = $PrincipalId
                             }
-                            New-MgOauth2PermissionGrant -BodyParameter $params
+                            $null = New-MgOauth2PermissionGrant -BodyParameter $params
                         }
-                    }
-                }
-            }
-
-            if ($_.Key -eq 'AppRoles') {
-                Write-Output "      Application"
-
-                foreach ($Permission in ($_.Value | Select-Object -Unique | Sort-Object)) {
-                    $AppRole = $ServicePrincipal.AppRoles | Where-Object { $_.Value -eq $Permission }
-                    if ($null -eq $AppRole) {
-                        Write-Error "$($ServicePrincipal.DisplayName): No App Role found with name $Permission"
-                    }
-                    else {
-                        Write-Output "         $($AppRole.Value)`n            ($($AppRole.DisplayName))"
-                    }
-
-                    if (-Not ($AppRoleAssignments | Where-Object AppRoleId -eq $AppRole.Id)) {
-                        $params = @{
-                            PrincipalId = $ManagedIdentity.Id
-                            ResourceId  = $ServicePrincipal.Id
-                            AppRoleId   = $AppRole.Id
-                        }
-                        $null = New-MgServicePrincipalAppRoleAssignment `
-                            -ServicePrincipalId $ManagedIdentity.Id `
-                            -BodyParameter $params
                     }
                 }
             }
