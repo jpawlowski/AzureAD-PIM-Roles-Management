@@ -21,7 +21,7 @@
     Location
 
 .PARAMETER Plan
-    Plan
+    Plan, defaults to Basic
 
 .PARAMETER Tags
     Tags
@@ -32,7 +32,7 @@
 .NOTES
     Filename: New-AzAutomation-for-Tier0-IAM.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.1
+    Version: 1.2
 #>
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
@@ -58,7 +58,7 @@ Param (
     [string]$Name,
     [Parameter(Position = 4, mandatory = $true)]
     [string]$Location,
-    [string]$Plan,
+    [string]$Plan = 'Basic',
     [System.Collections.Generic.Dictionary[string, object]]$Tags,
     [string]$DirectoryScopeID = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
 )
@@ -114,39 +114,71 @@ if (-Not $automationAccount) {
     }
 }
 
-$PSGalleryModules = @(
-    'Microsoft.Graph.Authentication'
-    'Microsoft.Graph.Identity.SignIns'
-    'Microsoft.Graph.Users'
-    'Microsoft.Graph.Users.Actions'
-    'Microsoft.Graph.Users.Functions'
-)
-
 if ($PSCmdlet.ShouldProcess(
         "Install PowerShell Modules in $($automationAccount.AutomationAccountName)",
         "Do you confirm to install desired PowerShell Modules in $($automationAccount.AutomationAccountName) ?",
         'Install PowerShell Modules in Azure Automation Account'
     )) {
-    foreach ($ModuleName in $PSGalleryModules) {
-        $Module = Get-AzAutomationModule `
+
+    $PSGalleryModules = @(
+        @{
+            ModuleName    = 'PackageManagement'
+            ModuleVersion = '1.4.8.1'
+        }
+        @{
+            ModuleName    = 'PowerShellGet'
+            ModuleVersion = '2.2.5'
+        }
+        @{
+            ModuleName    = 'Microsoft.Graph.Authentication'
+            ModuleVersion = '2.0'
+        }
+        @{
+            ModuleName    = 'Microsoft.Graph.Identity.SignIns'
+            ModuleVersion = '2.0'
+        }
+        @{
+            ModuleName    = 'Microsoft.Graph.Users'
+            ModuleVersion = '2.0'
+        }
+        @{
+            ModuleName    = 'Microsoft.Graph.Users.Actions'
+            ModuleVersion = '2.0'
+        }
+        @{
+            ModuleName    = 'Microsoft.Graph.Users.Functions'
+            ModuleVersion = '2.0'
+        }
+        @{
+            ModuleName    = 'ExchangeOnlineManagement'
+            ModuleVersion = '3.0'
+        }
+    )
+
+    foreach ($Module in $PSGalleryModules) {
+        $AzPSModule = Get-AzAutomationModule `
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $automationAccount.AutomationAccountName `
-            -Name $ModuleName `
-            -ErrorAction SilentlyContinue
+            -Name $Module.ModuleName
 
         if (
-                (-Not $Module) -or
-                ($Module.ProvisioningState -eq 'Failed')
+                (-Not $AzPSModule) -or
+                ($AzPSModule.ProvisioningState -eq 'Failed') -or
+            (
+                $Module.ModuleVersion -and
+                ([System.Version]$AzPSModule.ModuleVersion -lt [System.Version]$Module.ModuleVersion) -and
+                $AzPSModule.ProvisioningState -ne 'Creating'
+            )
         ) {
-            Write-Output "   Installing: ${ModuleName}"
+            Write-Output "   Installing: $($Module.ModuleName)"
             $null = New-AzAutomationModule `
                 -ResourceGroupName $automationAccount.ResourceGroupName `
                 -AutomationAccountName $automationAccount.AutomationAccountName `
-                -Name $ModuleName `
-                -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$ModuleName"
+                -Name $Module.ModuleName `
+                -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.ModuleName)"
         }
         else {
-            Write-Output "   Installed: ${ModuleName}"
+            Write-Output "   Installed: $($Module.ModuleName)"
         }
     }
 }
@@ -178,14 +210,14 @@ if (-Not $automationAccount.Identity) {
 }
 
 if ($PSCmdlet.ShouldProcess(
-        "Assign Microsoft Graph permissions to System-Assigned Managed Identity of $($automationAccount.AutomationAccountName)",
-        "Do you confirm to assign desired permissions to Microsoft Graph for $($automationAccount.AutomationAccountName) ?",
-        'Assign Microsoft Graph permissions to System-Assigned Managed Identity of Azure Automation Account'
+        "Assign app permissions to System-Assigned Managed Identity of $($automationAccount.AutomationAccountName)",
+        "Do you confirm to assign desired permissions to apps for $($automationAccount.AutomationAccountName) ?",
+        'Assign app permissions to System-Assigned Managed Identity of Azure Automation Account'
     )) {
 
     $MgScopes = @(
-        'Application.Read.All'
-        'Directory.Read.All'
+        'Application.ReadWrite.All'
+        'Directory.ReadWrite.All'
         'AppRoleAssignment.ReadWrite.All'
         'RoleManagement.ReadWrite.Directory'
     )
@@ -214,36 +246,149 @@ if ($PSCmdlet.ShouldProcess(
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
     }
 
-    $AzAutomationPermissions = @(
-        'Directory.Read.All'                        # To read directory data and settings
-        'Policy.Read.All'                           # To read and validate current policy settings
-        'User.Read.All'                             # To read user information
-        'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
-        'UserAuthenticationMethod.ReadWrite.All'    # To update authentication methods of the user
-    )
+    $ManagedIdentity = Get-MgServicePrincipal -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'ManagedIdentity' and DisplayName eq '$Name'"
 
-    $MgGraphAppId = "00000003-0000-0000-c000-000000000000"
-    $MgGraphServicePrincipal = Get-AzADServicePrincipal -Filter "appId eq '$MgGraphAppId'"
-    $MgGraphAppRoles = $MgGraphServicePrincipal.AppRole | Where-Object { ($_.Value -in $AzAutomationPermissions) -and ($_.AllowedMemberType -contains 'Application') }
-
-    foreach ($AppRole in $MgGraphAppRoles) {
-        $params = @{
-            "PrincipalId" = $automationAccount.Identity.PrincipalId
-            "ResourceId"  = $MgGraphServicePrincipal.Id
-            "AppRoleId"   = $AppRole.Id
+    $AppPermissions = @{
+        # Microsoft Graph
+        '00000003-0000-0000-c000-000000000000' = @{
+            # Oauth2PermissionScopes = @{
+            #     Admin             = @(
+            #     )
+            #     '<User-ObjectId>' = @(
+            #     )
+            # }
+            AppRoles = @(
+                'Directory.Read.All'
+                'Directory.ReadWrite.All'
+                'Mail.Send'
+                'OnPremDirectorySynchronization.Read.All'
+                'Organization.Read.All'
+                'Policy.Read.All'
+                'RoleManagement.ReadWrite.Directory'
+                'User.Read.All'
+                'User.ReadWrite.All'
+                'UserAuthenticationMethod.Read.All'
+                'UserAuthenticationMethod.ReadWrite.All'
+            )
         }
-        Write-Output "   Assigning: $($AppRole.Value)"
-        $null = New-MgServicePrincipalAppRoleAssignment `
-            -ServicePrincipalId $params.PrincipalId `
-            -BodyParameter $params `
-            -ErrorAction SilentlyContinue
+
+        # Office 365 Exchange Online
+        '00000002-0000-0ff1-ce00-000000000000' = @{
+            Oauth2PermissionScopes = @{
+                Admin = @(
+                    'Organization.Read.All'
+                    'User.Read.All'
+                )
+                # '<User-ObjectId>' = @(
+                # )
+            }
+            AppRoles               = @(
+                'Exchange.ManageAsApp'
+                'full_access_as_app'
+                'MailboxSettings.ReadWrite'
+                'Organization.Read.All'
+                'User.Read.All'
+            )
+        }
+    }
+
+    $AppPermissions.GetEnumerator() | ForEach-Object {
+        $ServicePrincipal = $null
+        if ($_.key -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
+            $ServicePrincipal = Get-MgServicePrincipal -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and appId eq '$($_.key)'"
+        }
+        else {
+            $ServicePrincipal = Get-MgServicePrincipal -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' DisplayName eq '$($_.key)'"
+        }
+        Write-Output "   $($ServicePrincipal.DisplayName)"
+        $PermissionGrants = Get-MgOauth2PermissionGrant -All -Filter "ClientId eq '$($ManagedIdentity.Id)' and ResourceId eq '$($ServicePrincipal.Id)'"
+        $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $ManagedIdentity.Id | Where-Object ResourceId -eq $ServicePrincipal.Id
+
+        $Permissions = $_.Value
+        $Permissions.GetEnumerator() | ForEach-Object {
+            $Permission = $_.value
+
+            if ($_.Key -eq 'Oauth2PermissionScopes') {
+                Write-Output "      Delegated"
+
+                $_.Value.GetEnumerator() | ForEach-Object {
+                    $ClientId = $ManagedIdentity.Id
+                    $ResourceId = $ServicePrincipal.Id
+                    $PrincipalId = $_.Key
+                    $ConsentType = if ($PrincipalId -eq 'Admin') { 'AllPrincipals' } else { 'Principal' }
+                    Write-Output "         ${PrincipalId}:"
+
+                    $scopes = @()
+                    foreach ($Permission in ($_.Value | Select-Object -Unique | Sort-Object)) {
+                        $OAuth2Permission = $ServicePrincipal.Oauth2PermissionScopes | Where-Object { $_.Value -eq $Permission }
+                        if ($null -eq $OAuth2Permission) {
+                            Write-Error "$($ServicePrincipal.DisplayName): No OAuth Permission found with name $Permission"
+                        }
+                        else {
+                            Write-Output "            $($OAuth2Permission.Value)`n               ($(if ($PrincipalId -eq 'Admin') { $OAuth2Permission.AdminConsentDisplayName } else { $OAuth2Permission.UserConsentDisplayName }))"
+                            $scopes += $OAuth2Permission.Value
+                        }
+                    }
+
+                    if ($scopes.Count -gt 0) {
+                        $PermissionGrant = $PermissionGrants | Where-Object ConsentType -eq $ConsentType
+                        if ($ConsentType -eq 'Principal') {
+                            $PermissionGrant = $PermissionGrant | Where-Object PrincipalId -eq $PrincipalId
+                        }
+                        if ($PermissionGrant) {
+                            $params = @{
+                                Scope = $scopes -join ' '
+                            }
+                            Update-MgOauth2PermissionGrant -OAuth2PermissionGrantId $PermissionGrant.Id -BodyParameter $params
+                        }
+                        else {
+                            $params = @{
+                                ClientId    = $ClientId
+                                ConsentType = $ConsentType
+                                ResourceId  = $ResourceId
+                                Scope       = $scopes -join ' '
+                            }
+                            if ($PrincipalId -ne 'Admin') {
+                                $params.PrincipalId = $PrincipalId
+                            }
+                            New-MgOauth2PermissionGrant -BodyParameter $params
+                        }
+                    }
+                }
+            }
+
+            if ($_.Key -eq 'AppRoles') {
+                Write-Output "      Application"
+
+                foreach ($Permission in ($_.Value | Select-Object -Unique | Sort-Object)) {
+                    $AppRole = $ServicePrincipal.AppRoles | Where-Object { $_.Value -eq $Permission }
+                    if ($null -eq $AppRole) {
+                        Write-Error "$($ServicePrincipal.DisplayName): No App Role found with name $Permission"
+                    }
+                    else {
+                        Write-Output "         $($AppRole.Value)`n            ($($AppRole.DisplayName))"
+                    }
+
+                    if (-Not ($AppRoleAssignments | Where-Object AppRoleId -eq $AppRole.Id)) {
+                        $params = @{
+                            PrincipalId = $ManagedIdentity.Id
+                            ResourceId  = $ServicePrincipal.Id
+                            AppRoleId   = $AppRole.Id
+                        }
+                        $null = New-MgServicePrincipalAppRoleAssignment `
+                            -ServicePrincipalId $ManagedIdentity.Id `
+                            -BodyParameter $params
+                    }
+                }
+            }
+        }
     }
 }
 elseif ($WhatIfPreference) {
-    Write-Verbose 'What If: Microsoft Graph permissions would have been assigned.'
+    Write-Verbose 'What If: App permissions would have been assigned.'
 }
 else {
-    Write-Verbose 'Assignment of Microsoft Graph permissions was denied.'
+    Write-Verbose 'Assignment of app permissions was denied.'
 }
 
 if ($PSCmdlet.ShouldProcess(
@@ -257,6 +402,27 @@ if ($PSCmdlet.ShouldProcess(
             DisplayName      = 'Authentication Administrator'
             RoleDefinitionId = 'c4e39bd9-1100-46d3-8c65-fb160da0071f'
             DirectoryScopeId = $DirectoryScopeID
+        }
+        @{
+            DisplayName      = 'Privileged Authentication Administrator'
+            RoleDefinitionId = '7be44c8a-adaf-4e2a-84d6-ab2649e08a13'
+        }
+        @{
+            DisplayName      = 'Privileged Role Administrator'
+            RoleDefinitionId = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+        }
+        @{
+            DisplayName      = 'Exchange Recipient Administrator'
+            RoleDefinitionId = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+        }
+        @{
+            DisplayName      = 'User Administrator'
+            RoleDefinitionId = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+            DirectoryScopeId = $DirectoryScopeID
+        }
+        @{
+            DisplayName      = 'Global Reader'
+            RoleDefinitionId = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451'
         }
     )
 
@@ -276,7 +442,7 @@ if ($PSCmdlet.ShouldProcess(
         }
         if ($Role.DirectoryScopeId) { $params.DirectoryScopeId = $Role.DirectoryScopeId }
         Write-Output "   Assigning: $($Role.RoleDefinitionId) ($($Role.DisplayName))"
-        $null = New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest `
+        New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest `
             -BodyParameter $params `
             -ErrorAction SilentlyContinue
     }
