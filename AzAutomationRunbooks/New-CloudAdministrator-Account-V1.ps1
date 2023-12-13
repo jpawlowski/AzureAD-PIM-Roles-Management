@@ -63,16 +63,23 @@
 .PARAMETER OutputText
     Output the generated User Principal Name only.
 
-.PARAMETER Version
-    Print version information.
-
 .NOTES
     Filename: New-CloudAdministrator-Account-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.0.1
 #>
 
+#Requires -Version 5.1
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
+#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0' }
+
 #TODO:
+#- add Git revision to .NOTES section during git commit
 #-admin prefix separator as variable
 #- research if Desired State Provisioning could be used?
 #- Multiple licenses support
@@ -86,17 +93,9 @@
 #- Progress support
 #- Only update account if there is actual changes to it and report that changes had to be made --> a continuous monitoring and enforcement of the account state shall be possible via scheduled task
 
-#Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
-#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0' }
-
 [CmdletBinding(
     SupportsShouldProcess,
-    ConfirmImpact = 'High'
+    ConfirmImpact = 'Medium'
 )]
 Param (
     [Parameter(Position = 0, mandatory = $true)]
@@ -108,15 +107,8 @@ Param (
     [string]$UserPhotoUrl,
     [string]$Webhook,
     [switch]$OutJson,
-    [switch]$OutText,
-    [switch]$Version
+    [switch]$OutText
 )
-
-if ($Version) {
-    (Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet
-    exit
-}
-Write-Verbose $(((Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet.Alert.Text) )
 
 Function ResilientRemoteCall {
     param(
@@ -145,39 +137,39 @@ Function ResilientRemoteCall {
         }
     } While ($DoLoop)
 }
-Function Send-FailMail {
-    $to = "email@domain.com"
-    $from = "FromEmail@domain.com"
-    $bcc = $from
-    $subject = "Employee Photo - $photo - Failed to Update"
-    $type = "html"
-    $template = "C:\temp\PhotoFailMail.html"
-    $params = @{
-        Message         = @{
-            Subject       = $subject
-            Body          = @{
-                ContentType = $type
-                Content     = $template
-            }
-            ToRecipients  = @(
-                @{
-                    EmailAddress = @{
-                        Address = $to
-                    }
-                }
-            )
-            BccRecipients = @(
-                @{
-                    EmailAddress = @{
-                        Address = $bcc
-                    }
-                }
-            )
-        }
-        SaveToSentItems = "true"
-    }
-    Send-MgUserMail -UserId $from -BodyParameter $params
-}
+# Function Send-FailMail {
+#     $to = "email@domain.com"
+#     $from = "FromEmail@domain.com"
+#     $bcc = $from
+#     $subject = "Employee Photo - $photo - Failed to Update"
+#     $type = "html"
+#     $template = "C:\temp\PhotoFailMail.html"
+#     $params = @{
+#         Message         = @{
+#             Subject       = $subject
+#             Body          = @{
+#                 ContentType = $type
+#                 Content     = $template
+#             }
+#             ToRecipients  = @(
+#                 @{
+#                     EmailAddress = @{
+#                         Address = $to
+#                     }
+#                 }
+#             )
+#             BccRecipients = @(
+#                 @{
+#                     EmailAddress = @{
+#                         Address = $bcc
+#                     }
+#                 }
+#             )
+#         }
+#         SaveToSentItems = "true"
+#     }
+#     Send-MgUserMail -UserId $from -BodyParameter $params
+# }
 Function Get-RandomCharacter($length, $characters) {
     if ($length -lt 1) { return '' }
     $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
@@ -203,10 +195,16 @@ Function Get-RandomPassword($lowerChars, $upperChars, $numbers, $symbols) {
 }
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-    $null = ResilientRemoteCall { Write-Verbose (Connect-AzAccount -Identity -Scope Process) }
-    Write-Verbose (Get-AzContext | ConvertTo-Json)
+    try {
+        $AzureContext = (Connect-AzAccount -Identity -Scope Process).context
+    }
+    catch {
+        Throw "There is no system-assigned user identity. Aborting.";
+    }
+    $AzureContext = Set-AzContext -SubscriptionName $AzureContext.Subscription -DefaultProfile $AzureContext
+    $AzureAutomationAccount = Get-AzAutomationAccount
 
-    $tmpLicenseSkuPartNumber = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminLicenseSkuPartNumber" -ErrorAction SilentlyContinue }
+    $tmpLicenseSkuPartNumber = Get-AzAutomationVariable -ResourceGroupName $AzureAutomationAccount.ResourceGroupName -AutomationAccountName $AzureAutomationAccount.AutomationAccountName -Name "avTier${Tier}AdminLicenseSkuPartNumber" -ErrorAction SilentlyContinue
     if ($tmpLicenseSkuPartNumber.Value) {
         if ($LicenseSkuPartNumber) {
             Write-Warning 'Ignored LicenseSkuPartNumber parameter from job request input and replaced by Azure Automation variable.'
@@ -214,13 +212,13 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         else {
             Write-Verbose 'Using LicenseSkuPartNumber from Azure Automation variable.'
         }
-        Set-Variable LicenseSkuPartNumber -Option Constant -Value $tmpLicenseSkuPartNumber.Value
+        $LicenseSkuPartNumber = $tmpLicenseSkuPartNumber.Value
     }
     else {
-        Set-Variable LicenseSkuPartNumber -Option Constant -Value 'EXCHANGEDESKLESS'
+        $LicenseSkuPartNumber = 'EXCHANGEDESKLESS'
         Write-Verbose "Using LicenseSkuPartNumber built-in default value $LicenseSkuPartNumber."
     }
-    $tmpGroupId = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminGroupId" -ErrorAction SilentlyContinue }
+    $tmpGroupId = Get-AzAutomationVariable -ResourceGroupName $AzureAutomationAccount.ResourceGroupName -AutomationAccountName $AzureAutomationAccount.AutomationAccountName -Name "avTier${Tier}AdminGroupId" -ErrorAction SilentlyContinue
     if ($tmpGroupId.Value) {
         if ($GroupId) {
             Write-Warning 'Ignored GroupId parameter from job request input and replaced by Azure Automation variable.'
@@ -228,9 +226,9 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         else {
             Write-Verbose 'Using GroupId from Azure Automation variable.'
         }
-        Set-Variable GroupId -Option Constant -Value $tmpGroupId.Value
+        $GroupId = $tmpGroupId.Value
     }
-    $tmpUserPhotoUrl = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminUserPhotoUrl" -ErrorAction SilentlyContinue }
+    $tmpUserPhotoUrl = Get-AzAutomationVariable -ResourceGroupName $AzureAutomationAccount.ResourceGroupName -AutomationAccountName $AzureAutomationAccount.AutomationAccountName -Name "avTier${Tier}AdminUserPhotoUrl" -ErrorAction SilentlyContinue
     if ($tmpUserPhotoUrl.Value) {
         if ($UserPhotoUrl) {
             Write-Warning 'Ignored UserPhotoUrl parameter from job request input and replaced by Azure Automation variable.'
@@ -238,13 +236,13 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         else {
             Write-Verbose 'Using UserPhotoUrl from Azure Automation variable.'
         }
-        Set-Variable UserPhotoUrl -Option Constant -Value $tmpUserPhotoUrl.Value
+        $UserPhotoUrl = $tmpUserPhotoUrl.Value
     }
     if (-Not $Webhook) {
-        $tmpWebhook = ResilientRemoteCall { Get-AzAutomationVariable -Name "avTier${Tier}AdminWebhook" -ErrorAction SilentlyContinue }
+        $tmpWebhook = Get-AzAutomationVariable -ResourceGroupName $AzureAutomationAccount.ResourceGroupName -AutomationAccountName $AzureAutomationAccount.AutomationAccountName -Name "avTier${Tier}AdminWebhook" -ErrorAction SilentlyContinue
         if ($tmpWebhook.Value) {
             Write-Verbose 'Using Webhook from Azure Automation variable.'
-            Set-Variable Webhook -Option Constant -Value $tmpWebhook.Value
+            $Webhook = $tmpWebhook.Value
         }
     }
 
@@ -302,11 +300,10 @@ if ($Webhook -and ($Webhook -notmatch '^https:\/\/.+$')) {
 $MgScopes = @(
     'User.ReadWrite.All'                        # To read and write user information, including EmployeeHireDate
     'Directory.ReadWrite.All'                   # To read and write directory data
-    'User.Read.All'                             # To read user information, including EmployeeHireDate
-    'Directory.Read.All'                        # To read directory data
     'Organization.Read.All'                     # To read organization data, e.g. licenses
     'OnPremDirectorySynchronization.Read.All'   # To read directory sync data
     'RoleManagement.ReadWrite.Directory'        # To update role-assignable groups
+    'Mail.Send'                                 # To send e-mails
 )
 $MissingMgScopes = @()
 $return = @{}
@@ -326,12 +323,12 @@ foreach ($MgScope in $MgScopes) {
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        $null = ResilientRemoteCall { Write-Verbose (Connect-MgGraph -NoWelcome -Identity -ContextScope Process) }
+        $null = ResilientRemoteCall { Connect-MgGraph -NoWelcome -Identity -ContextScope Process -ErrorAction Stop }
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
         Write-Verbose 'Opening connection to Microsoft Graph ...'
-        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process -ErrorAction Stop }
     }
 }
 foreach ($MgScope in $MgScopes) {
@@ -345,7 +342,7 @@ if ($MissingMgScopes) {
     }
     else {
         Write-Verbose 'Re-authentication to Microsoft Graph for missing scopes ...'
-        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process -ErrorAction Stop }
     }
 }
 
@@ -535,12 +532,12 @@ if (
 ) {
     Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ForEach-Object { Disconnect-ExchangeOnline -ConnectionId $_.ConnectionId -Confirm:$false -InformationAction SilentlyContinue }
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        $null = ResilientRemoteCall { Write-Verbose (Connect-ExchangeOnline -ShowBanner:$false -ManagedIdentity -Organization $tenantDomain.Name) }
+        $null = ResilientRemoteCall { Connect-ExchangeOnline -ShowBanner:$false -ManagedIdentity -Organization $tenantDomain.Name -ErrorAction Stop }
         Write-Verbose (Get-ConnectionInformation | Where-Object Organization -eq $tenantDomain.Name | ConvertTo-Json)
     }
     else {
         Write-Information 'Opening connection to Exchange Online ...'
-        ResilientRemoteCall { Connect-ExchangeOnline -ShowBanner:$false -Organization $tenantDomain.Name }
+        ResilientRemoteCall { Connect-ExchangeOnline -ShowBanner:$false -Organization $tenantDomain.Name -ErrorAction Stop }
     }
 }
 
@@ -740,14 +737,14 @@ else {
     $RetryCount = 1
     $MaxRetry = 30
     $WaitSec = 7
-    $newUserId = $userObj.Id
+    $newUser = $userObj
 
     do {
         $userObj = ResilientRemoteCall {
             Get-MgUser `
                 -ConsistencyLevel eventual `
                 -CountVariable CountVar `
-                -Filter "Id eq '$newUserId'" `
+                -Filter "Id eq '$($newUser.Id)'" `
                 -ErrorAction SilentlyContinue `
                 -Debug:$DebugPreference `
                 -Verbose:$false
@@ -756,14 +753,14 @@ else {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            $userObj = ResilientRemoteCall {
+            $null = ResilientRemoteCall {
                 Remove-MgUser `
-                    -UserId $newUserId `
+                    -UserId $newUser.Id `
                     -ErrorAction SilentlyContinue `
                     -Confirm:$false
             }
             $DoLoop = $false
-            Throw "User provisioning consistency timeout: Tier 0 Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+            Throw "User provisioning consistency timeout: Tier 0 Cloud Administrator account $($newUser.UserPrincipalName) ($($newUser.Id)) was deleted after unfinished provisioning."
         }
         else {
             $RetryCount += 1
@@ -860,7 +857,7 @@ if ($groupObj) {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            $userObj = ResilientRemoteCall {
+            $null = ResilientRemoteCall {
                 Remove-MgUser `
                     -UserId $userObj.Id `
                     -ErrorAction SilentlyContinue `
@@ -894,7 +891,7 @@ do {
         $DoLoop = $false
     }
     elseif ($RetryCount -ge $MaxRetry) {
-        $userObj = ResilientRemoteCall {
+        $null = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
                 -ErrorAction SilentlyContinue `
@@ -928,7 +925,7 @@ do {
         $DoLoop = $false
     }
     elseif ($RetryCount -ge $MaxRetry) {
-        $userObj = ResilientRemoteCall {
+        $null = ResilientRemoteCall {
             Remove-MgUser `
                 -UserId $userObj.Id `
                 -ErrorAction SilentlyContinue `
@@ -966,15 +963,25 @@ $userObj = ResilientRemoteCall {
         -Verbose:$false
 }
 
+if (-Not $UserPhotoUrl) {
+    $OrgBranding = Get-MgOrganizationBranding -OrganizationId (Get-MgContext).TenantId
+    if ($OrgBranding.SquareLogoRelativeUrl) {
+        Write-Verbose "Using tenant square logo as user photo"
+        $UserPhotoUrl = 'https://' + $OrgBranding.CdnList[0] + '/' + $OrgBranding.SquareLogoRelativeUrl
+    }
+    elseif ($OrgBranding.SquareLogoRelativeUrl) {
+        Write-Verbose "Using tenant square logo dark as user photo"
+        $UserPhotoUrl = 'https://' + $OrgBranding.CdnList[0] + '/' + $OrgBranding.SquareLogoDarkRelativeUrl
+    }
+}
+
 if ($UserPhotoUrl) {
     Write-Verbose "Retrieving user photo from URL '$($UserPhotoUrl)'"
     $null = Invoke-WebRequest `
         -UseBasicParsing `
         -Method GET `
         -Uri $UserPhotoUrl `
-        -TimeoutSec 3 `
-        -RetryIntervalSec 5 `
-        -MaximumRetryCount 3 `
+        -TimeoutSec 10 `
         -ErrorAction SilentlyContinue `
         -OutVariable UserPhoto
     if (
@@ -985,10 +992,9 @@ if ($UserPhotoUrl) {
         Write-Warning "Unable to download photo from URL '$($UserPhotoUrl)'"
     }
     elseif (
-        ($UserPhoto.Headers.'Content-Type' -ne 'image/png') -and
-        ($UserPhoto.Headers.'Content-Type' -ne 'image/jpeg')
+        $UserPhoto.Headers.'Content-Type' -notmatch '^image/'
     ) {
-        Write-Warning "Photo from URL '$($UserPhotoUrl)' must have Content-Type 'image/png' or 'image/jpeg'."
+        Write-Warning "Photo from URL '$($UserPhotoUrl)' must have Content-Type 'image/*'."
     }
     else {
         Write-Verbose 'Updating user photo'
@@ -1017,6 +1023,7 @@ ForEach ($property in $userProperties) {
         $return.Data.$property = $userObj.$property
     }
 }
+if ($UserPhotoUrl ) { $return.Data.UserPhotoUrl = $UserPhotoUrl }
 
 
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }

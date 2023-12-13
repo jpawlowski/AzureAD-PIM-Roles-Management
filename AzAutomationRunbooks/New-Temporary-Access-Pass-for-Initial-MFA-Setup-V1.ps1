@@ -30,9 +30,6 @@
 .PARAMETER Simulate
     Same as -WhatIf parameter but makes it available for Azure Automation.
 
-.PARAMETER Version
-    Print version information.
-
 .NOTES
     Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
@@ -62,12 +59,6 @@ Param (
     [switch]$Simulate,
     [switch]$Version
 )
-
-if ($Version) {
-    (Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet
-    exit
-}
-Write-Verbose $(((Get-Help $MyInvocation.InvocationName -Full).PSExtended.AlertSet.Alert.Text) )
 
 Function ResilientRemoteCall {
     param(
@@ -136,12 +127,12 @@ foreach ($MgScope in $MgScopes) {
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        $null = ResilientRemoteCall { Write-Verbose (Connect-MgGraph -NoWelcome -Identity -ContextScope Process) }
+        $null = ResilientRemoteCall { Connect-MgGraph -NoWelcome -Identity -ContextScope Process -ErrorAction Stop }
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {
         Write-Information 'Opening connection to Microsoft Graph ...'
-        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process -ErrorAction Stop }
     }
 }
 foreach ($MgScope in $MgScopes) {
@@ -155,7 +146,7 @@ if ($MissingMgScopes) {
     }
     else {
         Write-Information 'Re-authentication to Microsoft Graph for missing scopes ...'
-        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process }
+        ResilientRemoteCall { Connect-MgGraph -NoWelcome -Scopes $MgScopes -ContextScope Process -ErrorAction Stop }
     }
 }
 
