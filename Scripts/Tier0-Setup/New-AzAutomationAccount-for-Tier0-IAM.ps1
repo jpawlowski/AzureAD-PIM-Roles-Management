@@ -380,7 +380,7 @@ if ($automationAccount.Identity.PrincipalId) {
         $AppPermissions = @{
             # Microsoft Graph
             '00000003-0000-0000-c000-000000000000' = @{
-                AppRoles               = @(
+                AppRoles = @(
                     'Directory.ReadWrite.All'
                     'Mail.Send'
                     'OnPremDirectorySynchronization.Read.All'
@@ -390,20 +390,16 @@ if ($automationAccount.Identity.PrincipalId) {
                     'User.ReadWrite.All'
                     'UserAuthenticationMethod.ReadWrite.All'
                 )
-                Oauth2PermissionScopes = @{
-                    Admin = @(
-                        'email'
-                        'offline_access'
-                        'openid'
-                        'profile'
-                        'Directory.ReadWrite.All'
-                        'User.Read'
-                        'User.Read.All'
-                        'User.ReadWrite.All'
-                    )
-                    # '<User-ObjectId>' = @(
-                    # )
-                }
+                # Oauth2PermissionScopes = @{
+                #     Admin = @(
+                #         'email'
+                #         'offline_access'
+                #         'openid'
+                #         'profile'
+                #     )
+                #     '<User-ObjectId>' = @(
+                #     )
+                # }
             }
 
             # Office 365 Exchange Online
