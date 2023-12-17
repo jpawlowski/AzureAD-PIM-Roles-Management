@@ -40,13 +40,9 @@ Param(
 if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
-#region [COMMON] CONNECTIONS ---------------------------------------------------
-./Common__0000_Connect-MgGraph.ps1 1> $null
-#endregion ---------------------------------------------------------------------
-
 $activeRoles = @()
 $missingRoles = @()
-$RoleAssignment = ./Common__0000_Get-MgDirectoryRoleActiveAssignment.ps1
+$RoleAssignment = ./Common__0001_Get-MgDirectoryRoleActiveAssignment.ps1
 $GlobalAdmin = $RoleAssignment | Where-Object roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'
 $PrivRoleAdmin = $RoleAssignment | Where-Object roleTemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814'
 

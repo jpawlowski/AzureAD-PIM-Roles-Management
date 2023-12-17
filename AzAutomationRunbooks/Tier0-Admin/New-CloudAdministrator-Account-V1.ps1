@@ -98,7 +98,6 @@
 #- Multiple licenses support
 #- variable for dedicated account yes/no per tier
 #- Variable for extension attribute
-#- Parallel run check
 #- Check refUser for extensionAttribute and EmployeeType
 #- Send emails were applicable
 #- find existing account not only by UPN but also extensionAttribute and EmployeeType
@@ -267,7 +266,7 @@ Begin {
     #endregion ---------------------------------------------------------------------
 
     #region [COMMON] CONCURRENT JOBS -----------------------------------------------
-    if (-Not (./Common__0000_Wait-AzAutomationConcurrentJob.ps1)) {
+    if (-Not (./Common__0001_Wait-AzAutomationConcurrentJob.ps1)) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
             Message           = "Maximum job runtime was reached."
             ErrorId           = '504'
@@ -287,10 +286,10 @@ Begin {
     $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
 
     # Confirm required Microsoft Graph directory roles
-    ./Common__0001_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
+    ./Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
 
     # Confirm required permissions for other app besides Microsoft Graph
-    ./Common__0001_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
+    ./Common__0002_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
 
     # Exchange Online connection
     ./Common__0000_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name

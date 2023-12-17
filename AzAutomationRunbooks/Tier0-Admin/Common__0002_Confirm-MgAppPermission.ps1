@@ -40,14 +40,10 @@ Param(
 # if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
-#region [COMMON] CONNECTIONS ---------------------------------------------------
-./Common__0000_Connect-MgGraph.ps1 1> $null
-#endregion ---------------------------------------------------------------------
-
-$AppPermissions = ./Common__0000_Get-MgAppPermission.ps1
+$AppPermissions = ./Common__0001_Get-MgAppPermission.ps1
 
 foreach ($Permission in ($Permissions | Select-Object -Unique)) {
-
+#TODO
 }
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
