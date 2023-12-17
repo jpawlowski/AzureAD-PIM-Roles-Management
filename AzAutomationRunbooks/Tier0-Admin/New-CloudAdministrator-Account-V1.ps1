@@ -269,14 +269,13 @@ Begin {
     #region [COMMON] CONCURRENT JOBS -----------------------------------------------
     if (-Not (./Common__0000_Wait-AzAutomationConcurrentJob.ps1)) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
-            Message           = "${ReferralUserId}: ReferralUserId is invalid"
+            Message           = "Maximum job runtime was reached."
             ErrorId           = '504'
             Category          = 'OperationTimeout'
-            RecommendedAction = 'Retry again later.'
+            RecommendedAction = 'Try again later.'
             CategoryActivity  = 'Job Concurrency Check'
             CategoryReason    = "Maximum job runtime was reached."
         }
-        $persistentError = $true
     }
     #endregion ---------------------------------------------------------------------
 
@@ -383,7 +382,17 @@ Process {
     #region [COMMON] PS PIPELINE LOOP HANDLING -------------------------------------
     # Only process items if there was no error in Begin{} section
     if (($Iteration -eq 0) -and ($return.Error.Count -gt 0)) { $persistentError = $true }
-    if ($persistentError) { return }
+    if ($persistentError) {
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Skipped processing."
+            ErrorId           = '500'
+            Category          = 'OperationStopped'
+            RecommendedAction = 'Try again later.'
+            CategoryActivity  = 'Persisent Error'
+            CategoryReason    = "No other items are processed due to persisent error before."
+        }
+        return
+    }
     $Iteration++
     #endregion ---------------------------------------------------------------------
 
@@ -396,7 +405,7 @@ Process {
             Category          = 'SyntaxError'
             TargetName        = $ReferralUserId
             TargetObject      = $null
-            TargetType        = 'User'
+            TargetType        = 'UserId'
             RecommendedAction = 'Provide either User Principal Name, or Object ID (UUID).'
             CategoryActivity  = 'ReferralUserId parameter validation'
             CategoryReason    = "Parameter ReferralUserId does not match $regex"
@@ -411,7 +420,7 @@ Process {
             Category          = 'SyntaxError'
             TargetName        = $ReferralUserId
             TargetObject      = $null
-            TargetType        = 'User'
+            TargetType        = 'Retry again later'
             RecommendedAction = 'Provide a Tier level of 0, 1, or 2.'
             CategoryActivity  = 'Tier parameter validation'
             CategoryReason    = "Parameter Tier does not match $regex"
@@ -426,7 +435,7 @@ Process {
             Category          = 'SyntaxError'
             TargetName        = $ReferralUserId
             TargetObject      = $null
-            TargetType        = 'User'
+            TargetType        = 'UserId'
             RecommendedAction = 'Please correct the URL format for paramter UserPhotoUrl.'
             CategoryActivity  = 'UserPhotoUrl parameter validation'
             CategoryReason    = "Parameter UserId does not match $regex"
@@ -481,7 +490,7 @@ Process {
             Category          = 'ObjectNotFound'
             TargetName        = $ReferralUserId
             TargetObject      = $null
-            TargetType        = 'User'
+            TargetType        = 'UserId'
             RecommendedAction = 'Provide an existing User Principal Name, or Object ID (UUID).'
             CategoryActivity  = 'ReferralUserId user validation'
             CategoryReason    = 'Referral User ID does not exist in directory.'
@@ -502,7 +511,7 @@ Process {
             Category         = 'PermissionDenied'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID is listed as not capable of having a Cloud Administrator account.'
         }
@@ -516,7 +525,7 @@ Process {
             Category         = 'PermissionDenied'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID must not use a onmicrosoft.com subdomain.'
         }
@@ -530,7 +539,7 @@ Process {
             Category         = 'NotEnabled'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
         }
@@ -544,7 +553,7 @@ Process {
             Category         = 'InvalidType'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
         }
@@ -561,7 +570,7 @@ Process {
             Category         = 'ResourceUnavailable'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID must have manager property set.'
         }
@@ -580,7 +589,7 @@ Process {
             Category         = 'ResourceUnavailable'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up for active employees."
         }
@@ -597,7 +606,7 @@ Process {
             Category         = 'OperationStopped'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
         }
@@ -614,7 +623,7 @@ Process {
             Category         = 'InvalidType'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = "Referral User ID must be a hybrid identity synced from on-premises directory."
         }
@@ -632,7 +641,7 @@ Process {
             Category         = 'NotEnabled'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = "Referral User ID must have a mailbox."
         }
@@ -646,7 +655,7 @@ Process {
             Category         = 'InvalidType'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = "Referral User ID mailbox must be of type UserMailbox. Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
         }
@@ -740,7 +749,7 @@ Process {
                 Category         = 'ResourceExists'
                 TargetName       = $refUserObj.UserPrincipalName
                 TargetObject     = $refUserObj.Id
-                TargetType       = 'User'
+                TargetType       = 'UserId'
                 CategoryActivity = 'Account Provisioning'
                 CategoryReason   = "An existing admin account was deleted before."
             }
@@ -774,7 +783,7 @@ Process {
             Category          = 'ResourceExists'
             TargetName        = $refUserObj.UserPrincipalName
             TargetObject      = $refUserObj.Id
-            TargetType        = 'User'
+            TargetType        = 'UserId'
             RecommendedAction = "Delete conflicting administration account to comply with corporate compliance policy: $($duplicatesObj.UserPrincipalName)"
             CategoryActivity  = 'Account Compliance'
             CategoryReason    = "Other accounts were found using the same namespace."
@@ -799,7 +808,7 @@ Process {
                 Category          = 'ResourceExists'
                 TargetName        = $refUserObj.UserPrincipalName
                 TargetObject      = $refUserObj.Id
-                TargetType        = 'User'
+                TargetType        = 'UserId'
                 RecommendedAction = 'Manual deletion of this cloud object is required to resolve this conflict.'
                 CategoryActivity  = 'Cloud Administrator Creation'
                 CategoryReason    = "Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises."
@@ -838,7 +847,7 @@ Process {
                 Category          = 'LimitsExceeded'
                 TargetName        = $refUserObj.UserPrincipalName
                 TargetObject      = $refUserObj.Id
-                TargetType        = 'User'
+                TargetType        = 'UserId'
                 RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
                 CategoryActivity  = 'License Availability Validation'
                 CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
@@ -883,7 +892,7 @@ Process {
                     Category          = 'OperationTimeout'
                     TargetName        = $refUserObj.UserPrincipalName
                     TargetObject      = $refUserObj.Id
-                    TargetType        = 'User'
+                    TargetType        = 'UserId'
                     RecommendedAction = 'Try again later.'
                     CategoryActivity  = 'Account Provisioning'
                     CategoryReason    = "A timeout occured during provisioning wait after account creation."
@@ -907,7 +916,7 @@ Process {
             Category         = 'NotSpecified'
             TargetName       = "$($refUserObj.UserPrincipalName): $($Error[0].CategoryInfo.TargetName)"
             TargetObject     = $refUserObj.Id
-            TargetType       = 'User'
+            TargetType       = 'UserId'
             CategoryActivity = $Error[0].CategoryInfo.Activity
             CategoryReason   = $Error[0].CategoryInfo.Reason
         }
@@ -940,7 +949,7 @@ Process {
                 Category          = 'LimitsExceeded'
                 TargetName        = $refUserObj.UserPrincipalName
                 TargetObject      = $refUserObj.Id
-                TargetType        = 'User'
+                TargetType        = 'UserId'
                 RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
                 CategoryActivity  = 'License Availability Validation'
                 CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
@@ -1019,7 +1028,7 @@ Process {
                     Category          = 'OperationTimeout'
                     TargetName        = $refUserObj.UserPrincipalName
                     TargetObject      = $refUserObj.Id
-                    TargetType        = 'User'
+                    TargetType        = 'UserId'
                     RecommendedAction = 'Try again later.'
                     CategoryActivity  = 'Account Provisioning'
                     CategoryReason    = "A timeout occured during provisioning wait after group assignment."
@@ -1069,7 +1078,7 @@ Process {
                 Category          = 'OperationTimeout'
                 TargetName        = $refUserObj.UserPrincipalName
                 TargetObject      = $refUserObj.Id
-                TargetType        = 'User'
+                TargetType        = 'UserId'
                 RecommendedAction = 'Try again later.'
                 CategoryActivity  = 'Account Provisioning'
                 CategoryReason    = "A timeout occured during Exchange Online license activation."
@@ -1112,7 +1121,7 @@ Process {
                 Category          = 'OperationTimeout'
                 TargetName        = $refUserObj.UserPrincipalName
                 TargetObject      = $refUserObj.Id
-                TargetType        = 'User'
+                TargetType        = 'UserId'
                 RecommendedAction = 'Try again later.'
                 CategoryActivity  = 'Account Provisioning'
                 CategoryReason    = "A timeout occured during mailbox provisioning."
