@@ -357,7 +357,8 @@ Process {
     #endregion ---------------------------------------------------------------------
 
     #region [COMMON] PARAMETER VALIDATION FOR AZURE AUTOMATION ---------------------
-    if ($ReferralUserId -notmatch '^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$') {
+    $regex = '^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$'
+    if ($ReferralUserId -notmatch $regex) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: ReferralUserId is invalid"
             ErrorId           = '400'
@@ -367,11 +368,12 @@ Process {
             TargetType        = 'User'
             RecommendedAction = 'Provide either User Principal Name, or Object ID (UUID).'
             CategoryActivity  = 'ReferralUserId parameter validation'
-            CategoryReason    = 'Parameter ReferralUserId does not match ^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$'
+            CategoryReason    = "Parameter ReferralUserId does not match $regex"
         }
         return
     }
-    if ($Tier -notmatch '^[0-2]$') {
+    $regex = '^[0-2]$'
+    if ($Tier -notmatch $regex) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: Tier $Tier is invalid"
             ErrorId           = '400'
@@ -381,11 +383,12 @@ Process {
             TargetType        = 'User'
             RecommendedAction = 'Provide a Tier level of 0, 1, or 2.'
             CategoryActivity  = 'Tier parameter validation'
-            CategoryReason    = 'Parameter Tier does not match 0, 1, or 2.'
+            CategoryReason    = "Parameter Tier does not match $regex"
         }
         return
     }
-    if ($UserPhotoUrl -notmatch '(?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)') {
+    $regex = '(?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)'
+    if ($UserPhotoUrl -notmatch $regex) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: UserPhotoUrl $UserPhotoUrl is invalid"
             ErrorId           = '400'
@@ -395,7 +398,7 @@ Process {
             TargetType        = 'User'
             RecommendedAction = 'Please correct the URL format for paramter UserPhotoUrl.'
             CategoryActivity  = 'UserPhotoUrl parameter validation'
-            CategoryReason    = 'Parameter UserId does not match (?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)'
+            CategoryReason    = "Parameter UserId does not match $regex"
         }
         return
     }
