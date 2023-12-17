@@ -27,6 +27,9 @@
     Scope ID to limit access for Microsoft Entra roles for app roles, e.g. '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
     IMPORTANT: Not functional from Microsoft Graph API side as of December 2023.
 
+.PARAMETER Runbooks
+    Path to a folder with runbooks to upload.
+
 .NOTES
     Filename: New-AzAutomationAccount-for-Tier0-IAM.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
@@ -62,7 +65,9 @@ Param (
 
     [string]$Location,
     [string]$Plan,
-    [string]$AppScopeID
+    [string]$AppScopeID,
+
+    [Array]$Runbooks = (Join-Path (Get-Item $MyInvocation.MyCommand).Directory 'Runbooks')
 )
 
 if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -275,6 +280,73 @@ elseif ($WhatIfPreference) {
 }
 else {
     Write-Verbose 'Installation of PowerShell modules was denied.'
+}
+
+if ($PSCmdlet.ShouldProcess(
+        "Upload runbooks to in $($automationAccount.AutomationAccountName)",
+        "Do you confirm to upload runbooks to $($automationAccount.AutomationAccountName) ?",
+        'Upload runbooks to Azure Automation Account'
+    )) {
+
+    $ExistingRunbooks = Get-AzAutomationRunbook `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $automationAccount.AutomationAccountName
+
+    $Files = Get-ChildItem $Runbooks -File -Filter *.ps1 -Depth 0 -ErrorAction SilentlyContinue
+
+    Write-Output "   Common runbooks:"
+    foreach ($File in $Files | Where-Object Name -match '^Common__' | Sort-Object -Property Name) {
+        $ExistingRunbook = $ExistingRunbooks | Where-Object Name -eq $File.BaseName
+        $Params = @{
+            ResourceGroupName     = $ResourceGroupName
+            AutomationAccountName = $automationAccount.AutomationAccountName
+            Name                  = $File.BaseName
+            Type                  = 'PowerShell'
+            Path                  = $File
+        }
+
+        if ($ExistingRunbook) {
+            Write-Output "      (Update) $($File.Name)"
+            $Params.Force = $true
+            $Params.Publish = $true
+        }
+        else {
+            Write-Output "      (New) $($File.Name)"
+            $Params.Publish = $true
+        }
+
+        $null = Import-AzAutomationRunbook @Params
+    }
+
+    Write-Output "   Runbooks:"
+    foreach ($File in $Files | Where-Object Name -notmatch '^Common__' | Sort-Object -Property Name) {
+        $ExistingRunbook = $ExistingRunbooks | Where-Object Name -eq $File.BaseName
+        $Params = @{
+            ResourceGroupName     = $ResourceGroupName
+            AutomationAccountName = $automationAccount.AutomationAccountName
+            Name                  = $File.BaseName
+            Type                  = 'PowerShell'
+            Path                  = $File
+        }
+
+        if ($ExistingRunbook) {
+            Write-Output "      (Update) $($File.Name)"
+            $Params.Force = $true
+            $Params.Publish = $true
+        }
+        else {
+            Write-Output "      (New) $($File.Name)"
+            $Params.Publish = $true
+        }
+
+        $null = Import-AzAutomationRunbook @Params
+    }
+}
+elseif ($WhatIfPreference) {
+    Write-Verbose 'What If: Runbooks would have been uploaded.'
+}
+else {
+    Write-Verbose 'Runbook upload was denied.'
 }
 
 if (-Not $automationAccount.Identity) {
