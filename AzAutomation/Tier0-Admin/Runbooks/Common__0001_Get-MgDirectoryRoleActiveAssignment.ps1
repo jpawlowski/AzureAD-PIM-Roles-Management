@@ -12,7 +12,7 @@ if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other run
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region CONNECTIONS ------------------------------------------------------------
-./Common__0000_Connect-MgGraph.ps1 1> $null
+.\Common__0000_Connect-MgGraph.ps1 1> $null
 #endregion ---------------------------------------------------------------------
 
 $return = $null

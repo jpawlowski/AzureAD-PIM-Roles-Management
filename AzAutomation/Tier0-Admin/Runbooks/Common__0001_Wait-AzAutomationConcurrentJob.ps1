@@ -21,7 +21,7 @@ $return = $null
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    ./Common__0000_Connect-AzAccount.ps1 1> $null
+    .\Common__0000_Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $DoLoop = $true

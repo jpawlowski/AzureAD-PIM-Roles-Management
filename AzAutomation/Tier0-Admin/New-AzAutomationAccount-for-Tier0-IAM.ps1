@@ -130,11 +130,11 @@ if ($PSCmdlet.ShouldProcess(
     $Variables = @(
         @{
             Name  = 'AV_Tier0Admin_LicenseSkuPartNumber'
-            Value = [array]'EXCHANGEDESKLESS'
+            Value = [string]'EXCHANGEDESKLESS'
         }
         @{
             Name  = 'AV_Tier1Admin_LicenseSkuPartNumber'
-            Value = [array]'EXCHANGEDESKLESS'
+            Value = [string]'EXCHANGEDESKLESS'
         }
         @{
             Name  = 'AV_Tier0Admin_UserPhotoUrl'
@@ -316,6 +316,7 @@ if ($PSCmdlet.ShouldProcess(
         }
 
         $null = Import-AzAutomationRunbook @Params
+        Start-Sleep -Seconds 5
     }
 
     Write-Output "   Runbooks:"
@@ -340,6 +341,7 @@ if ($PSCmdlet.ShouldProcess(
         }
 
         $null = Import-AzAutomationRunbook @Params
+        Start-Sleep -Seconds 5
     }
 }
 elseif ($WhatIfPreference) {
