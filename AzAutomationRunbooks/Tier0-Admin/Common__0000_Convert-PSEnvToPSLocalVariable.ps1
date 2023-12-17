@@ -36,7 +36,7 @@ foreach ($Item in $Variable) {
         }
         Write-Verbose "Using $($params.Name) from script parameter $($Item.respectScriptParameter)"
     }
-    elseif (Get-ChildItem -Path "env:$($Item.sourceName)" -ErrorAction SilentlyContinue) {
+    elseif ([Environment]::GetEnvironmentVariable($Item.sourceName)) {
         $params.Value = (Get-ChildItem -Path "env:$($Item.sourceName)").Value
         Write-Verbose "Using $($params.Name) from `$env:$($Item.sourceName)"
     }

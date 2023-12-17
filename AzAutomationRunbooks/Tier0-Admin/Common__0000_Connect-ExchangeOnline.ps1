@@ -25,8 +25,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 $params = @{
     Organization = $Organization
     ShowBanner   = $false
-    Verbose      = $true
-    Debug        = $true
+    ShowProgress = $false
 }
 
 $Connection = Get-ConnectionInformation

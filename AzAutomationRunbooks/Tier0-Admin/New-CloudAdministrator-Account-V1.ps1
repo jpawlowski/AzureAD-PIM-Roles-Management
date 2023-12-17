@@ -74,9 +74,6 @@
 .PARAMETER OutputText
     Output the generated User Principal Name only.
 
-.OUTPUTS
-    System.String
-
 .NOTES
     Original name: New-CloudAdministrator-Account-V1.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
@@ -113,20 +110,33 @@
 
 [CmdletBinding(
     SupportsShouldProcess,
-    ConfirmImpact = 'Medium'
+    ConfirmImpact = 'Medium',
+    DefaultParameterSetName = 'HashtableOutput'
 )]
+[OutputType([Hashtable], ParameterSetName = 'HashtableOutput')]
+[OutputType([String], ParameterSetName = 'JsonOutput')]
+[OutputType([String], ParameterSetName = 'TextOutput')]
 Param (
-    [Parameter(mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'HashtableOutput', Position = 0, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'StringOutput', Position = 0, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'TextOutput', Position = 0, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
     [String]$ReferralUserId,
 
-    [Parameter(mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'HashtableOutput', Position = 1, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'StringOutput', Position = 1, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'TextOutput', Position = 1, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
     [String]$Tier,
 
-    [Parameter(ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'HashtableOutput', Position = 2, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'StringOutput', Position = 2, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(ParameterSetName = 'TextOutput', Position = 2, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
     [AllowEmptyString()]
     [String]$UserPhotoUrl,
 
-    [Boolean]$OutJson = $false,
+    [parameter(ParameterSetName = 'StringOutput')]
+    [Boolean]$OutJson,
+
+    [parameter(ParameterSetName = 'TextOutput')]
     [Boolean]$OutText
 )
 
@@ -225,14 +235,8 @@ Begin {
     #endregion ---------------------------------------------------------------------
 
     #region [COMMON] ENVIRONMENT ---------------------------------------------------
-    $Error.Clear()
     ./Common__0001_Add-AzAutomationVariableToPSEnv.ps1
     ./Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $ConfigurationVariables
-
-    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        # Send JSON to output stream unless webhook is used
-        if (-Not $Webhook) { $OutJson = $true }
-    }
     #endregion ---------------------------------------------------------------------
 
     #region [COMMON] OPEN PERSISTENT CONNECTIONS -----------------------------------
@@ -253,7 +257,13 @@ Begin {
     #endregion ---------------------------------------------------------------------
 
     #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
-    $return = @{}
+    $return = @{
+        Information = @()
+        Warning     = @()
+        Error       = @()
+    }
+    $persistentError = $false
+    $Iteration = 0
     #endregion ---------------------------------------------------------------------
 
     #region Group Validation -------------------------------------------------------
@@ -339,17 +349,54 @@ Begin {
 }
 
 Process {
+    #region [COMMON] PS PIPELINE LOOP HANDLING -------------------------------------
+    # Only process items if there was no error in Begin{} section
+    if (($Iteration -eq 0) -and ($return.Error.Count -gt 0)) { $persistentError = $true }
+    if ($persistentError) { return }
+    $Iteration++
+    #endregion ---------------------------------------------------------------------
+
     #region [COMMON] PARAMETER VALIDATION FOR AZURE AUTOMATION ---------------------
     if ($ReferralUserId -notmatch '^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$') {
-        Write-Error "${ReferralUserId}: ReferralUserId is invalid"
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: ReferralUserId is invalid"
+            ErrorId           = '400'
+            Category          = 'SyntaxError'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
+            TargetType        = 'User'
+            RecommendedAction = 'Provide either User Principal Name, or Object ID (UUID).'
+            CategoryActivity  = 'ReferralUserId parameter validation'
+            CategoryReason    = 'Parameter ReferralUserId does not match ^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$'
+        }
         return
     }
     if ($Tier -notmatch '^[0-2]$') {
-        Write-Error "${ReferralUserId}: Tier $Tier is invalid"
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Tier $Tier is invalid"
+            ErrorId           = '400'
+            Category          = 'SyntaxError'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
+            TargetType        = 'User'
+            RecommendedAction = 'Provide a Tier level of 0, 1, or 2.'
+            CategoryActivity  = 'Tier parameter validation'
+            CategoryReason    = 'Parameter Tier does not match 0, 1, or 2.'
+        }
         return
     }
     if ($UserPhotoUrl -notmatch '(?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)') {
-        Write-Error "${ReferralUserId}: UserPhotoUrl $UserPhotoUrl is invalid"
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: UserPhotoUrl $UserPhotoUrl is invalid"
+            ErrorId           = '400'
+            Category          = 'SyntaxError'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
+            TargetType        = 'User'
+            RecommendedAction = 'Please correct the URL format for paramter UserPhotoUrl.'
+            CategoryActivity  = 'UserPhotoUrl parameter validation'
+            CategoryReason    = 'Parameter UserId does not match (?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)'
+        }
         return
     }
     #endregion ---------------------------------------------------------------------
@@ -394,7 +441,17 @@ Process {
         -ErrorAction SilentlyContinue
 
     if ($null -eq $refUserObj) {
-        Write-Error "${ReferralUserId}: Referral User ID does not exist."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Referral User ID does not exist in directory."
+            ErrorId           = '404'
+            Category          = 'ObjectNotFound'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
+            TargetType        = 'User'
+            RecommendedAction = 'Provide an existing User Principal Name, or Object ID (UUID).'
+            CategoryActivity  = 'ReferralUserId user validation'
+            CategoryReason    = 'Referral User ID does not exist in directory.'
+        }
         return
     }
 
@@ -405,22 +462,58 @@ Process {
     ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
     ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
     ) {
-        Write-Error "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
+            ErrorId          = '403'
+            Category         = 'PermissionDenied'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID is listed as not capable of having a Cloud Administrator account.'
+        }
         return
     }
 
     if (($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$') {
-        Write-Error "${ReferralUserId}: Referral User ID must not use a onmicrosoft.com subdomain."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must not use a onmicrosoft.com subdomain."
+            ErrorId          = '403'
+            Category         = 'PermissionDenied'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID must not use a onmicrosoft.com subdomain.'
+        }
         return
     }
 
     if (-Not $refUserObj.AccountEnabled) {
-        Write-Error "${ReferralUserId}: Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts."
+            ErrorId          = '403'
+            Category         = 'NotEnabled'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
+        }
         return
     }
 
     if ($refUserObj.UserType -ne 'Member') {
-        Write-Error "${ReferralUserId}: Referral User ID must be of type Member."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must be of type Member."
+            ErrorId          = '403'
+            Category         = 'InvalidType'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
+        }
         return
     }
 
@@ -428,7 +521,16 @@ Process {
     (-Not $refUserObj.Manager) -or
     (-Not $refUserObj.Manager.Id)
     ) {
-        Write-Error "${ReferralUserId}: Referral User ID must have manager property set."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must have manager property set."
+            ErrorId          = '403'
+            Category         = 'ResourceUnavailable'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID must have manager property set.'
+        }
         return
     }
 
@@ -438,7 +540,16 @@ Process {
     ($null -ne $refUserObj.EmployeeHireDate) -and
     ($timeNow.ToUniversalTime() -lt $refUserObj.EmployeeHireDate)
     ) {
-        Write-Error "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
+            ErrorId          = '403'
+            Category         = 'ResourceUnavailable'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
+        }
         return
     }
 
@@ -446,7 +557,16 @@ Process {
     ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
     ($timeNow.ToUniversalTime() -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
-        Write-Error "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+            ErrorId          = '403'
+            Category         = 'OperationStopped'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+        }
         return
     }
 
@@ -454,7 +574,16 @@ Process {
     $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 
     if ($true -eq $tenant.OnPremisesSyncEnabled -and ($true -ne $refUserObj.OnPremisesSyncEnabled)) {
-        Write-Error "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
+            ErrorId          = '403'
+            Category         = 'InvalidType'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = "Referral User ID must be a hybrid identity synced from on-premises directory."
+        }
         return
     }
 
@@ -463,12 +592,30 @@ Process {
         -ErrorAction SilentlyContinue
 
     if ($null -eq $refUserExObj) {
-        Write-Error "${ReferralUserId}: Referral User ID must have a mailbox."
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
+            ErrorId          = '403'
+            Category         = 'NotEnabled'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = "Referral User ID must have a mailbox."
+        }
         return
     }
 
     if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUserExObj.RecipientTypeDetails) {
-        Write-Error "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox. Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox. Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+            ErrorId          = '403'
+            Category         = 'InvalidType'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = "Referral User ID mailbox must be of type UserMailbox. Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+        }
         return
     }
     #endregion ---------------------------------------------------------------------
@@ -553,7 +700,17 @@ Process {
 
     if ($deletedUserList.'@odata.count' -gt 0) {
         foreach ($deletedUserObj in $deletedUserList.Value) {
-            Write-Warning "Admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was already existing for referral user $($refUserObj.UserPrincipalName), but was deleted on $($deletedUserObj.DeletedDateTime) Universal Time. Account will be permanently deleted for account re-creation."
+            $return.Warning += ./Common__0000_Write-Warning.ps1 @{
+                Message          = "${ReferralUserId}: Soft-deleted admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was permanently deleted before re-creation."
+                ErrorId          = '205'
+                Category         = 'ResourceExists'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'User'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = "An existing admin account was deleted before."
+            }
+
             Invoke-MgGraphRequest `
                 -OutputType PSObject `
                 -Method DELETE `
@@ -562,7 +719,7 @@ Process {
     }
     #endregion ---------------------------------------------------------------------
 
-    #region User Account Duplication Check -----------------------------------------
+    #region User Account Compliance Check -----------------------------------------
     $duplicatesObj = Get-MgUser `
         -ConsistencyLevel eventual `
         -Count userCount `
@@ -576,6 +733,18 @@ Process {
     "
     if ($userCount -gt 1) {
         Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
+
+        $return.Warning += ./Common__0000_Write-Warning.ps1 @{
+            Message           = "${ReferralUserId}: Admin account must be mutually exclusive."
+            ErrorId           = '103'
+            Category          = 'ResourceExists'
+            TargetName        = $refUserObj.UserPrincipalName
+            TargetObject      = $refUserObj.Id
+            TargetType        = 'User'
+            RecommendedAction = "Delete conflicting administration account to comply with corporate compliance policy: $($duplicatesObj.UserPrincipalName)"
+            CategoryActivity  = 'Account Compliance'
+            CategoryReason    = "Other accounts were found using the same namespace."
+        }
     }
     #endregion ---------------------------------------------------------------------
 
@@ -587,9 +756,20 @@ Process {
         -ErrorAction SilentlyContinue
 
     $userObj = $null
+    $License = $null
     if ($null -ne $existingUserObj) {
         if ($null -ne $existingUserObj.OnPremisesSyncEnabled) {
-            Write-Error "${ReferralUserId}: Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises. Manual deletion of this cloud object is required to resolve this conflict."
+            $return.Error += ./Common__0000_Write-Error.ps1 @{
+                Message           = "${ReferralUserId}: Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises."
+                ErrorId           = '500'
+                Category          = 'ResourceExists'
+                TargetName        = $refUserObj.UserPrincipalName
+                TargetObject      = $refUserObj.Id
+                TargetType        = 'User'
+                RecommendedAction = 'Manual deletion of this cloud object is required to resolve this conflict.'
+                CategoryActivity  = 'Cloud Administrator Creation'
+                CategoryReason    = "Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises."
+            }
             return
         }
         Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
@@ -618,7 +798,19 @@ Process {
         #region License Availability Validation ----------------------------------------
         $License = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         if ($License.ConsumedUnits -ge $License.Enabled) {
-            Throw "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses. Purchase additional licenses to create new Cloud Administrator accounts."
+            $return.Error += ./Common__0000_Write-Error.ps1 @{
+                Message           = "${ReferralUserId}: License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+                ErrorId           = '503'
+                Category          = 'LimitsExceeded'
+                TargetName        = $refUserObj.UserPrincipalName
+                TargetObject      = $refUserObj.Id
+                TargetType        = 'User'
+                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                CategoryActivity  = 'License Availability Validation'
+                CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+            }
+            $persistentError = $true
+            return
         }
         #endregion ---------------------------------------------------------------------
 
@@ -650,7 +842,19 @@ Process {
                     -Confirm:$false `
                     1> $null
                 $DoLoop = $false
-                Throw "User provisioning consistency timeout: Tier 0 Cloud Administrator account $($newUser.UserPrincipalName) ($($newUser.Id)) was deleted after unfinished provisioning."
+
+                $return.Error += ./Common__0000_Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: Account provisioning consistency timeout for $($newUser.UserPrincipalName)."
+                    ErrorId           = '504'
+                    Category          = 'OperationTimeout'
+                    TargetName        = $refUserObj.UserPrincipalName
+                    TargetObject      = $refUserObj.Id
+                    TargetType        = 'User'
+                    RecommendedAction = 'Try again later.'
+                    CategoryActivity  = 'Account Provisioning'
+                    CategoryReason    = "A timeout occured during provisioning wait after account creation."
+                }
+                return
             }
             else {
                 $RetryCount += 1
@@ -663,7 +867,16 @@ Process {
     }
 
     if ($null -eq $userObj) {
-        Write-Error ("${ReferralUserId}: Could not create or update Tier $Tier Cloud Administrator account $($BodyParams.UserPrincipalName): " + $Error[0].CategoryInfo.TargetName + ': ' + $Error[0].ToString())
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Could not create or update Tier $Tier Cloud Administrator account $($BodyParams.UserPrincipalName): $($Error[0].Message)"
+            ErrorId          = '503'
+            Category         = 'NotSpecified'
+            TargetName       = "$($refUserObj.UserPrincipalName): $($Error[0].CategoryInfo.TargetName)"
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'User'
+            CategoryActivity = $Error[0].CategoryInfo.Activity
+            CategoryReason   = $Error[0].CategoryInfo.Reason
+        }
         return
     }
     #endregion ---------------------------------------------------------------------
@@ -680,6 +893,27 @@ Process {
             '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
         }
         Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager 1> $null
+    }
+    #endregion ---------------------------------------------------------------------
+
+    #region License Availability Validation ----------------------------------------
+    if (-Not $License) {
+        $License = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+        if ($License.ConsumedUnits -ge $License.Enabled) {
+            $return.Error += ./Common__0000_Write-Error.ps1 @{
+                Message           = "${ReferralUserId}: License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+                ErrorId           = '503'
+                Category          = 'LimitsExceeded'
+                TargetName        = $refUserObj.UserPrincipalName
+                TargetObject      = $refUserObj.Id
+                TargetType        = 'User'
+                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                CategoryActivity  = 'License Availability Validation'
+                CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+            }
+            $persistentError = $true
+            return
+        }
     }
     #endregion ---------------------------------------------------------------------
 
@@ -744,11 +978,23 @@ Process {
                     -Confirm:$false `
                     1> $null
                 $DoLoop = $false
-                Throw "Group assignment timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+
+                $return.Error += ./Common__0000_Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: Group assignment timeout for $($newUser.UserPrincipalName)."
+                    ErrorId           = '504'
+                    Category          = 'OperationTimeout'
+                    TargetName        = $refUserObj.UserPrincipalName
+                    TargetObject      = $refUserObj.Id
+                    TargetType        = 'User'
+                    RecommendedAction = 'Try again later.'
+                    CategoryActivity  = 'Account Provisioning'
+                    CategoryReason    = "A timeout occured during provisioning wait after group assignment."
+                }
+                return
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange license assignment ..."
+                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for group assignment ..."
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
@@ -782,7 +1028,19 @@ Process {
                 -Confirm:$false `
                 1> $null
             $DoLoop = $false
-            Throw "License assignment timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+
+            $return.Error += ./Common__0000_Write-Error.ps1 @{
+                Message           = "${ReferralUserId}: Exchange Online license activation timeout for $($newUser.UserPrincipalName)."
+                ErrorId           = '504'
+                Category          = 'OperationTimeout'
+                TargetName        = $refUserObj.UserPrincipalName
+                TargetObject      = $refUserObj.Id
+                TargetType        = 'User'
+                RecommendedAction = 'Try again later.'
+                CategoryActivity  = 'Account Provisioning'
+                CategoryReason    = "A timeout occured during Exchange Online license activation."
+            }
+            return
         }
         else {
             $RetryCount += 1
@@ -813,7 +1071,19 @@ Process {
                 -Confirm:$false `
                 1> $null
             $DoLoop = $false
-            Throw "Mailbox creation timeout: Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) was deleted after unfinished provisioning."
+
+            $return.Error += ./Common__0000_Write-Error.ps1 @{
+                Message           = "${ReferralUserId}: Mailbox provisioning timeout for $($newUser.UserPrincipalName)."
+                ErrorId           = '504'
+                Category          = 'OperationTimeout'
+                TargetName        = $refUserObj.UserPrincipalName
+                TargetObject      = $refUserObj.Id
+                TargetType        = 'User'
+                RecommendedAction = 'Try again later.'
+                CategoryActivity  = 'Account Provisioning'
+                CategoryReason    = "A timeout occured during mailbox provisioning."
+            }
+            return
         }
         else {
             $RetryCount += 1
@@ -887,8 +1157,16 @@ Process {
     }
     #endregion ---------------------------------------------------------------------
 
-    #region Prepare Return Data ----------------------------------------------------
+    #region Add Return Data ----------------------------------------------------
     $data = @{
+        ReferralUserId             = $refUserObj.Id
+        ReferralUser               = @{
+            Id                = $refUserObj.Id
+            UserPrincipalName = $refUserObj.UserPrincipalName
+            Mail              = $refUserObj.Mail
+            DisplayName       = $refUserObj.DisplayName
+        }
+        Tier                       = $Tier
         Manager                    = @{
             Id                = $userObj.Manager.Id
             UserPrincipalName = $userObj.manager.AdditionalProperties.userPrincipalName
@@ -908,16 +1186,20 @@ Process {
 
     if (-Not $return.Data) { $return.Data = @() }
     $return.Data += $data
+
+    if ($OutText) {
+        Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
+    }
     #endregion ---------------------------------------------------------------------
 }
 
 End {
-    #region Send Return Data -------------------------------------------------------
-    if ($Webhook) { Invoke-WebRequest -UseBasicParsing -Uri $Webhook -Method POST -Body $($return | ConvertTo-Json -Compress -Depth 5) }
-    if ($OutText) { return Write-Output $(if ($return.Data.UserPrincipalName) { $return.Data.UserPrincipalName } else { $null }) }
-    if ($OutJson) { return Write-Output $($return | ConvertTo-Json -Compress -Depth 4) }
-
+    #region Send and Output Return Data --------------------------------------------
+    if ($Webhook) { ./Common__0000_Submit-Webhook.ps1 -Uri $Webhook -Body $return }
     $InformationPreference = $origInformationPreference
+    if (($true -eq $OutText) -or ($PSBoundParameters.Keys -contains 'OutJson') -and ($false -eq $OutJson)) { return }
+    if ($OutJson) { ./Common__0000_Write-JsonOutput.ps1 $return; return }
+
     return $return
     #endregion ---------------------------------------------------------------------
 }
