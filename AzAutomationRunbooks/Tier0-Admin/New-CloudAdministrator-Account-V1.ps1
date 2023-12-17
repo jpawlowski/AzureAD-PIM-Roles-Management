@@ -239,6 +239,47 @@ Begin {
     ./Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $ConfigurationVariables
     #endregion ---------------------------------------------------------------------
 
+    #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
+    $return = @{
+        Information = @()
+        Warning     = @()
+        Error       = @()
+        Job         = @{
+            StartTime = Get-Date -AsUTC
+        }
+    }
+    $persistentError = $false
+    $Iteration = 0
+
+    # Add job information from Azure Information
+    if ($PSPrivateMetadata.JobId) {
+        $return.Job.Id = $PSPrivateMetadata.JobId
+        $AA = Get-AzAutomationAccount
+        $return.Job.Runbook = Get-AzAutomationRunbook `
+            -ResourceGroupName $AA.ResourceGroupName `
+            -AutomationAccountName $AA.AutomationAccountName `
+            -RunbookName (Get-Item $MyInvocation.MyCommand).BaseName
+    }
+    else {
+        $return.Job.Runbook = @{}
+        $return.Job.Runbook.RunbookName = (Get-Item $MyInvocation.MyCommand).BaseName
+    }
+    #endregion ---------------------------------------------------------------------
+
+    #region [COMMON] CONCURRENT JOBS -----------------------------------------------
+    if (-Not (./Common__0000_Wait-AzAutomationConcurrentJob.ps1)) {
+        $return.Error += ./Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: ReferralUserId is invalid"
+            ErrorId           = '504'
+            Category          = 'OperationTimeout'
+            RecommendedAction = 'Retry again later.'
+            CategoryActivity  = 'Job Concurrency Check'
+            CategoryReason    = "Maximum job runtime was reached."
+        }
+        $persistentError = $true
+    }
+    #endregion ---------------------------------------------------------------------
+
     #region [COMMON] OPEN PERSISTENT CONNECTIONS -----------------------------------
     # Microsoft Graph connection
     ./Common__0000_Connect-MgGraph.ps1 -Scopes $MGGRAPHSCOPES
@@ -254,16 +295,6 @@ Begin {
 
     # Exchange Online connection
     ./Common__0000_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name
-    #endregion ---------------------------------------------------------------------
-
-    #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
-    $return = @{
-        Information = @()
-        Warning     = @()
-        Error       = @()
-    }
-    $persistentError = $false
-    $Iteration = 0
     #endregion ---------------------------------------------------------------------
 
     #region Group Validation -------------------------------------------------------
@@ -537,38 +568,38 @@ Process {
         return
     }
 
-    $timeNow = Get-Date
+    $timeNow = Get-Date -AsUTC
 
     if (
     ($null -ne $refUserObj.EmployeeHireDate) -and
-    ($timeNow.ToUniversalTime() -lt $refUserObj.EmployeeHireDate)
+    ($timeNow -lt $refUserObj.EmployeeHireDate)
     ) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
+            Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up for active employees."
             ErrorId          = '403'
             Category         = 'ResourceUnavailable'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
             TargetType       = 'User'
             CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
+            CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up for active employees."
         }
         return
     }
 
     if (
     ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
-    ($timeNow.ToUniversalTime() -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
+    ($timeNow -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
         $return.Error += ./Common__0000_Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+            Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
             ErrorId          = '403'
             Category         = 'OperationStopped'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
             TargetType       = 'User'
             CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+            CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
         }
         return
     }
@@ -1198,6 +1229,9 @@ Process {
 
 End {
     #region Send and Output Return Data --------------------------------------------
+    if (-Not $return.Job.EndTime) { $return.Job.EndTime = Get-Date -AsUTC }
+    $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
+
     if ($Webhook) { ./Common__0000_Submit-Webhook.ps1 -Uri $Webhook -Body $return }
     $InformationPreference = $origInformationPreference
     if (($true -eq $OutText) -or ($PSBoundParameters.Keys -contains 'OutJson') -and ($false -eq $OutJson)) { return }
