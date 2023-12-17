@@ -48,13 +48,18 @@
 Param (
     [Parameter(Position = 0, mandatory = $true)]
     [string]$TenantId,
+
     [Parameter(Position = 1, mandatory = $true)]
     [string]$Subscription,
+
     [Parameter(Position = 2, mandatory = $true)]
     [string]$ResourceGroupName,
+
     [Parameter(Position = 3, mandatory = $true)]
     [string]$Name,
+
     [Parameter(Position = 4, mandatory = $true)]
+
     [string]$Location,
     [string]$Plan,
     [string]$AppScopeID
@@ -119,31 +124,31 @@ if ($PSCmdlet.ShouldProcess(
 
     $Variables = @(
         @{
-            Name  = 'avTier0AdminLicenseSkuPartNumber'
-            Value = [string]'EXCHANGEDESKLESS'
+            Name  = 'AV_Tier0Admin_LicenseSkuPartNumber'
+            Value = [array]'EXCHANGEDESKLESS'
         }
         @{
-            Name  = 'avTier1AdminLicenseSkuPartNumber'
-            Value = [string]'EXCHANGEDESKLESS'
+            Name  = 'AV_Tier1Admin_LicenseSkuPartNumber'
+            Value = [array]'EXCHANGEDESKLESS'
         }
         @{
-            Name  = 'avTier0AdminUserPhotoUrl'
-            Value = [string]'https://example.azureedge.net/user-photo/Tier0-Admin.png'
-        }
-        @{
-            Name  = 'avTier1AdminUserPhotoUrl'
-            Value = [string]'https://example.azureedge.net/user-photo/Tier1-Admin.png'
-        }
-        @{
-            Name  = 'avTier0AdminGroupId'
+            Name  = 'AV_Tier0Admin_UserPhotoUrl'
             Value = [string]''
         }
         @{
-            Name  = 'avTier1AdminGroupId'
+            Name  = 'AV_Tier1Admin_UserPhotoUrl'
             Value = [string]''
         }
         @{
-            Name  = 'avTier2AdminGroupId'
+            Name  = 'AV_Tier0Admin_GroupId'
+            Value = [string]''
+        }
+        @{
+            Name  = 'AV_Tier1Admin_GroupId'
+            Value = [string]''
+        }
+        @{
+            Name  = 'AV_Tier2Admin_GroupId'
             Value = [string]''
         }
     )
@@ -156,7 +161,13 @@ if ($PSCmdlet.ShouldProcess(
     foreach ($Variable in ($Variables | Sort-Object Name)) {
         Write-Output "   $($Variable.Name)"
 
-        if ($SetVariables | Where-Object Name -eq $Variable.Name) { continue }
+        $SetVariable = $SetVariables | Where-Object Name -eq $Variable.Name
+        if ($SetVariable) {
+            if ($SetVariable.Value.PSObject.TypeNames[0] -ne $Variable.Value.PSObject.TypeNames[0]) {
+                Write-Error $($Variable.Name + ': Variable type missmatch: Should be ' + $Variable.Value.PSObject.TypeNames[0] + ', not ' + $SetVariable.Value.PSObject.TypeNames[0])
+            }
+            continue
+        }
 
         $Params = @{
             ResourceGroupName     = $automationAccount.ResourceGroupName
@@ -218,6 +229,10 @@ if ($PSCmdlet.ShouldProcess(
         }
         @{
             Name    = 'Microsoft.Graph.Groups'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Applications'
             Version = '2.0'
         }
         @{
@@ -381,18 +396,17 @@ if ($automationAccount.Identity.PrincipalId) {
             # Microsoft Graph
             '00000003-0000-0000-c000-000000000000' = @{
                 AppRoles = @(
-                    'Directory.ReadWrite.All'
+                    'Directory.Read.All'
+                    'Group.ReadWrite.All'
                     'Mail.Send'
                     'OnPremDirectorySynchronization.Read.All'
                     'Organization.Read.All'
                     'Policy.Read.All'
-                    'RoleManagement.ReadWrite.Directory'
                     'User.ReadWrite.All'
                     'UserAuthenticationMethod.ReadWrite.All'
                 )
                 # Oauth2PermissionScopes = @{
                 #     Admin = @(
-                #         'email'
                 #         'offline_access'
                 #         'openid'
                 #         'profile'
@@ -422,7 +436,7 @@ if ($automationAccount.Identity.PrincipalId) {
                 $ServicePrincipal = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and appId eq '$($_.key)'"
             }
             else {
-                $ServicePrincipal = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' DisplayName eq '$($_.key)'"
+                $ServicePrincipal = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($_.key)'"
             }
             Write-Output "   $($ServicePrincipal.DisplayName.ToUpper())"
             $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $ManagedIdentity.Id | Where-Object ResourceId -eq $ServicePrincipal.Id
@@ -524,32 +538,28 @@ if ($automationAccount.Identity.PrincipalId) {
 
         $EntraRoles = @(
             @{
-                DisplayName = 'Exchange Recipient Administrator'
-                TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+                DisplayName    = 'Exchange Recipient Administrator'
+                roleTemplateId = '31392ffb-586c-42d1-9346-e59415a2cc4e'
             }
             @{
-                DisplayName = 'Global Reader'
-                TemplateId  = 'f2ef992c-3afb-46b9-b7cf-a126ee74c451'
+                DisplayName    = 'Group Administrator'
+                roleTemplateId = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
             }
             @{
-                DisplayName = 'Group Administrator'
-                TemplateId  = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
+                DisplayName    = 'License Administrator'
+                roleTemplateId = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
             }
             @{
-                DisplayName = 'License Administrator'
-                TemplateId  = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DisplayName    = 'Privileged Authentication Administrator'
+                roleTemplateId = '7be44c8a-adaf-4e2a-84d6-ab2649e08a13'
             }
+            # @{
+            #     DisplayName = 'Privileged Role Administrator'
+            #     TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+            # }
             @{
-                DisplayName = 'Privileged Authentication Administrator'
-                TemplateId  = '7be44c8a-adaf-4e2a-84d6-ab2649e08a13'
-            }
-            @{
-                DisplayName = 'Privileged Role Administrator'
-                TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
-            }
-            @{
-                DisplayName = 'User Administrator'
-                TemplateId  = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+                DisplayName    = 'User Administrator'
+                roleTemplateId = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
             }
         )
 
@@ -562,8 +572,8 @@ if ($automationAccount.Identity.PrincipalId) {
             if ($Role.RoleDefinitionId) {
                 $RoleDefinition = $RoleDefinitions | Where-Object { $_.RoleDefinitionId -eq $Role.RoleDefinitionId }
             }
-            elseif ($Role.TemplateId) {
-                $RoleDefinition = $RoleDefinitions | Where-Object { $_.TemplateId -eq $Role.TemplateId }
+            elseif ($Role.roleTemplateId) {
+                $RoleDefinition = $RoleDefinitions | Where-Object { $_.TemplateId -eq $Role.roleTemplateId }
             }
             elseif ($Role.DisplayName) {
                 $RoleDefinition = $RoleDefinitions | Where-Object { $_.DisplayName -eq $Role.DisplayName }

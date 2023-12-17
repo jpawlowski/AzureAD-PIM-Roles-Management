@@ -26,9 +26,15 @@
         # Do not flag 'cd' alias.
         PSAvoidUsingCmdletAliases = @{Whitelist = @('cd') }
 
-        # # Check if your script uses cmdlets that are compatible on PowerShell Core,
-        # # version 7.0.0-alpha, on Linux.
-        # PSUseCompatibleCmdlets    = @{Compatibility = @("core-7.0.0-alpha-linux") }
+        # Check if your script uses cmdlets that are compatible with the following platforms
+        PSUseCompatibleCmdlets    = @{
+            Compatibility = @(
+                'desktop-5.1.14393.206-windows'
+                'core-6.1.0-linux'
+                'core-6.1.0-macos'
+                'core-6.1.0-windows'
+            )
+        }
 
         PSUseCompatibleSyntax     = @{
             # This turns the rule on (setting it to false will turn it off)

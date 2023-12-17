@@ -72,7 +72,7 @@ elseif (
     ($Subscription -ne (Get-AzContext).Subscription.Name) -and
     ($Subscription -ne (Get-AzContext).Subscription.Id)
 ) {
-    $null = Set-AzContext -Subscription $Subscription -WarningAction SilentlyContinue
+    Set-AzContext -Subscription $Subscription -WarningAction SilentlyContinue 1> $null
 }
 
 $job = Start-AzAutomationRunbook `

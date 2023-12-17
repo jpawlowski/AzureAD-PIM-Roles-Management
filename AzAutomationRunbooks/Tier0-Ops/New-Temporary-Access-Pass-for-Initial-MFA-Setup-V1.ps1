@@ -99,7 +99,6 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
 
 $MgScopes = @(
     'User.Read.All'                             # To read user information, including EmployeeHireDate
-    'UserAuthenticationMethod.Read.All'         # To read authentication methods of the user
     'UserAuthenticationMethod.ReadWrite.All'    # To update authentication methods (TAP) of the user
     'Policy.Read.All'                           # To read and validate current policy settings
     'Directory.Read.All'                        # To read directory data and settings
@@ -127,7 +126,7 @@ foreach ($MgScope in $MgScopes) {
 }
 if (-Not (Get-MgContext)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        $null = ResilientRemoteCall { Connect-MgGraph -NoWelcome -Identity -ContextScope Process -ErrorAction Stop }
+        Connect-MgGraph -NoWelcome -Identity -ContextScope Process -ErrorAction Stop 1> $null
         Write-Verbose (Get-MgContext | ConvertTo-Json)
     }
     else {

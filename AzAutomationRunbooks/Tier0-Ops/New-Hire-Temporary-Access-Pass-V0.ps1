@@ -411,14 +411,15 @@ if ((-Not $return.Errors) -and ($WhatIfPreference -or (-Not $return.Data.Tempora
             'Update Employee Hire Date'
         )) {
 
-        $null = Update-MgUser `
+        Update-MgUser `
             -UserId $userObj.Id `
             -EmployeeHireDate $EmployeeHireDate `
             -Confirm:$false `
             -ErrorAction SilentlyContinue `
             -Debug:$DebugPreference `
             -Verbose:$VerbosePreference `
-            -WhatIf:$WhatIfPreference
+            -WhatIf:$WhatIfPreference `
+            1> $null
 
         $userObj.EmployeeHireDate = $EmployeeHireDate
         $return.Data.EmployeeHireDate = $EmployeeHireDate

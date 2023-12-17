@@ -153,14 +153,15 @@ if (-Not $return.Errors) {
                         "Do you confirm to delete TAP with ID $($authMethod.Id) for $($userObj.UserPrincipalName) ?",
                         'DeleteTemporary Access Pass'
                     )) {
-                    $null = Remove-MgUserAuthenticationTemporaryAccessPassMethod `
+                    Remove-MgUserAuthenticationTemporaryAccessPassMethod `
                         -TemporaryAccessPassAuthenticationMethodId $authMethod.Id `
                         -UserId $userObj.Id `
                         -Confirm:$false `
                         -ErrorAction SilentlyContinue `
                         -Debug:$DebugPreference `
                         -Verbose:$VerbosePreference `
-                        -WhatIf:$WhatIfPreference
+                        -WhatIf:$WhatIfPreference `
+                        1> $null
 
                     $return.Informations += @{ message = "Temporary Access Pass with ID $($authMethod.Id) was deleted." }
                 }
