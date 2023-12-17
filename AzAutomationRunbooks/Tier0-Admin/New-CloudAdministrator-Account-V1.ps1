@@ -252,12 +252,12 @@ Begin {
     $Iteration = 0
 
     # Add job information from Azure Information
-    if ($PSPrivateMetadata.JobId) {
-        $return.Job.Id = $PSPrivateMetadata.JobId
-        $AA = Get-AzAutomationAccount
+    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+        if ($PSPrivateMetadata.JobId) { $return.Job.Id = $PSPrivateMetadata.JobId }
+        $return.AutomationAccount = Get-AzAutomationAccount
         $return.Job.Runbook = Get-AzAutomationRunbook `
-            -ResourceGroupName $AA.ResourceGroupName `
-            -AutomationAccountName $AA.AutomationAccountName `
+            -ResourceGroupName $return.AutomationAccount.ResourceGroupName `
+            -AutomationAccountName $return.AutomationAccount.AutomationAccountName `
             -RunbookName (Get-Item $MyInvocation.MyCommand).BaseName
     }
     else {
@@ -387,6 +387,8 @@ Process {
             Message           = "${ReferralUserId}: Skipped processing."
             ErrorId           = '500'
             Category          = 'OperationStopped'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
             RecommendedAction = 'Try again later.'
             CategoryActivity  = 'Persisent Error'
             CategoryReason    = "No other items are processed due to persisent error before."
@@ -1238,7 +1240,7 @@ Process {
 
 End {
     #region Send and Output Return Data --------------------------------------------
-    if (-Not $return.Job.EndTime) { $return.Job.EndTime = Get-Date -AsUTC }
+    $return.Job.EndTime = Get-Date -AsUTC
     $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
 
     if ($Webhook) { ./Common__0000_Submit-Webhook.ps1 -Uri $Webhook -Body $return }
