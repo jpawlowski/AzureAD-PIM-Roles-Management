@@ -26,7 +26,7 @@ else {
     @{}
 }
 
-Write-Warning @params
+Write-Warning -Message ($params | Select-Object -Property Message).Message
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 
