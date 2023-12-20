@@ -10,6 +10,33 @@
     Also, extensionAttribute15 will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'AxC__' is added where 'x' represents the respective Tier level.
     Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
 
+.PARAMETER ReferralUserId
+    User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
+
+.PARAMETER Tier
+    The Tier level where the Cloud Administrator account shall be created.
+
+.PARAMETER UserPhotoUrl
+    URL of an image that shall be set as default photo for the user. Must use HTTPS protocol, end with .jpg/.jpeg/.png, and use image/* as Content-Type in HTTP return header.
+    If environment variable $env:AV_Tier<Tier>Admin_UserPhotoUrl is set, it will be used as a fallback option.
+    In case no photo URL was provided at all, Entra square logo from organizational tenant branding will be used.
+
+.PARAMETER OutputJson
+    Output the result in JSON format.
+    This is automatically implied when running in Azure Automation and no Webhook parameter was set.
+
+.PARAMETER OutputText
+    Output the generated User Principal Name only.
+
+.NOTES
+    Original name: New-CloudAdministrator-Account-V1.ps1
+    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
+    Version: 0.9.0
+
+
+    CONDITIONS TO CREATE A CLOUD ADMINISTRATOR ACCOUNT
+    ==================================================
+
     Following conditions must be met to create a Cloud Administrator account:
 
          1. A free license with Exchange Online plan must be available.
@@ -35,49 +62,54 @@
     Variables for custom configuration settings, either from $env:<VariableName>,
     or Azure Automation Account Variables, whose will automatically be published in $env.
 
-    .Variable AV_Tier<Tier>Admin_UserPhotoUrl - [String]
+    .VARIABLE AV_CloudAdmin_Webhook - [String]
+        Send return data in JSON format as POST to this webhook URL.
+
+    .VARIABLE AV_CloudAdminTier<Tier>_UserPhotoUrl - [String]
         Default value for script parameter UserPhotoUrl. If no parameter was provided, this value will be used instead.
 
-    .VARIABLE AV_Tier<Tier>Admin_LicenseSkuPartNumber - [String]
-        License assigned to the user. The license SkuPartNumber must contain an Exchange Online service plan to generate a mailbox for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
-        If avTier<Tier>AdminGroupId is also provided, group-based licensing is implied and license assignment will only be monitored before continuing.
+    .VARIABLE AV_CloudAdminTier<Tier>_LicenseSkuPartNumber - [String]
+        License assigned to the user. The license SKU part number must contain an Exchange Online service plan to generate a mailbox for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
+        If GroupId is also provided, group-based licensing is implied and license assignment will only be monitored before continuing.
         This parameter has a default value for Exchange Online Kiosk license (SkuPartNumber EXCHANGEDESKLESS) and only Exchange license plan will be enabled in it.
 
-    .VARIABLE AV_Tier<Tier>Admin_GroupId - [String]
+    .VARIABLE AV_CloudAdminTier<Tier>_GroupId - [String]
         Entra Group Object ID where the user shall be added. If the group is dynamic, group membership update will only be monitored before continuing.
 
-    .VARIABLE AV_Tier<Tier>Admin_Webhook - [String]
-        Send return data in JSON format as POST to this webhook URL.
+    .VARIABLE AV_CloudAdminTier<Tier>_GroupDescription - [String]
+        ...
+
+    .VARIABLE AV_CloudAdminTier<Tier>_DedicatedAccount - [Boolean]
+        ...
 
     Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2.
     For example:
 
-        AV_Tier0Admin_GroupId
-        AV_Tier1Admin_GroupId
-        AV_Tier2Admin_GroupId
+        AV_CloudAdminTier0_GroupId
+        AV_CloudAdminTier2_GroupId
+        AV_CloudAdminTier2_GroupId
 
-.PARAMETER ReferralUserId
-    User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
+.EXAMPLE
+    PS> .\New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0
 
-.PARAMETER Tier
-    The Tier level where the Cloud Administrator account shall be created.
+.EXAMPLE
+    PS> .\New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0 -UserPhotoUrl https://example.com/assets/Tier0-Admins.png
 
-.PARAMETER UserPhotoUrl
-    URL of an image that shall be set as default photo for the user. Must use HTTPS protocol, end with .jpg/.jpeg/.png, and use image/* as Content-Type in HTTP return header.
-    If environment variable $env:AV_Tier<Tier>Admin_UserPhotoUrl is set, it will be used as a fallback option.
-    In case no photo URL was provided at all, Entra square logo from organizational tenant branding will be used.
+.EXAMPLE
+    BATCH PROCESSING
+    ================
 
-.PARAMETER OutputJson
-    Output the result in JSON format.
-    This is automatically implied when running in Azure Automation and no Webhook parameter was set.
+    Azure Automation has limited support for regular PowerShell pipelining as it does not process inline execution of child runbooks within Begin/End blocks.
+    Therefore, classic PowerShell pipelining like this does NOT work:
 
-.PARAMETER OutputText
-    Output the generated User Principal Name only.
+        PS> Get-Content list.csv | ConvertFrom-Csv | .\New-CloudAdministrator-Account-V1.ps1
 
-.NOTES
-    Original name: New-CloudAdministrator-Account-V1.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 0.0.1
+    Instead, a collection can be used to provide the required input data:
+
+        PS> $csv = Get-Content list.csv | ConvertFrom-Csv
+        PS> .\New-CloudAdministrator-Account-V1.ps1 -ReferralUserId $csv.ReferralUserId -Tier $csv.Tier -UserPhotoUrl $csv.UserPhotoUrl
+
+    The advantage is that the script will run more efficient as some tasks only need to be performed once per batch instead of each individual account.
 #>
 
 #Requires -Version 5.1
@@ -92,281 +124,630 @@
 #Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0' }
 
 #region TODO:
-#- add Git revision to .NOTES section during git commit
-#-admin prefix separator as variable
-#- research if Desired State Provisioning could be used?
+#- only create user based on dedicated parmeter, also dont update photo
+#- admin prefix separator as variable
 #- Multiple licenses support
 #- variable for dedicated account yes/no per tier
 #- Variable for extension attribute
 #- Check refUser for extensionAttribute and EmployeeType
 #- Send emails were applicable
 #- find existing account not only by UPN but also extensionAttribute and EmployeeType
-#- WhatIf support
-#- Progress support
-#- Only update account if there is actual changes to it and report that changes had to be made --> a continuous monitoring and enforcement of the account state shall be possible via scheduled task
-#- Install PowerShell modules what are mentioned as "requires" but do not update existing ones, just to support the initial run of the script
+#- Install PowerShell modules that are mentioned as "requires" but do not update existing ones, just to support the initial run of the script
 #endregion
 
-[CmdletBinding(
-    SupportsShouldProcess,
-    ConfirmImpact = 'Medium'
-)]
+[CmdletBinding()]
 Param (
-    [Parameter(Position = 0, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
-    [String]$ReferralUserId,
+    [Parameter(Position = 0, mandatory = $true)]
+    [String[]]$ReferralUserId,
 
-    [Parameter(Position = 1, mandatory = $true, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
-    [Int32]$Tier,
+    [Parameter(Position = 1, mandatory = $true)]
+    [Int32[]]$Tier,
 
-    [Parameter(Position = 2, ValueFromPipeline = $true, ValueFromPipelinebyPropertyName = $true)]
+    [Parameter(Position = 2)]
     [AllowEmptyString()]
-    [String]$UserPhotoUrl,
+    [String[]]$UserPhotoUrl,
 
     [Boolean]$OutJson,
     [Boolean]$OutText
 )
 
-Begin {
-    #region [COMMON] SCRIPT CONFIGURATION PARAMETERS -------------------------------
-    $ConfigurationVariables = @(
-        @{
-            sourceName             = "AV_Tier${Tier}Admin_LicenseSkuPartNumber"
-            respectScriptParameter = $null
-            mapToVariable          = 'LicenseSkuPartNumber'
-            defaultValue           = 'EXCHANGEDESKLESS'
-            Regex                  = '^[A-Z][A-Z_]+[A-Z]$'
-        }
-        @{
-            sourceName             = "AV_Tier${Tier}Admin_GroupId"
-            respectScriptParameter = $null
-            mapToVariable          = 'GroupId'
-            defaultValue           = $null
-            Regex                  = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
-        }
-        @{
-            sourceName             = "AV_Tier${Tier}Admin_UserPhotoUrl"
-            respectScriptParameter = 'UserPhotoUrl'
-            mapToVariable          = 'PhotoUrl'
-            defaultValue           = $null
-            Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
-        }
-        @{
-            sourceName             = "AV_Tier${Tier}Admin_Webhook"
-            respectScriptParameter = $null
-            mapToVariable          = 'Webhook'
-            defaultValue           = $null
-            Regex                  = '^https:\/\/.+$'
-        }
-    )
+#region [COMMON] SCRIPT CONFIGURATION PARAMETERS -------------------------------
+$ConfigurationVariables = @(
+    #region General
+    @{
+        sourceName             = "AV_CloudAdmin_Webhook"
+        respectScriptParameter = $null
+        mapToVariable          = 'Webhook'
+        defaultValue           = $null
+        Regex                  = '^https:\/\/.+$'
+    }
+    #endregion
 
-    $MgGraphScopes = @(
-        'User.ReadWrite.All'
-        'Directory.Read.All'
-        'Group.ReadWrite.All'
-        'Organization.Read.All'
-        'OnPremDirectorySynchronization.Read.All'
-        'Mail.Send'
-    )
+    #region Tier 0
+    @{
+        sourceName             = "AV_CloudAdminTier0_LicenseSkuPartNumber"
+        respectScriptParameter = $null
+        mapToVariable          = 'LicenseSkuPartNumber_Tier0'
+        defaultValue           = 'EXCHANGEDESKLESS'
+        Regex                  = '^[A-Z][A-Z_ ]+[A-Z]$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GroupId"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupId_Tier0'
+        defaultValue           = $null
+        Regex                  = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GroupDescription"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupDescription_Tier0'
+        defaultValue           = 'Tier 0 Cloud Administrators'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserPhotoUrl"
+        respectScriptParameter = 'UserPhotoUrl'
+        mapToVariable          = 'PhotoUrl_Tier0'
+        defaultValue           = $null
+        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_DedicatedAccount"
+        respectScriptParameter = $null
+        mapToVariable          = 'DedicatedAccount_Tier0'
+        defaultValue           = $null
+        Type                   = [boolean]
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserDisplayNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefix_Tier0'
+        defaultValue           = 'A0C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserDisplayNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefixSeparator_Tier0'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserDisplayNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffix_Tier0'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserDisplayNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffixSeparator_Tier0'
+        defaultValue           = ' '
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GivenNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefix_Tier0'
+        defaultValue           = 'A0C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GivenNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefixSeparator_Tier0'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GivenNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffix_Tier0'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_GivenNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffixSeparator_Tier0'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserPrincipalNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefix_Tier0'
+        defaultValue           = 'A0C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserPrincipalNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefixSeparator_Tier0'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserPrincipalNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffix_Tier0'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier0_UserPrincipalNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffixSeparator_Tier0'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    #endregion
 
-    $MgGraphDirectoryRoles = @(
-        @{
-            DisplayName = 'Exchange Recipient Administrator'
-            TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
-        }
-        @{
-            DisplayName = 'Group Administrator'
-            TemplateId  = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
-        }
-        @{
-            DisplayName = 'License Administrator'
-            TemplateId  = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
-        }
-        @{
-            DisplayName = 'User Administrator'
-            TemplateId  = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-        }
+    #region Tier 1
+    @{
+        sourceName             = "AV_CloudAdminTier1_LicenseSkuPartNumber"
+        respectScriptParameter = $null
+        mapToVariable          = 'LicenseSkuPartNumber_Tier1'
+        defaultValue           = 'EXCHANGEDESKLESS'
+        Regex                  = '^[A-Z][A-Z_ ]+[A-Z]$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GroupId"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupId_Tier1'
+        defaultValue           = $null
+        Regex                  = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_GroupDescription"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupDescription_Tier1'
+        defaultValue           = 'Tier 1 Cloud Administrators'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserPhotoUrl"
+        respectScriptParameter = 'UserPhotoUrl'
+        mapToVariable          = 'PhotoUrl_Tier1'
+        defaultValue           = $null
+        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_DedicatedAccount"
+        respectScriptParameter = $null
+        mapToVariable          = 'DedicatedAccount_Tier1'
+        defaultValue           = $false
+        Type                   = [boolean]
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserDisplayNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefix_Tier1'
+        defaultValue           = 'A1C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserDisplayNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefixSeparator_Tier1'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserDisplayNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffix_Tier1'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserDisplayNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffixSeparator_Tier1'
+        defaultValue           = ' '
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_GivenNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefix_Tier1'
+        defaultValue           = 'A1C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_GivenNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefixSeparator_Tier1'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_GivenNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffix_Tier1'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_GivenNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffixSeparator_Tier1'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserPrincipalNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefix_Tier1'
+        defaultValue           = 'A1C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserPrincipalNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefixSeparator_Tier1'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserPrincipalNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffix_Tier1'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier1_UserPrincipalNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffixSeparator_Tier1'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    #endregion
 
-        # # Only required if group is role-enabled
-        # @{
-        #     DisplayName = 'Privileged Role Administrator'
-        #     TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+    #region Tier 2
+    @{
+        sourceName             = "AV_CloudAdminTier2_LicenseSkuPartNumber"
+        respectScriptParameter = $null
+        mapToVariable          = 'LicenseSkuPartNumber_Tier2'
+        defaultValue           = ''
+        Regex                  = '^[A-Z][A-Z_ ]+[A-Z]$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GroupId"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupId_Tier2'
+        defaultValue           = $null
+        Regex                  = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GroupDescription"
+        respectScriptParameter = $null
+        mapToVariable          = 'GroupDescription_Tier2'
+        defaultValue           = 'Tier 2 Cloud Administrators'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserPhotoUrl"
+        respectScriptParameter = 'UserPhotoUrl'
+        mapToVariable          = 'PhotoUrl_Tier2'
+        defaultValue           = $null
+        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_DedicatedAccount"
+        respectScriptParameter = $null
+        mapToVariable          = 'DedicatedAccount_Tier2'
+        defaultValue           = $false
+        Type                   = [boolean]
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserDisplayNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefix_Tier2'
+        defaultValue           = 'A2C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserDisplayNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNamePrefixSeparator_Tier2'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserDisplayNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffix_Tier2'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserDisplayNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserDisplayNameSuffixSeparator_Tier2'
+        defaultValue           = ' '
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GivenNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefix_Tier2'
+        defaultValue           = 'A2C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GivenNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNamePrefixSeparator_Tier2'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GivenNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffix_Tier2'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_GivenNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'GivenNameSuffixSeparator_Tier2'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserPrincipalNamePrefix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefix_Tier2'
+        defaultValue           = 'A2C'
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserPrincipalNamePrefixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNamePrefixSeparator_Tier2'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserPrincipalNameSuffix"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffix_Tier2'
+        defaultValue           = $null
+        Regex                  = '^[^\s]+.*[^\s]+$'
+    }
+    @{
+        sourceName             = "AV_CloudAdminTier2_UserPrincipalNameSuffixSeparator"
+        respectScriptParameter = $null
+        mapToVariable          = 'UserPrincipalNameSuffixSeparator_Tier2'
+        defaultValue           = '-'
+        Regex                  = '^.$'
+    }
+    #endregion
+)
+
+$MgGraphScopes = @(
+    'User.ReadWrite.All'
+    'Directory.Read.All'
+    'Group.ReadWrite.All'
+    'Organization.Read.All'
+    'OnPremDirectorySynchronization.Read.All'
+    'Mail.Send'
+)
+
+$MgGraphDirectoryRoles = @(
+    @{
+        DisplayName = 'Exchange Recipient Administrator'
+        TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+    }
+    @{
+        DisplayName = 'Group Administrator'
+        TemplateId  = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
+    }
+    @{
+        DisplayName = 'License Administrator'
+        TemplateId  = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+    }
+    @{
+        DisplayName = 'User Administrator'
+        TemplateId  = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+    }
+)
+
+$MgAppPermissions = @(
+    @{
+        DisplayName = 'Office 365 Exchange Online'
+        AppId       = '00000002-0000-0ff1-ce00-000000000000'
+        AppRoles    = @(
+            'Exchange.ManageAsApp'
+        )
+        # Oauth2PermissionScopes = @{
+        #     Admin = @(
+        #     )
+        #     '<User-ObjectId>' = @(
+        #     )
         # }
-    )
+    }
+)
+#endregion ---------------------------------------------------------------------
 
-    $MgAppPermissions = @(
-        @{
-            DisplayName = 'Office 365 Exchange Online'
-            AppId       = '00000002-0000-0ff1-ce00-000000000000'
-            AppRoles    = @(
-                'Exchange.ManageAsApp'
-            )
-            # Oauth2PermissionScopes = @{
-            #     Admin = @(
-            #     )
-            #     '<User-ObjectId>' = @(
-            #     )
-            # }
-        }
+#region [COMMON] PARAMETER COUNT VALIDATION ------------------------------------
+if (
+    ($ReferralUserId.Count -gt 1) -and
+    (
+        ($ReferralUserId.Count -ne $Tier.Count) -or
+        ($ReferralUserId.Count -ne $UserPhotoUrl.Count)
     )
-    #endregion ---------------------------------------------------------------------
+) {
+    Throw 'ReferralUserId, Tier, and UserPhotoUrl must contain the same number of items for batch processing.'
+}
+#endregion ---------------------------------------------------------------------
 
-    #region [COMMON] INFORMATION OUTPUT FOR INTERACTIVE SESSIONS -------------------
-    $origInformationPreference = $InformationPreference
-    if (
+#region [COMMON] INFORMATION OUTPUT FOR INTERACTIVE SESSIONS -------------------
+$origInformationPreference = $InformationPreference
+if (
         (-not $env:AZUREPS_HOST_ENVIRONMENT) -and
         (-not $PSPrivateMetadata.JobId)
+) {
+    $InformationPreference = 'Continue'
+}
+#endregion ---------------------------------------------------------------------
+
+#region [COMMON] ENVIRONMENT ---------------------------------------------------
+.\Common__0001_Add-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $ConfigurationVariables 1> $null
+#endregion ---------------------------------------------------------------------
+
+#region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
+$persistentError = $false
+$Iteration = 0
+$return = @{
+    Information = @()
+    Warning     = @()
+    Error       = @()
+    Job         = @{
+        AutomationAccount = @{}
+        Runbook           = @{}
+        StartTime         = (Get-Date).ToUniversalTime()
+        EndTime           = @{}
+        RunTime           = @{}
+    }
+}
+if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+    if ($PSPrivateMetadata.JobId) { $return.Job.Id = $PSPrivateMetadata.JobId }
+    $return.Job.AutomationAccount = Get-AzAutomationAccount
+    $params = @{
+        ResourceGroupName     = $return.Job.AutomationAccount.ResourceGroupName
+        AutomationAccountName = $return.Job.AutomationAccount.AutomationAccountName
+        RunbookName           = (Get-Item $MyInvocation.MyCommand).BaseName
+    }
+    $return.Job.Runbook = Get-AzAutomationRunbook @params
+}
+else {
+    $return.Job.Runbook.RunbookName = (Get-Item $MyInvocation.MyCommand).BaseName
+}
+#endregion ---------------------------------------------------------------------
+
+#region [COMMON] CONCURRENT JOBS -----------------------------------------------
+if (-Not (.\Common__0001_Wait-AzAutomationConcurrentJob.ps1)) {
+    $return.Error += .\Common__0000_Write-Error.ps1 @{
+        Message           = "Maximum job runtime was reached."
+        ErrorId           = '504'
+        Category          = 'OperationTimeout'
+        RecommendedAction = 'Try again later.'
+        CategoryActivity  = 'Job Concurrency Check'
+        CategoryReason    = "Maximum job runtime was reached."
+    }
+}
+#endregion ---------------------------------------------------------------------
+
+#region [COMMON] OPEN CONNECTIONS ----------------------------------------------
+.\Common__0000_Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
+$tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
+$tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
+$tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
+.\Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
+.\Common__0002_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
+.\Common__0000_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
+#endregion ---------------------------------------------------------------------
+
+#region Group Validation -------------------------------------------------------
+ForEach (
+    $GroupId in @(
+        ($GroupId_Tier0, $GroupId_Tier2, $GroupId_Tier2) | Select-Object -Unique
+    )
+) {
+    if ([string]::IsNullOrEmpty($GroupId)) { continue }
+    $params = @{
+        GroupId        = $GroupId
+        ExpandProperty = 'Owners'
+        ErrorAction    = 'SilentlyContinue'
+    }
+    $GroupObj = Get-MgBetaGroup @params
+
+    if (-Not $GroupObj) {
+        Throw "GroupId $($GroupId) does not exist."
+    }
+    if (-Not $GroupObj.SecurityEnabled) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be security-enabled to be used for Cloud Administration."
+    }
+    if ($null -ne $GroupObj.OnPremisesSyncEnabled) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
+    }
+    if (
+        $GroupObj.GroupType -and
+            ($GroupObj.GroupType -contains 'Unified')
     ) {
-        $InformationPreference = 'Continue'
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
     }
-    #endregion ---------------------------------------------------------------------
-
-    #region [COMMON] ENVIRONMENT ---------------------------------------------------
-    .\Common__0001_Add-AzAutomationVariableToPSEnv.ps1
-    .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $ConfigurationVariables
-    #endregion ---------------------------------------------------------------------
-
-    #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
-    $return = @{
-        Information = @()
-        Warning     = @()
-        Error       = @()
-        Job         = @{
-            StartTime = Get-Date -AsUTC
-        }
+    if ($GroupObj.MailEnabled) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
     }
-    $persistentError = $false
-    $Iteration = 0
-
-    # Add job information from Azure Information
-    if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        if ($PSPrivateMetadata.JobId) { $return.Job.Id = $PSPrivateMetadata.JobId }
-        $return.AutomationAccount = Get-AzAutomationAccount
-        $return.Job.Runbook = Get-AzAutomationRunbook `
-            -ResourceGroupName $return.AutomationAccount.ResourceGroupName `
-            -AutomationAccountName $return.AutomationAccount.AutomationAccountName `
-            -RunbookName (Get-Item $MyInvocation.MyCommand).BaseName
+    if (
+                (-Not $GroupObj.IsManagementRestricted) -and
+                (-Not $GroupObj.IsAssignableToRole)
+    ) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
     }
-    else {
-        $return.Job.Runbook = @{}
-        $return.Job.Runbook.RunbookName = (Get-Item $MyInvocation.MyCommand).BaseName
-    }
-    #endregion ---------------------------------------------------------------------
-
-    #region [COMMON] CONCURRENT JOBS -----------------------------------------------
-    if (-Not (.\Common__0001_Wait-AzAutomationConcurrentJob.ps1)) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
-            Message           = "Maximum job runtime was reached."
-            ErrorId           = '504'
-            Category          = 'OperationTimeout'
-            RecommendedAction = 'Try again later.'
-            CategoryActivity  = 'Job Concurrency Check'
-            CategoryReason    = "Maximum job runtime was reached."
-        }
-    }
-    #endregion ---------------------------------------------------------------------
-
-    #region [COMMON] OPEN PERSISTENT CONNECTIONS -----------------------------------
-    # Microsoft Graph connection
-    .\Common__0000_Connect-MgGraph.ps1 -Scopes $MGGRAPHSCOPES
-    $tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
-    $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
-    $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
-
-    # Confirm required Microsoft Graph directory roles
-    .\Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
-
-    # Confirm required permissions for other app besides Microsoft Graph
-    .\Common__0002_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
-
-    # Exchange Online connection
-    .\Common__0000_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name
-    #endregion ---------------------------------------------------------------------
-
-    #region Group Validation -------------------------------------------------------
-    $groupObj = $null
-    if ($GroupId) {
-        $groupObj = Get-MgBetaGroup `
-            -GroupId $GroupId `
-            -ExpandProperty Owners `
-            -ErrorAction SilentlyContinue
-
-        if (-Not $groupObj) {
-            Throw "GroupId $($GroupId) does not exist."
-        }
-        if (-Not $groupObj.SecurityEnabled) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be security-enabled to be used for Cloud Administration."
-        }
-        if ($null -ne $groupObj.OnPremisesSyncEnabled) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
-        }
-        if (
-            $groupObj.GroupType -and
-        ($groupObj.GroupType -contains 'Unified')
-        ) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
-        }
-        if ($groupObj.MailEnabled) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
-        }
-        if (
-            (-Not $groupObj.IsManagementRestricted) -and
-            (-Not $groupObj.IsAssignableToRole)
-        ) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($groupObj.IsManagementRestricted), IsAssignableToRole = $($groupObj.IsAssignableToRole))"
-        }
-        elseif ($groupObj.IsAssignableToRole) {
-            .\Common__0001_Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
-                @{
-                    DisplayName = 'Privileged Role Administrator'
-                    TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
-                }
-            ) 1> $null
-        }
-        if ('Private' -ne $groupObj.Visibility) {
-            Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Correcting visibility to Private for Cloud Administration."
-            Update-MgBetaGroup `
-                -GroupId $groupObj.Id `
-                -Visibility 'Private' `
-                1> $null
-        }
-        #TODO check for assigned roles and remove them
-        if ($groupObj.Owners) {
-            foreach ($owner in $groupObj.Owners) {
-                Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Removing unwanted group owner $($owner.Id)"
-                Remove-MgGroupOwnerByRef `
-                    -GroupId $groupObj.Id `
-                    -DirectoryObjectId $owner.Id `
-                    1> $null
+    elseif ($GroupObj.IsAssignableToRole) {
+        .\Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
+            @{
+                DisplayName = 'Privileged Role Administrator'
+                TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
             }
-        }
-
-        $GroupDescription = "Tier $Tier Cloud Administrators"
-        if (-Not $groupObj.Description) {
-            Write-Warning "Group $($groupObj.DisplayName) ($($groupObj.Id)): Adding missing description for Tier $Tier identification"
-            Update-MgGroup -GroupId -Description $GroupDescription 1> $null
-        }
-        elseif ($groupObj.Description -ne $GroupDescription) {
-            Throw "Group $($groupObj.DisplayName) ($($groupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
+        ) 1> $null
+    }
+    if ('Private' -ne $GroupObj.Visibility) {
+        Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Correcting visibility to Private for Cloud Administration."
+        Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' 1> $null
+    }
+    #TODO check for assigned roles and remove them
+    if ($GroupObj.Owners) {
+        foreach ($owner in $GroupObj.Owners) {
+            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)"
+            Remove-MgGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $owner.Id 1> $null
         }
     }
-    #endregion ---------------------------------------------------------------------
 
-    #region License Existance Validation -------------------------------------------
-    $License = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ServicePlans
+    $GroupDescription = "Tier $Tier Cloud Administrators"
+    if (-Not $GroupObj.Description) {
+        Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $Tier identification"
+        Update-MgGroup -GroupId -Description $GroupDescription 1> $null
+    }
+    elseif ($GroupObj.Description -ne $GroupDescription) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
+    }
+}
+#endregion ---------------------------------------------------------------------
 
-    if (-Not $License) {
+#region License Existance Validation -------------------------------------------
+ForEach (
+    $SkuPartNumber in @(
+        ($LicenseSkuPartNumber_Tier0, $LicenseSkuPartNumber_Tier2, $LicenseSkuPartNumber_Tier2) | Select-Object -Unique
+    )
+) {
+    if ([String]::IsNullOrEmpty($SkuPartNumber)) { continue }
+    $Sku = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
+
+    if (-Not $Sku) {
         Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant."
     }
-
-    if (-Not ($License.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') })) {
+    if (-Not ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') })) {
         Throw "License SkuPartNumber $LicenseSkuPartNumber does not contain an Exchange Online service plan."
     }
-    #endregion ---------------------------------------------------------------------
 }
+#endregion ---------------------------------------------------------------------
 
-Process {
-    #region [COMMON] PS PIPELINE LOOP HANDLING -------------------------------------
-    # Only process items if there was no error in Begin{} section
+#region Process Referral User --------------------------------------------------
+function ProcessItem ($ReferralUserId, $Tier, $UserPhotoUrl) {
+    Write-Verbose "-----STARTLOOP $ReferralUserId ---"
+
+    #region [COMMON] LOOP HANDLING -------------------------------------------------
+    # Only process items if there was no error during script initialization before
     if (($Iteration -eq 0) -and ($return.Error.Count -gt 0)) { $persistentError = $true }
     if ($persistentError) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -381,10 +762,26 @@ Process {
         }
         return
     }
+
     $Iteration++
     #endregion ---------------------------------------------------------------------
 
-    #region [COMMON] PARAMETER VALIDATION FOR AZURE AUTOMATION ---------------------
+    #region [COMMON] LOOP ENVIRONMENT ----------------------------------------------
+    .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $ConfigurationVariables -scriptParameterOnly $true 1> $null
+
+    $LicenseSkuPartNumber = Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier"
+    $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
+    $PhotoUrl = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
+    $GroupObj = $null
+    $UserObj = $null
+    $License = $null
+
+    if (-Not [string]::IsNullOrEmpty($GroupId)) {
+        $GroupObj = Get-MgGroup -GroupId $GroupId
+    }
+    #endregion ---------------------------------------------------------------------
+
+    #region [COMMON] PARAMETER VALIDATION ------------------------------------------
     $regex = '^(?:.+@.{3,}\..{2,}|[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})$'
     if ($ReferralUserId -notmatch $regex) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -465,11 +862,13 @@ Process {
         'Manager'
     )
 
-    $refUserObj = Get-MgUser `
-        -UserId $ReferralUserId `
-        -Property $userProperties `
-        -ExpandProperty $userExpandPropeties `
-        -ErrorAction SilentlyContinue
+    $params = @{
+        UserId         = $ReferralUserId
+        Property       = $userProperties
+        ExpandProperty = $userExpandPropeties
+        ErrorAction    = 'SilentlyContinue'
+    }
+    $refUserObj = Get-MgUser @params
 
     if ($null -eq $refUserObj) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -549,8 +948,8 @@ Process {
     }
 
     if (
-    (-Not $refUserObj.Manager) -or
-    (-Not $refUserObj.Manager.Id)
+        (-Not $refUserObj.Manager) -or
+        (-Not $refUserObj.Manager.Id)
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must have manager property set."
@@ -565,38 +964,38 @@ Process {
         return
     }
 
-    $timeNow = Get-Date -AsUTC
+    $timeNow = (Get-Date).ToUniversalTime()
 
     if (
-    ($null -ne $refUserObj.EmployeeHireDate) -and
-    ($timeNow -lt $refUserObj.EmployeeHireDate)
+        ($null -ne $refUserObj.EmployeeHireDate) -and
+        ($timeNow -lt $refUserObj.EmployeeHireDate)
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up for active employees."
+            Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
             ErrorId          = '403'
             Category         = 'ResourceUnavailable'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
             TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up for active employees."
+            CategoryReason   = "Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
         }
         return
     }
 
     if (
-    ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
-    ($timeNow -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
+        ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
+        ($timeNow -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+            Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
             ErrorId          = '403'
             Category         = 'OperationStopped'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
             TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o' -AsUTC) Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
+            CategoryReason   = "Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
         }
         return
     }
@@ -618,9 +1017,7 @@ Process {
         return
     }
 
-    $refUserExObj = Get-EXOMailbox `
-        -UserPrincipalName $refUserObj.UserPrincipalName `
-        -ErrorAction SilentlyContinue
+    $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction SilentlyContinue
 
     if ($null -eq $refUserExObj) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -652,10 +1049,21 @@ Process {
     #endregion ---------------------------------------------------------------------
 
     #region Prepare New User Account Properties ------------------------------------
+    $UserPrefix = if (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") {
+        (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") +
+        $(if (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "UserPrincipalNamePrefixSeparator_Tier$Tier" } else { '' } )
+    }
+    else { '' }
+
+    $UserSuffix = if (Get-Variable -ValueOnly -Name "UserPrincipalNameSuffix_Tier$Tier") {
+        $(if (Get-Variable -ValueOnly -Name "UserPrincipalNameSuffixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "UserPrincipalNameSuffixSeparator_Tier$Tier" } else { '' } ) +
+        (Get-Variable -ValueOnly -Name "UserPrincipalNameSuffix_Tier$Tier")
+    }
+    else { '' }
+
     $BodyParamsNull = @{
         JobTitle = $null
     }
-    $AdminPrefix = "A${Tier}C"
     $BodyParams = @{
         OnPremisesExtensionAttributes = @{
             extensionAttribute1  = $null
@@ -675,9 +1083,9 @@ Process {
             extensionAttribute15 = $null
         }
         EmployeeType                  = "Tier $Tier Cloud Administrator"
-        UserPrincipalName             = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
-        Mail                          = $AdminPrefix + '-' + ($refUserObj.UserPrincipalName).Split('@')[0] + '@' + $tenantDomain.Name
-        MailNickname                  = $AdminPrefix + '-' + $refUserObj.MailNickname
+        UserPrincipalName             = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $tenantDomain.Name
+        Mail                          = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $tenantDomain.Name
+        MailNickname                  = $UserPrefix + $refUserObj.MailNickname + $UserSuffix
         PasswordProfile               = @{
             Password                             = .\Common__0000_Get-RandomPassword.ps1 -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
             ForceChangePasswordNextSignIn        = $false
@@ -685,83 +1093,150 @@ Process {
         }
         PasswordPolicies              = 'DisablePasswordExpiration'
     }
+
     if ([string]::IsNullOrEmpty($refUserObj.OnPremisesExtensionAttributes.extensionAttribute15)) {
-        $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = $AdminPrefix
+        Write-Verbose 'Creating property extensionAttribute15'
+        $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = if (Get-Variable -ValueOnly -Name "ExtensionAttributePrefix_Tier$Tier") {
+            (Get-Variable -ValueOnly -Name "ExtensionAttributePrefix_Tier$Tier")
+        }
+        elseif (Get-Variable -ValueOnly -Name "ExtensionAttributeSuffix_Tier$Tier") {
+            (Get-Variable -ValueOnly -Name "ExtensionAttributeSuffix_Tier$Tier")
+        }
+        else { $null }
     }
     else {
-        $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = $AdminPrefix + '__' + $refUserObj.OnPremisesExtensionAttributes.extensionAttribute15
+        Write-Verbose 'Copying property extensionAttribute15'
+        $BodyParams.OnPremisesExtensionAttributes.extensionAttribute15 = $(
+            if (Get-Variable -ValueOnly -Name "ExtensionAttributePrefix_Tier$Tier") {
+                Write-Verbose 'Adding prefix to property extensionAttribute15'
+                (Get-Variable -ValueOnly -Name "ExtensionAttributePrefix_Tier$Tier")
+                (if (Get-Variable -ValueOnly -Name "ExtensionAttributePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "ExtensionAttributePrefixSeparator_Tier$Tier" } else { '' } )
+            }
+            else { '' }
+        ) + $refUserObj.OnPremisesExtensionAttributes.extensionAttribute15 + $(
+            if (Get-Variable -ValueOnly -Name "ExtensionAttributeSuffix_Tier$Tier") {
+                Write-Verbose 'Adding suffix to property extensionAttribute15'
+                (if (Get-Variable -ValueOnly -Name "ExtensionAttributeSuffixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "ExtensionAttributeSuffixSeparator_Tier$Tier" } else { '' } )
+                (Get-Variable -ValueOnly -Name "ExtensionAttributeSuffix_Tier$Tier")
+            }
+            else { '' }
+        )
     }
+
     if (-Not [string]::IsNullOrEmpty($refUserObj.DisplayName)) {
-        $BodyParams.DisplayName = $AdminPrefix + '-' + $refUserObj.DisplayName
+        Write-Verbose 'Copying property DisplayName'
+        $BodyParams.DisplayName = $(
+            Write-Verbose 'Adding prefix to property DisplayName'
+            if (Get-Variable -ValueOnly -Name "UserDisplayNamePrefix_Tier$Tier") {
+                (Get-Variable -ValueOnly -Name "UserDisplayNamePrefix_Tier$Tier") +
+                $(if (Get-Variable -ValueOnly -Name "UserDisplayNamePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "UserDisplayNamePrefixSeparator_Tier$Tier" } else { '' } )
+            }
+            else { '' }
+        ) + $refUserObj.DisplayName + $(
+            if (Get-Variable -ValueOnly -Name "UserDisplayNameSuffix_Tier$Tier") {
+                Write-Verbose 'Adding suffix to property DisplayName'
+                $(if (Get-Variable -ValueOnly -Name "UserDisplayNameSuffixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "UserDisplayNameSuffixSeparator_Tier$Tier" } else { '' } ) +
+                (Get-Variable -ValueOnly -Name "UserDisplayNameSuffix_Tier$Tier")
+            }
+            else { '' }
+        )
     }
+
     if (-Not [string]::IsNullOrEmpty($refUserObj.GivenName)) {
-        $BodyParams.GivenName = $AdminPrefix + '-' + $refUserObj.GivenName
+        Write-Verbose 'Copying property GivenName'
+        $BodyParams.GivenName = $(
+            if (Get-Variable -ValueOnly -Name "GivenNamePrefix_Tier$Tier") {
+                Write-Verbose 'Adding prefix to property GivenName'
+                (Get-Variable -ValueOnly -Name "GivenNamePrefix_Tier$Tier") +
+                $(if (Get-Variable -ValueOnly -Name "GivenNamePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "GivenNamePrefixSeparator_Tier$Tier" } else { '' } )
+            }
+            else { '' }
+        ) + $refUserObj.GivenName + $(
+            if (Get-Variable -ValueOnly -Name "GivenNameSuffix_Tier$Tier") {
+                Write-Verbose 'Adding suffix to property GivenName'
+                $(if (Get-Variable -ValueOnly -Name "GivenNameSuffixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "GivenNameSuffixSeparator_Tier$Tier" } else { '' } ) +
+                (Get-Variable -ValueOnly -Name "GivenNameSuffix_Tier$Tier")
+            }
+            else { '' }
+        )
     }
+
     ForEach ($property in $userProperties) {
         if (
-        ($null -eq $BodyParams.$property) -and
-        ($property -notin @('Id', 'Mail', 'UserType')) -and
-        ($property -notmatch '^OnPremises')
+            ($null -eq $BodyParams.$property) -and
+            ($property -notin @('Id', 'Mail', 'UserType')) -and
+            ($property -notmatch '^OnPremises')
         ) {
             # Empty or null values require special handling as of today
             if ([string]::IsNullOrEmpty($refUserObj.$property)) {
+                Write-Verbose "Clearing property $property"
                 $BodyParamsNull.$property = $null
             }
             else {
+                Write-Verbose "Copying property $property"
                 $BodyParams.$property = $refUserObj.$property
             }
         }
     }
-    if ([string]::IsNullOrEmpty($BodyParams.UsageLocation) -and -not $groupObj) {
+    if ([string]::IsNullOrEmpty($BodyParams.UsageLocation) -and -not $GroupObj) {
         $BodyParams.UsageLocation = if ($tenant.DefaultUsageLocation) {
+            Write-Verbose "Creating property UsageLocation from tenant DefaultUsageLocation"
             $tenant.DefaultUsageLocation
         }
         else {
+            Write-Verbose "Creating property UsageLocation from tenant CountryLetterCode"
             $tenant.CountryLetterCode
         }
     }
     #endregion ---------------------------------------------------------------------
 
     #region Cleanup Soft-Deleted User Accounts -------------------------------------
-    $deletedUserList = Invoke-MgGraphRequest `
-        -OutputType PSObject `
-        -Method GET `
-        -Headers @{ 'ConsistencyLevel' = 'eventual' } `
-        -Uri "https://graph.microsoft.com/beta/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')"
+    $params = @{
+        OutputType = 'PSObject'
+        Method     = 'GET'
+        Headers    = @{ ConsistencyLevel = 'eventual' }
+        Uri        = "https://graph.microsoft.com/beta/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')"
+    }
+    $deletedUserList = Invoke-MgGraphRequest @params
 
     if ($deletedUserList.'@odata.count' -gt 0) {
         foreach ($deletedUserObj in $deletedUserList.Value) {
-            $return.Warning += .\Common__0000_Write-Warning.ps1 @{
+            $return.Information += .\Common__0000_Write-Information.ps1 @{
                 Message          = "${ReferralUserId}: Soft-deleted admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was permanently deleted before re-creation."
-                ErrorId          = '205'
                 Category         = 'ResourceExists'
                 TargetName       = $refUserObj.UserPrincipalName
                 TargetObject     = $refUserObj.Id
                 TargetType       = 'UserId'
                 CategoryActivity = 'Account Provisioning'
                 CategoryReason   = "An existing admin account was deleted before."
+                Tags             = 'UserId', 'Account Provisioning'
             }
 
-            Invoke-MgGraphRequest `
-                -OutputType PSObject `
-                -Method DELETE `
-                -Uri "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)"
+            $params = @{
+                OutputType = 'PSObject'
+                Method     = 'DELETE'
+                Uri        = "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)"
+            }
+            Invoke-MgGraphRequest @params
         }
     }
     #endregion ---------------------------------------------------------------------
 
     #region User Account Compliance Check -----------------------------------------
-    $duplicatesObj = Get-MgUser `
-        -ConsistencyLevel eventual `
-        -Count userCount `
-        -OrderBy UserPrincipalName `
-        -Filter "`
-        startsWith(UserPrincipalName, '$(($BodyParams.UserPrincipalName).Split('@')[0])@') or `
-        startsWith(Mail, '$(($BodyParams.Mail).Split('@')[0])@') or `
-        DisplayName eq '$($BodyParams.DisplayName)' or `
-        MailNickname eq '$($BodyParams.MailNickname)' or `
-        proxyAddresses/any(x:x eq 'smtp:$($BodyParams.Mail)') `
-    "
+    $params = @{
+        ConsistencyLevel = 'eventual'
+        Count            = 'userCount'
+        OrderBy          = 'UserPrincipalName'
+        Filter           = @(
+            "startsWith(UserPrincipalName, '$(($BodyParams.UserPrincipalName).Split('@')[0])@') or"
+            "startsWith(Mail, '$(($BodyParams.Mail).Split('@')[0])@') or"
+            "DisplayName eq '$($BodyParams.DisplayName)' or"
+            "MailNickname eq '$($BodyParams.MailNickname)' or"
+            "proxyAddresses/any(x:x eq 'smtp:$($BodyParams.Mail)')"
+        ) -join ' '
+    }
+    $duplicatesObj = Get-MgUser @params
+
     if ($userCount -gt 1) {
         Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
 
@@ -780,14 +1255,14 @@ Process {
     #endregion ---------------------------------------------------------------------
 
     #region Create or Update User Account ------------------------------------------
-    $existingUserObj = Get-MgUser `
-        -UserId $BodyParams.UserPrincipalName `
-        -Property $userProperties `
-        -ExpandProperty $userExpandPropeties `
-        -ErrorAction SilentlyContinue
+    $params = @{
+        UserId         = $BodyParams.UserPrincipalName
+        Property       = $userProperties
+        ExpandProperty = $userExpandPropeties
+        ErrorAction    = 'SilentlyContinue'
+    }
+    $existingUserObj = Get-MgUser @params
 
-    $userObj = $null
-    $License = $null
     if ($null -ne $existingUserObj) {
         if ($null -ne $existingUserObj.OnPremisesSyncEnabled) {
             $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -807,23 +1282,24 @@ Process {
         $BodyParams.Remove('UserPrincipalName')
         $BodyParams.Remove('AccountEnabled')
         $BodyParams.Remove('PasswordProfile')
-        Update-MgUser `
-            -UserId $existingUserObj.Id `
-            -BodyParameter $BodyParams `
-            -Confirm:$false `
-            1> $null
+        $params = @{
+            UserId        = $existingUserObj.Id
+            BodyParameter = $BodyParams
+            Confirm       = $false
+        }
+        Update-MgUser @params 1> $null
+
         if ($BodyParamsNull.Count -gt 0) {
             # Workaround as properties cannot be nulled using Update-MgUser at the moment ...
-            Invoke-MgGraphRequest `
-                -OutputType PSObject `
-                -Method PATCH `
-                -Uri "https://graph.microsoft.com/v1.0/users/$($existingUserObj.Id)" `
-                -Body $BodyParamsNull `
-                1> $null
+            $params = @{
+                OutputType = 'PSObject'
+                Method     = 'PATCH'
+                Uri        = "https://graph.microsoft.com/v1.0/users/$($existingUserObj.Id)"
+                Body       = $BodyParamsNull
+            }
+            Invoke-MgGraphRequest @params 1> $null
         }
-        $userObj = Get-MgUser `
-            -UserId $existingUserObj.Id `
-            -ErrorAction SilentlyContinue
+        $UserObj = Get-MgUser -UserId $existingUserObj.Id -ErrorAction SilentlyContinue
     }
     else {
         #region License Availability Validation ----------------------------------------
@@ -845,33 +1321,29 @@ Process {
         }
         #endregion ---------------------------------------------------------------------
 
-        $userObj = New-MgUser `
-            -BodyParameter $BodyParams `
-            -ErrorAction SilentlyContinue `
-            -Confirm:$false
+        $UserObj = New-MgUser -BodyParameter $BodyParams -ErrorAction SilentlyContinue -Confirm:$false
 
         # Wait for user provisioning consistency
         $DoLoop = $true
         $RetryCount = 1
         $MaxRetry = 30
         $WaitSec = 7
-        $newUser = $userObj
+        $newUser = $UserObj
 
         do {
-            $userObj = Get-MgUser `
-                -ConsistencyLevel eventual `
-                -CountVariable CountVar `
-                -Filter "Id eq '$($newUser.Id)'" `
-                -ErrorAction SilentlyContinue
-            if ($null -ne $userObj) {
+            $params = @{
+                ConsistencyLevel = 'eventual'
+                CountVariable    = 'CountVar'
+                Filter           = "Id eq '$($newUser.Id)'"
+                ErrorAction      = 'SilentlyContinue'
+            }
+            $UserObj = Get-MgUser @params
+
+            if ($null -ne $UserObj) {
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgUser `
-                    -UserId $newUser.Id `
-                    -ErrorAction SilentlyContinue `
-                    -Confirm:$false `
-                    1> $null
+                Remove-MgUser -UserId $newUser.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -894,10 +1366,10 @@ Process {
             }
         } While ($DoLoop)
 
-        Write-Verbose "Created Tier $Tier Cloud Administrator account $($userObj.UserPrincipalName) ($($userObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+        Write-Verbose "Created Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     }
 
-    if ($null -eq $userObj) {
+    if ($null -eq $UserObj) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Could not create or update Tier $Tier Cloud Administrator account $($BodyParams.UserPrincipalName): $($Error[0].Message)"
             ErrorId          = '503'
@@ -923,7 +1395,7 @@ Process {
         $NewManager = @{
             '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
         }
-        Set-MgUserManagerByRef -UserId $userObj.Id -BodyParameter $NewManager 1> $null
+        Set-MgUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager 1> $null
     }
     #endregion ---------------------------------------------------------------------
 
@@ -949,41 +1421,41 @@ Process {
     #endregion ---------------------------------------------------------------------
 
     #region Direct License Assignment ----------------------------------------------
-    $userLicObj = Get-MgUserLicenseDetail -UserId $userObj.Id
-    if ($groupObj) {
+    $userLicObj = Get-MgUserLicenseDetail -UserId $UserObj.Id
+    if ($GroupObj) {
         #TODO remove any direct license assignment to enforce group-based licensing
     }
     elseif (-Not ($userLicObj | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber)) {
         Write-Verbose "Implying direct license assignment is required as no GroupId was provided for group-based licensing."
-        $disabledPlans = $License.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
-        $addLicenses = @(
-            @{
-                SkuId         = $License.SkuId
-                DisabledPlans = $disabledPlans
-            }
-        )
-        Set-MgUserLicense `
-            -UserId $userObj.Id `
-            -AddLicenses $addLicenses `
-            -RemoveLicenses @() `
-            1> $null
+        $params = @{
+            UserId         = $UserObj.Id
+            AddLicenses    = @(
+                @{
+                    SkuId         = $License.SkuId
+                    DisabledPlans = $License.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
+                }
+            )
+            RemoveLicenses = @()
+        }
+        Set-MgUserLicense @params 1> $null
     }
     #endregion ---------------------------------------------------------------------
 
     #region Group Membership Assignment --------------------------------------------
-    if ($groupObj) {
+    if ($GroupObj) {
         if (
-            $groupObj.GroupType -NotContains 'DynamicMembership' -or
-        ($groupObj.MembershipRuleProcessingState -ne 'On')
+            $GroupObj.GroupType -NotContains 'DynamicMembership' -or
+            ($GroupObj.MembershipRuleProcessingState -ne 'On')
         ) {
-            $groupMembership = Get-MgGroupMember `
-                -ConsistencyLevel eventual `
-                -GroupId $groupObj.Id `
-                -CountVariable CountVar `
-                -Filter "Id eq '$($userObj.Id)'"
-            if (-Not $groupMembership) {
-                Write-Verbose "Implying manually adding user to static group $($groupObj.DisplayName) ($($groupObj.Id))"
-                New-MgBetaGroupMember -GroupId $groupObj.Id -DirectoryObjectId $userObj.Id
+            $params = @{
+                ConsistencyLevel = 'eventual'
+                GroupId          = $GroupObj.Id
+                CountVariable    = 'CountVar'
+                Filter           = "Id eq '$($UserObj.Id)'"
+            }
+            if (-Not (Get-MgGroupMember @params)) {
+                Write-Verbose "Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
+                New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id
             }
         }
 
@@ -994,20 +1466,18 @@ Process {
         $WaitSec = 7
 
         do {
-            $groupMembership = Get-MgGroupMember `
-                -ConsistencyLevel eventual `
-                -GroupId $groupObj.Id `
-                -CountVariable CountVar `
-                -Filter "Id eq '$($userObj.Id)'"
-            if ($null -ne $groupMembership) {
+            $params = @{
+                ConsistencyLevel = 'eventual'
+                GroupId          = $GroupObj.Id
+                CountVariable    = 'CountVar'
+                Filter           = "Id eq '$($UserObj.Id)'"
+            }
+            if ($null -ne (Get-MgGroupMember @params)) {
+                Write-Verbose "OK: Detected group memnbership."
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgUser `
-                    -UserId $userObj.Id `
-                    -ErrorAction SilentlyContinue `
-                    -Confirm:$false `
-                    1> $null
+                Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1039,7 +1509,7 @@ Process {
     $WaitSec = 7
 
     do {
-        $userLicObj = Get-MgUserLicenseDetail -UserId $userObj.Id
+        $userLicObj = Get-MgUserLicenseDetail -UserId $UserObj.Id
         if (
             ($null -ne $userLicObj) -and
             (
@@ -1050,14 +1520,11 @@ Process {
                 }
             )
         ) {
+            Write-Verbose "OK: Detected license provisioning completion."
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgUser `
-                -UserId $userObj.Id `
-                -ErrorAction SilentlyContinue `
-                -Confirm:$false `
-                1> $null
+            Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1089,18 +1556,13 @@ Process {
 
     $userExObj = $null
     do {
-        $userExObj = Get-EXOMailbox `
-            -UserPrincipalName $userObj.UserPrincipalName `
-            -ErrorAction SilentlyContinue
+        $userExObj = Get-EXOMailbox -ExternalDirectoryObjectId $UserObj.Id -ErrorAction SilentlyContinue
         if ($null -ne $userExObj) {
+            Write-Verbose "OK: Detected mailbox provisioning completion."
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgUser `
-                -UserId $userObj.Id `
-                -ErrorAction SilentlyContinue `
-                -Confirm:$false `
-                1> $null
+            Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1125,20 +1587,18 @@ Process {
     #endregion ---------------------------------------------------------------------
 
     #region Configure E-mail Forwarding --------------------------------------------
-    Set-Mailbox `
-        -Identity $userExObj.Identity `
-        -ForwardingAddress $refUserExObj.Identity `
-        -ForwardingSmtpAddress $null `
-        -DeliverToMailboxAndForward $false `
-        -HiddenFromAddressListsEnabled $true `
-        -WarningAction SilentlyContinue `
-        1> $null
+    $params = @{
+        Identity                      = $userExObj.Identity
+        ForwardingAddress             = $refUserExObj.Identity
+        ForwardingSmtpAddress         = $null
+        DeliverToMailboxAndForward    = $false
+        HiddenFromAddressListsEnabled = $true
+        WarningAction                 = 'SilentlyContinue'
+    }
+    Set-Mailbox @params 1> $null
 
     $userExMbObj = Get-Mailbox -Identity $userExObj.Identity
-    $userObj = Get-MgUser `
-        -UserId $userObj.Id `
-        -Property $userProperties `
-        -ExpandProperty $userExpandPropeties
+    $UserObj = Get-MgUser -UserId $UserObj.Id -Property $userProperties -ExpandProperty $userExpandPropeties
     #endregion ---------------------------------------------------------------------
 
     #region Set User Photo ---------------------------------------------------------
@@ -1157,38 +1617,41 @@ Process {
 
     if ($Url) {
         Write-Verbose "Retrieving user photo from URL '$($Url)'"
-        Invoke-WebRequest `
-            -UseBasicParsing `
-            -Method GET `
-            -Uri $Url `
-            -TimeoutSec 10 `
-            -ErrorAction SilentlyContinue `
-            -OutVariable UserPhoto `
-            1> $null
+        $params = @{
+            UseBasicParsing = $true
+            Method          = 'GET'
+            Uri             = $Url
+            TimeoutSec      = 10
+            ErrorAction     = 'SilentlyContinue'
+            OutVariable     = 'UserPhoto'
+        }
+        Invoke-WebRequest @params 1> $null
+
         if (
             (-Not $UserPhoto) -or
             ($UserPhoto.StatusCode -ne 200) -or
             (-Not $UserPhoto.Content)
         ) {
-            Write-Warning "Unable to download photo from URL '$($Url)'"
+            Write-Error "Unable to download photo from URL '$($Url)'"
         }
         elseif (
             $UserPhoto.Headers.'Content-Type' -notmatch '^image/'
         ) {
-            Write-Warning "Photo from URL '$($Url)' must have Content-Type 'image/*'."
+            Write-Error "Photo from URL '$($Url)' must have Content-Type 'image/*'."
         }
         else {
             Write-Verbose 'Updating user photo'
-            Set-MgUserPhotoContent `
-                -InFile nonExistat.lat `
-                -UserId $userObj.Id `
-                -Data ([System.IO.MemoryStream]::new($UserPhoto.Content)) `
-                1> $null
+            $params = @{
+                InFile = 'nonExistat.lat'
+                UserId = $UserObj.Id
+                Data   = ([System.IO.MemoryStream]::new($UserPhoto.Content))
+            }
+            Set-MgUserPhotoContent @params 1> $null
         }
     }
     #endregion ---------------------------------------------------------------------
 
-    #region Add Return Data ----------------------------------------------------
+    #region Add Return Data --------------------------------------------------------
     $data = @{
         ReferralUserId             = $refUserObj.Id
         ReferralUser               = @{
@@ -1199,10 +1662,10 @@ Process {
         }
         Tier                       = $Tier
         Manager                    = @{
-            Id                = $userObj.Manager.Id
-            UserPrincipalName = $userObj.manager.AdditionalProperties.userPrincipalName
-            Mail              = $userObj.manager.AdditionalProperties.mail
-            DisplayName       = $userObj.manager.AdditionalProperties.displayName
+            Id                = $UserObj.Manager.Id
+            UserPrincipalName = $UserObj.manager.AdditionalProperties.userPrincipalName
+            Mail              = $UserObj.manager.AdditionalProperties.mail
+            DisplayName       = $UserObj.manager.AdditionalProperties.displayName
         }
         ForwardingAddress          = $userExMbObj.ForwardingAddress
         ForwardingSMTPAddress      = $userExMbObj.ForwardingSMTPAddress
@@ -1210,7 +1673,7 @@ Process {
     }
     ForEach ($property in $userProperties) {
         if ($null -eq $data.$property) {
-            $data.$property = $userObj.$property
+            $data.$property = $UserObj.$property
         }
     }
     if ($PhotoUrl ) { $data.UserPhotoUrl = $PhotoUrl }
@@ -1222,18 +1685,30 @@ Process {
         Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
     }
     #endregion ---------------------------------------------------------------------
+
+    Write-Verbose "-------ENDLOOP $ReferralUserId ---"
 }
 
-End {
-    #region Send and Output Return Data --------------------------------------------
-    $return.Job.EndTime = Get-Date -AsUTC
-    $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
-
-    if ($Webhook) { .\Common__0000_Submit-Webhook.ps1 -Uri $Webhook -Body $return }
-    $InformationPreference = $origInformationPreference
-    if (($true -eq $OutText) -or ($PSBoundParameters.Keys -contains 'OutJson') -and ($false -eq $OutJson)) { return }
-    if ($OutJson) { .\Common__0000_Write-JsonOutput.ps1 $return; return }
-
-    return $return
-    #endregion ---------------------------------------------------------------------
+0..$($ReferralUserId.Count) | ForEach-Object {
+    if ([string]::IsNullOrEmpty($ReferralUserId[$_])) { return }
+    if ([string]::IsNullOrEmpty($Tier[$_])) { return }
+    $params = @{
+        ReferralUserId = $ReferralUserId[$_]
+        Tier           = $Tier[$_]
+        UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl)) { $null } else { $UserPhotoUrl[$_] }
+    }
+    ProcessItem @params
 }
+#endregion ---------------------------------------------------------------------
+
+#region Send and Output Return Data --------------------------------------------
+$return.Job.EndTime = (Get-Date).ToUniversalTime()
+$return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
+
+if ($Webhook) { .\Common__0000_Submit-Webhook.ps1 -Uri $Webhook -Body $return 1> $null }
+$InformationPreference = $origInformationPreference
+if (($true -eq $OutText) -or ($PSBoundParameters.Keys -contains 'OutJson') -and ($false -eq $OutJson)) { return }
+if ($OutJson) { .\Common__0000_Write-JsonOutput.ps1 $return; return }
+
+return $return
+#endregion ---------------------------------------------------------------------

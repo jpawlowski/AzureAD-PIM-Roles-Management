@@ -13,13 +13,22 @@
 [CmdletBinding()]
 Param(
     [Parameter(mandatory = $true)]
-    [Array]$Variable
+    [Array]$Variable,
+
+    [Boolean]$scriptParameterOnly
 )
 
 if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 foreach ($Item in $Variable) {
+    # Script parameters be of type array/collection and be processed during a loop,
+    # and therefore updated multiple times
+    if (
+        (($scriptParameterOnly -eq $true) -and ($null -eq $Item.respectScriptParameter)) -or
+        (($scriptParameterOnly -eq $false) -and ($null -ne $Item.respectScriptParameter))
+    ) { continue }
+
     $params = @{
         Name   = $Item.mapToVariable
         Value  = $null

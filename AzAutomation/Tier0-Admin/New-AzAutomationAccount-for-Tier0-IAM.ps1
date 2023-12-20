@@ -129,32 +129,48 @@ if ($PSCmdlet.ShouldProcess(
 
     $Variables = @(
         @{
-            Name  = 'AV_Tier0Admin_LicenseSkuPartNumber'
+            Name  = 'AV_CloudAdmin_Webhook'
+            Value = [string]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier0_LicenseSkuPartNumber'
             Value = [string]'EXCHANGEDESKLESS'
         }
         @{
-            Name  = 'AV_Tier1Admin_LicenseSkuPartNumber'
+            Name  = 'AV_CloudAdminTier1_LicenseSkuPartNumber'
             Value = [string]'EXCHANGEDESKLESS'
         }
         @{
-            Name  = 'AV_Tier0Admin_UserPhotoUrl'
+            Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
             Value = [string]''
         }
         @{
-            Name  = 'AV_Tier1Admin_UserPhotoUrl'
+            Name  = 'AV_CloudAdminTier1_UserPhotoUrl'
             Value = [string]''
         }
         @{
-            Name  = 'AV_Tier0Admin_GroupId'
+            Name  = 'AV_CloudAdminTier0_GroupId'
             Value = [string]''
         }
         @{
-            Name  = 'AV_Tier1Admin_GroupId'
+            Name  = 'AV_CloudAdminTier1_GroupId'
             Value = [string]''
         }
         @{
-            Name  = 'AV_Tier2Admin_GroupId'
+            Name  = 'AV_CloudAdminTier2_GroupId'
             Value = [string]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier0_DedicatedAccount'
+            Value = [boolean]$true
+        }
+        @{
+            Name  = 'AV_CloudAdminTier1_DedicatedAccount'
+            Value = [boolean]$true
+        }
+        @{
+            Name  = 'AV_CloudAdminTier2_DedicatedAccount'
+            Value = [boolean]$false
         }
     )
 
