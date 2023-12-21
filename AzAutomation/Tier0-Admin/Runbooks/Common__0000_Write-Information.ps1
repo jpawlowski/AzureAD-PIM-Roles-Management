@@ -30,11 +30,10 @@ if (-Not $params.MessageData -and $params.Message) {
     $params.MessageData = $params.Message
     $params.Remove('Message')
 }
-$iparams = $params.Clone()
-$iparams.GetEnumerator() | ForEach-Object {
-    if ($_.Key -notin ('MessageData', 'Tags')) {
-        $iparams.Remove($_.Key)
-    }
+$iparams = @{}
+foreach ($key in $params.Keys) {
+    if ($key -notin 'MessageData', 'Tags') { continue }
+    $iparams.$key = $params.$key
 }
 $params.Message = $params.MessageData
 $params.Remove('MessageData')

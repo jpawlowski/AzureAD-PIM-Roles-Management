@@ -3,7 +3,7 @@
     Import variables from script parameter and $env to local script scope
 
 .NOTES
-    Original name: Common__0000_Convert-PSEnvToPSLocalVariable.ps1
+    Original name: Common__0000_Convert-PSEnvToPSLocalConstant.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0.0
 #>
@@ -30,12 +30,13 @@ foreach ($Item in $Variable) {
     ) { continue }
 
     $params = @{
-        Name   = $Item.mapToVariable
-        Value  = $null
-        Scope  = 1
-        Force  = $true
-        Option = 'Constant'
+        Name  = $Item.mapToVariable
+        Value = $null
+        Scope = 1
+        Force = $true
+        # Option = 'Constant'
     }
+    if (-Not $Item.respectScriptParameter) { $params.Option = 'Constant' }
     if (
         ($Item.respectScriptParameter) -and
         (-Not [string]::IsNullOrEmpty($(Get-Variable -Name $Item.respectScriptParameter -Scope $params.Scope -ValueOnly -ErrorAction SilentlyContinue)))
@@ -52,6 +53,14 @@ foreach ($Item in $Variable) {
     elseif ($Item.defaultValue) {
         $params.Value = $Item.defaultValue
         Write-Verbose "`$env:$($Item.sourceName) not found, using $($params.Name) built-in default value"
+    }
+    if (
+        $params.Value -and
+        ($Item.Type) -and
+        ($params.Value.GetType().Name -ne $Item.Type)
+    ) {
+        Write-Warning "Type of environment variable $($Item.sourceName) is not $Item.Type and was ignored"
+        $params.Value = $null
     }
     if (
         $params.Value -and
