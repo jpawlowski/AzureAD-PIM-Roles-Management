@@ -8,8 +8,6 @@
     Version: 1.0.0
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param(
     [Int32]$lowerChars,
@@ -18,7 +16,7 @@ Param(
     [Int32]$symbols
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region [COMMON] FUNCTIONS -----------------------------------------------------

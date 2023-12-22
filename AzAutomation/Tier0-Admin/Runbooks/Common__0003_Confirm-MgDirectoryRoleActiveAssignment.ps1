@@ -21,12 +21,10 @@
     Using this parameter, you may enforce running for special occasions.
 
 .NOTES
-    Original name: Common__0001_Confirm-MgDirectoryRoleActiveAssignment.ps1
+    Original name: Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0.0
 #>
-
-#Requires -Version 5.1
 
 [CmdletBinding()]
 Param(
@@ -37,14 +35,16 @@ Param(
     [Boolean]$AllowPrivilegedRoleAdministratorInAzureAutomation = $false
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 $activeRoles = @()
 $missingRoles = @()
-$RoleAssignment = .\Common__0001_Get-MgDirectoryRoleActiveAssignment.ps1
+$RoleAssignment = .\Common__0002_Get-MgDirectoryRoleActiveAssignment.ps1
 $GlobalAdmin = $RoleAssignment | Where-Object roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'
 $PrivRoleAdmin = $RoleAssignment | Where-Object roleTemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+
+Write-Verbose "Detected assigned directory roles: $($RoleAssignment.DisplayName -join ', ')"
 
 if ($GlobalAdmin) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -75,6 +75,7 @@ else {
         $Optional = if ($Item -is [String]) { $false } else { $Item.Optional }
         $AssignedRole = $RoleAssignment | Where-Object { ($_.roleTemplateId -eq $roleTemplateId) -or ($_.DisplayName -eq $DisplayName) }
         if ($AssignedRole) {
+            Write-Verbose "Confirmed role $($AssignedRole.DisplayName) ($($AssignedRole.roleTemplateId))"
             $activeRoles += $AssignedRole
         }
         elseif ($Optional) {

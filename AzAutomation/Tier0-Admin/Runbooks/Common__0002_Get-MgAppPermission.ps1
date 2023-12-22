@@ -3,22 +3,22 @@
     Get permissions to other applications of current application
 #>
 
-#Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Applications'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-
 [CmdletBinding()]
 Param(
     [Array]$App
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region CONNECTIONS ------------------------------------------------------------
-.\Common__0000_Connect-MgGraph.ps1 1> $null
+.\Common__0001_Connect-MgGraph.ps1 1> $null
 #endregion ---------------------------------------------------------------------
+
+.\Common__0000_Import-Modules.ps1 -Modules @(
+    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+) 1> $null
 
 $return = @()
 

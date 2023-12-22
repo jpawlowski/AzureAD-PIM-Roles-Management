@@ -3,7 +3,7 @@
     Restores variables from Azure Automation account as environment variables
 
 .NOTES
-    Original name: Common__0001_Add-AzAutomationVariableToPSEnv.ps1
+    Original name: Common__0002_Add-AzAutomationVariableToPSEnv.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0.0
 #>
@@ -13,13 +13,16 @@
 [CmdletBinding()]
 Param()
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+    .\Common__0000_Import-Modules.ps1 -Modules @(
+        @{ Name = 'Az.Automation'; MinimumVersion = '1.9'; MaximumVersion = '1.65535' }
+    ) 1> $null
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common__0000_Connect-AzAccount.ps1 1> $null
+    .\Common__0001_Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $AA = Get-AzAutomationAccount

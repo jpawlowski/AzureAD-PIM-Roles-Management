@@ -8,12 +8,17 @@
 [CmdletBinding()]
 Param()
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region CONNECTIONS ------------------------------------------------------------
-.\Common__0000_Connect-MgGraph.ps1 1> $null
+.\Common__0001_Connect-MgGraph.ps1 1> $null
 #endregion ---------------------------------------------------------------------
+
+.\Common__0000_Import-Modules.ps1 -Modules @(
+    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+) 1> $null
 
 $return = $null
 
@@ -30,6 +35,8 @@ else {
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }
+
+Write-Verbose "Received directory roles: $($return.DisplayName -join ', ')"
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

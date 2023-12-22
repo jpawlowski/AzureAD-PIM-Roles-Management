@@ -6,12 +6,10 @@
     Microsoft.Azure.Commands.Profile.Models.Core.PSAzureContext
 
 .NOTES
-    Original name: Common__0000_Connect-AzAccount.ps1
+    Original name: Common__0001_Connect-AzAccount.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.1.0
 #>
-
-#Requires -Version 5.1
 
 [CmdletBinding()]
 Param(
@@ -19,8 +17,12 @@ Param(
     $Subscription
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+
+.\Common__0000_Import-Modules.ps1 -Modules @(
+    @{ Name = 'Az.Accounts'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+) 1> $null
 
 $Context = $null
 

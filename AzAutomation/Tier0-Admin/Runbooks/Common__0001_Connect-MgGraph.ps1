@@ -5,22 +5,23 @@
 .PARAMETER Scopes
 
 .NOTES
-    Original name: Common__0000_Connect-MgGraph.ps1
+    Original name: Common__0001_Connect-MgGraph.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.9.0
 #>
-
-#Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
 
 [CmdletBinding()]
 Param(
     [Array]$Scopes
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+
+.\Common__0000_Import-Modules.ps1 -Modules @(
+    @{ Name = 'Microsoft.Graph.Authentication'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Identity.SignIns'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+) 1> $null
 
 #region FUNCTIONS --------------------------------------------------------------
 function Get-MgMissingScope ([Array]$Scopes) {

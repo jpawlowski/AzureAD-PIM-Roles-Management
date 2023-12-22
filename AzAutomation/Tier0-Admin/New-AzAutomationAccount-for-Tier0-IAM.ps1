@@ -74,21 +74,27 @@ if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     Throw 'This script must be run interactively by a privileged administrator account.'
 }
 
-if (
+try {
+    if (
     (-Not (Get-AzContext)) -or
     ($TenantId -ne (Get-AzContext).Tenant)
-) {
-    Connect-AzAccount `
-        -TenantId $TenantId `
-        -Subscription $Subscription `
-        -Scope Process `
-        -Verbose:$Verbose
+    ) {
+        Connect-AzAccount `
+            -TenantId $TenantId `
+            -Subscription $Subscription `
+            -Scope Process `
+            -Verbose:$Verbose `
+            -ErrorAction Stop
+    }
+    elseif (
+        ($Subscription -ne (Get-AzContext).Subscription.Name) -and
+        ($Subscription -ne (Get-AzContext).Subscription.Id)
+    ) {
+        Set-AzContext -Subscription $Subscription -WarningAction SilentlyContinue -ErrorAction Stop
+    }
 }
-elseif (
-    ($Subscription -ne (Get-AzContext).Subscription.Name) -and
-    ($Subscription -ne (Get-AzContext).Subscription.Id)
-) {
-    Set-AzContext -Subscription $Subscription -WarningAction SilentlyContinue
+catch {
+    Throw $_
 }
 
 $automationAccount = Get-AzAutomationAccount `
@@ -130,47 +136,47 @@ if ($PSCmdlet.ShouldProcess(
     $Variables = @(
         @{
             Name  = 'AV_CloudAdmin_Webhook'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier0_LicenseSkuPartNumber'
-            Value = [string]'EXCHANGEDESKLESS'
+            Value = [String]'EXCHANGEDESKLESS'
         }
         @{
             Name  = 'AV_CloudAdminTier1_LicenseSkuPartNumber'
-            Value = [string]'EXCHANGEDESKLESS'
+            Value = [String]'EXCHANGEDESKLESS'
         }
         @{
             Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier1_UserPhotoUrl'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier0_GroupId'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier1_GroupId'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier2_GroupId'
-            Value = [string]''
+            Value = [String]''
         }
         @{
             Name  = 'AV_CloudAdminTier0_DedicatedAccount'
-            Value = [boolean]$true
+            Value = [Boolean]$true
         }
         @{
             Name  = 'AV_CloudAdminTier1_DedicatedAccount'
-            Value = [boolean]$true
+            Value = [Boolean]$false
         }
         @{
             Name  = 'AV_CloudAdminTier2_DedicatedAccount'
-            Value = [boolean]$false
+            Value = [Boolean]$false
         }
     )
 
@@ -400,7 +406,7 @@ if ($automationAccount.Identity.PrincipalId) {
 
         $AzureRoleScopes = @{
             # Scope: Automation Account
-        ($RgScope + '/providers/Microsoft.Automation/automationAccounts/' + $automationAccount.AutomationAccountName) = @(
+            ($RgScope + '/providers/Microsoft.Automation/automationAccounts/' + $automationAccount.AutomationAccountName) = @(
                 'Reader'
             )
 

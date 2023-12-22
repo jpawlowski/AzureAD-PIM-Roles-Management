@@ -5,13 +5,10 @@
 .PARAMETER Scopes
 
 .NOTES
-    Original name: Common__0000_Connect-ExchangeOnline.ps1
+    Original name: Common__0001_Connect-ExchangeOnline.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 0.9.0
 #>
-
-#Requires -Version 5.1
-#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0'; MaximumVersion='3.65535' }
 
 [CmdletBinding()]
 Param(
@@ -19,8 +16,12 @@ Param(
     [String]$Organization
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+
+.\Common__0000_Import-Modules.ps1 -Modules @(
+    @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.0'; MaximumVersion = '3.65535' }
+) 1> $null
 
 $params = @{
     Organization = $Organization

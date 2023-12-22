@@ -8,8 +8,6 @@
     Version: 1.0.0
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param(
     [Parameter(mandatory = $true)]
@@ -18,7 +16,7 @@ Param(
     [Boolean]$scriptParameterOnly
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 foreach ($Item in $Variable) {
@@ -56,10 +54,10 @@ foreach ($Item in $Variable) {
     }
     if (
         $params.Value -and
-        ($Item.Type) -and
+        $Item.Type -and
         ($params.Value.GetType().Name -ne $Item.Type)
     ) {
-        Write-Warning "Type of environment variable $($Item.sourceName) is not $Item.Type and was ignored"
+        Write-Warning "Type of environment variable $($Item.sourceName) is '$($params.Value.GetType().Name)' while '$($Item.Type)' was expected so it is ignored"
         $params.Value = $null
     }
     if (

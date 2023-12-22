@@ -3,7 +3,7 @@
     Wait for other concurrent jobs of the same runbook in Azure Automation
 
 .NOTES
-    Original name: Common__0000_Wait-AzAutomationConcurrentJob.ps1
+    Original name: Common__0002_Wait-AzAutomationConcurrentJob.ps1
     Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
     Version: 1.0.0
 #>
@@ -13,7 +13,7 @@
 [CmdletBinding()]
 Param()
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 $return = $null
@@ -21,8 +21,12 @@ $return = $null
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common__0000_Connect-AzAccount.ps1 1> $null
+    .\Common__0001_Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
+
+    .\Common__0000_Import-Modules.ps1 -Modules @(
+        @{ Name = 'Az.Automation'; MinimumVersion = '1.9'; MaximumVersion = '1.65535' }
+    ) 1> $null
 
     $DoLoop = $true
     $RetryCount = 1
@@ -30,12 +34,15 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     $WaitSec = 30
 
     $AA = Get-AzAutomationAccount
+    $RunbookName = (Get-AzAutomationJob -AutomationAccountName $AA.AutomationAccountName -ResourceGroupName $AA.ResourceGroupName -Id $PSPrivateMetadata.JobId).RunbookName
 
     do {
-        $jobs = Get-AzAutomationJob `
-            -ResourceGroupName $AA.ResourceGroupName `
-            -AutomationAccountName $AA.AutomationAccountName `
-            -RunbookName $((Get-ChildItem $MyInvocation.PSCommandPath).Name)
+        try {
+            $jobs = Get-AzAutomationJob -ResourceGroupName $AA.ResourceGroupName -AutomationAccountName $AA.AutomationAccountName -RunbookName $RunbookName -ErrorAction Stop
+        }
+        catch {
+            Throw $_
+        }
         $activeJobs = $jobs | Where-Object { $_.status -eq 'Running' -or $_.status -eq 'Queued' -or $_.status -eq 'New' -or $_.status -eq 'Activating' -or $_.status -eq 'Resuming' } | Sort-Object -Property CreationTime
 
         $jobRanking = @()

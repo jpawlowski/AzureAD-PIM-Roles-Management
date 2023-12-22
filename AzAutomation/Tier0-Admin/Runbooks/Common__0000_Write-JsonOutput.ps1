@@ -3,8 +3,6 @@
     Write text in JSON format to output stream
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param(
     [Parameter(Mandatory = $true)]
@@ -13,7 +11,7 @@ Param(
     [hashtable]$ConvertToParam
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 $params = if ($ConvertToParam) { $ConvertToParam.Clone() } else { @{} }

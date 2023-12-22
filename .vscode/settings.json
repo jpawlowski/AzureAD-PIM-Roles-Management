@@ -8,5 +8,5 @@
     // Relative paths for this setting are always relative to the workspace root dir.
     "powershell.scriptAnalysis.settingsPath": ".vscode/PSScriptAnalyzerSettings.psd1",
     "azureAutomation.directory.basePath": "",
-    "workbench.colorTheme": "PowerShell ISE"
+    "workbench.colorTheme": "Dark Powershell Theme"
 }

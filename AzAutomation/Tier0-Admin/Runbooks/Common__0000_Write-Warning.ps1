@@ -3,15 +3,13 @@
     Write warning to warning stream and return back object
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param(
     [Parameter(Mandatory = $true)]
     $Param
 )
 
-if (-Not $MyInvocation.PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
+if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 $params = if ($Param) {

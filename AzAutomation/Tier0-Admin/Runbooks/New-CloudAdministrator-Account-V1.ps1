@@ -1,3 +1,19 @@
+<#PSScriptInfo
+.VERSION 0.9.0
+.GUID 03b78b5d-1e83-44bc-83ce-a5c0f101461b
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS TieringModel Identity CloudAdministrator Security Azure Automation AzureAutomation
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Create or update a dedicated cloud native account for administrative purposes in Tier 0, 1, or 2
@@ -37,11 +53,6 @@
     Output the generated User Principal Name only.
 
 .NOTES
-    Original name: New-CloudAdministrator-Account-V1.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 0.9.0
-
-
     CONDITIONS TO CREATE A CLOUD ADMINISTRATOR ACCOUNT
     ==================================================
 
@@ -186,20 +197,9 @@
     ================
 
     Azure Automation has limited support for regular PowerShell pipelining as it does not process inline execution of child runbooks within Begin/End blocks.
-    Therefore, classic PowerShell pipelining like this does NOT work. Instead, a collection can be used to provide the required input data.
+    Therefore, classic PowerShell pipelining does NOT work. Instead, an array can be used to provide the required input data.
     The advantage is that the script will run more efficient as some tasks only need to be performed once per batch instead of each individual account.
 #>
-
-#Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.0'; MaximumVersion='6.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Applications'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
-#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0'; MaximumVersion='3.65535' }
 
 #region TODO:
 #- Multiple licenses support
@@ -210,14 +210,13 @@
 [CmdletBinding()]
 Param (
     [Parameter(Position = 0, mandatory = $true)]
-    [String[]]$ReferralUserId,
+    [Array]$ReferralUserId,
 
     [Parameter(Position = 1, mandatory = $true)]
-    [Int32[]]$Tier,
+    [Array]$Tier,
 
     [Parameter(Position = 2)]
-    [AllowEmptyString()]
-    [String[]]$UserPhotoUrl,
+    [Array]$UserPhotoUrl,
 
     [Boolean]$OutJson,
     [Boolean]$OutText,
@@ -225,6 +224,23 @@ Param (
 )
 
 #region [COMMON] SCRIPT CONFIGURATION PARAMETERS -------------------------------
+#
+# IMPORTANT: You should actually NOT change these parameters here. Instead, use the environment variables described above.
+# These parameters here exist quite far up in this file so that you get a quick idea of some
+# interesting aspects of the dependencies, e.g. when performing a code audit for security reasons.
+
+$ImportPsModules = @(
+    @{ Name = 'Az.Accounts'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Az.Resources'; MinimumVersion = '6.0'; MaximumVersion = '6.65535' }
+    @{ Name = 'Microsoft.Graph.Authentication'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Identity.SignIns'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.0'; MaximumVersion = '3.65535' }
+)
+
 $MgGraphScopes = @(
     'User.ReadWrite.All'
     'Directory.Read.All'
@@ -790,7 +806,8 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common__0001_Add-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common__0000_Import-Modules.ps1 -Modules $ImportPsModules 1> $null
+.\Common__0002_Add-AzAutomationVariableToPSEnv.ps1 1> $null
 .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -810,15 +827,17 @@ $return = @{
 }
 if ($JobReference) { $return.Job.Reference = $JobReference }
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-    if ($PSPrivateMetadata.JobId) { $return.Job.Id = $PSPrivateMetadata.JobId }
     $return.Job.AutomationAccount = @{}
     $return.Job.AutomationAccount = Get-AzAutomationAccount
-    $params = @{
-        ResourceGroupName     = $return.Job.AutomationAccount.ResourceGroupName
-        AutomationAccountName = $return.Job.AutomationAccount.AutomationAccountName
-        RunbookName           = (Get-Item $MyInvocation.MyCommand).BaseName
+    if ($PSPrivateMetadata.JobId) {
+        $return.Job.Id = $PSPrivateMetadata.JobId
+        $params = @{
+            ResourceGroupName     = $return.Job.AutomationAccount.ResourceGroupName
+            AutomationAccountName = $return.Job.AutomationAccount.AutomationAccountName
+            RunbookName           = (Get-AzAutomationJob -AutomationAccountName $return.Job.AutomationAccount.AutomationAccountName -ResourceGroupName $return.Job.AutomationAccount.ResourceGroupName -Id $PSPrivateMetadata.JobId).RunbookName
+        }
+        $return.Job.Runbook = Get-AzAutomationRunbook @params
     }
-    $return.Job.Runbook = Get-AzAutomationRunbook @params
 }
 else {
     $return.Job.Runbook.RunbookName = (Get-Item $MyInvocation.MyCommand).BaseName
@@ -826,7 +845,7 @@ else {
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
-if (-Not (.\Common__0001_Wait-AzAutomationConcurrentJob.ps1)) {
+if (-Not (.\Common__0002_Wait-AzAutomationConcurrentJob.ps1)) {
     $return.Error += .\Common__0000_Write-Error.ps1 @{
         Message           = "Maximum job runtime was reached."
         ErrorId           = '504'
@@ -839,13 +858,13 @@ if (-Not (.\Common__0001_Wait-AzAutomationConcurrentJob.ps1)) {
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] OPEN CONNECTIONS ----------------------------------------------
-.\Common__0000_Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
+.\Common__0001_Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
 $tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
 $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
-.\Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
-.\Common__0002_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
-.\Common__0000_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
+.\Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
+.\Common__0003_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
+.\Common__0001_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region Group Validation -------------------------------------------------------
@@ -893,7 +912,7 @@ ForEach (
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
     }
     elseif ($GroupObj.IsAssignableToRole) {
-        .\Common__0002_Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
+        .\Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
             @{
                 DisplayName = 'Privileged Role Administrator'
                 TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
