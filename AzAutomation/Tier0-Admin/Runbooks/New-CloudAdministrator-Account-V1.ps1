@@ -12,6 +12,8 @@
     Also, extensionAttribute will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'AxC__' is added where 'x' represents the respective Tier level.
     Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
 
+    NOTE: This script uses the Microsoft Graph Beta API as it requires support for Restricted Management Administrative Units which is not available in the stable API.
+
 .PARAMETER ReferralUserId
     User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
 
@@ -69,12 +71,8 @@
     or Azure Automation Account Variables, whose will automatically be published in $env.
 
     ********************************************************************************************************
-    | Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2. |
-    | For example:                                                                                         |
-    |                                                                                                      |
-    |   AV_CloudAdminTier0_GroupId                                                                         |
-    |   AV_CloudAdminTier1_GroupId                                                                         |
-    |   AV_CloudAdminTier2_GroupId                                                                         |
+    * Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2. *
+    * For example: AV_CloudAdminTier0_GroupId, AV_CloudAdminTier1_GroupId, AV_CloudAdminTier2_GroupId      *
     ********************************************************************************************************
 
     AV_CloudAdmin_AccountTypeExtensionAttribute - [Integer] - Default Value: 15
@@ -98,9 +96,10 @@
         If no value was provided at all, the tenant's square logo will be used.
 
     AV_CloudAdminTier<Tier>_LicenseSkuPartNumber - [String] - Default Value: EXCHANGEDESKLESS
-        License assigned to the user. The license SKU part number must contain an Exchange Online service plan to generate a mailbox for the user
-        (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
-        Only the Exchange Online service plan will be enabled for the user, any other service plan will be disabled.
+        License assigned to the dedicated admin user account. The license SKU part number must contain an Exchange Online service plan to generate a mailbox
+        for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
+        Multiple licenses may be assigned using a whitespace delimiter.
+        For the license containing the Exchange Online service plan, only that service plan is enabled for the user, any other service plan within that license will be disabled.
         If GroupId is also provided, group-based licensing is implied and Exchange Online service plan activation will only be monitored before continuing.
 
     AV_CloudAdminTier<Tier>_GroupId - [String] - Default Value: <empty>
@@ -192,15 +191,15 @@
 #>
 
 #Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='Microsoft.Graph.Applications'; ModuleVersion='2.0' }
-#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0' }
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.0'; MaximumVersion='6.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Users'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Groups'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Applications'; ModuleVersion='2.0'; MaximumVersion='2.65535' }
+#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0'; MaximumVersion='3.65535' }
 
 #region TODO:
 #- Multiple licenses support
@@ -271,7 +270,7 @@ $MgAppPermissions = @(
 )
 
 $Constants = @(
-    #region General
+    #region General Constants
     @{
         sourceName    = "AV_CloudAdmin_AccountTypeExtensionAttribute"
         mapToVariable = 'AccountTypeExtensionAttribute'
@@ -304,7 +303,7 @@ $Constants = @(
     }
     #endregion
 
-    #region Tier 0
+    #region Tier 0 Constants
     @{
         sourceName    = "AV_CloudAdminTier0_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier0'
@@ -333,7 +332,7 @@ $Constants = @(
     @{
         sourceName    = "AV_CloudAdminTier0_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier0'
-        defaultValue  = $null
+        defaultValue  = $true
         Type          = 'boolean'
     }
     @{
@@ -458,7 +457,7 @@ $Constants = @(
     }
     #endregion
 
-    #region Tier 1
+    #region Tier 1 Constants
     @{
         sourceName    = "AV_CloudAdminTier1_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier1'
@@ -466,7 +465,7 @@ $Constants = @(
         Regex         = '^[A-Z][A-Z_ ]+[A-Z]$'
     }
     @{
-        sourceName    = "AV_CloudAdminTier2_GroupId"
+        sourceName    = "AV_CloudAdminTier1_GroupId"
         mapToVariable = 'GroupId_Tier1'
         defaultValue  = $null
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
@@ -612,7 +611,7 @@ $Constants = @(
     }
     #endregion
 
-    #region Tier 2
+    #region Tier 2 Constants
     @{
         sourceName    = "AV_CloudAdminTier2_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier2'
@@ -859,9 +858,15 @@ ForEach (
     $params = @{
         GroupId        = $GroupId
         ExpandProperty = 'Owners'
-        ErrorAction    = 'SilentlyContinue'
+        ErrorAction    = 'Stop'
     }
-    $GroupObj = Get-MgBetaGroup @params
+
+    try {
+        $GroupObj = Get-MgBetaGroup @params
+    }
+    catch {
+        Throw $_
+    }
 
     if (-Not $GroupObj) {
         Throw "GroupId $($GroupId) does not exist."
@@ -897,42 +902,54 @@ ForEach (
     }
     if ('Private' -ne $GroupObj.Visibility) {
         Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Correcting visibility to Private for Cloud Administration."
-        Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' 1> $null
+        try {
+            Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' -ErrorAction Stop 1> $null
+        }
+        catch {
+            Throw $_
+        }
     }
     #TODO check for assigned roles and remove them
     if ($GroupObj.Owners) {
         foreach ($owner in $GroupObj.Owners) {
             Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)"
-            Remove-MgGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $owner.Id 1> $null
+            try {
+                Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $owner.Id -ErrorAction Stop 1> $null
+            }
+            catch {
+                Throw $_
+            }
         }
-    }
-
-    $GroupDescription = Get-Variable -ValueOnly -name "GroupDescription_Tier$Tier"
-    if (-Not $GroupObj.Description) {
-        Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $Tier identification"
-        Update-MgGroup -GroupId -Description $GroupDescription 1> $null
-    }
-    elseif ($GroupObj.Description -ne $GroupDescription) {
-        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
     }
 }
 #endregion ---------------------------------------------------------------------
 
 #region License Existance Validation -------------------------------------------
+$TenantLicensed = Get-MgSubscribedSku -All
+$SkuPartNumberWithExchangeServicePlan = $null
 ForEach (
     $SkuPartNumber in @(
-        ($LicenseSkuPartNumber_Tier0, $LicenseSkuPartNumber_Tier2, $LicenseSkuPartNumber_Tier2) | Select-Object -Unique
+        @(($LicenseSkuPartNumber_Tier0 -split ' '); ($LicenseSkuPartNumber_Tier1 -split ' '); ($LicenseSkuPartNumber_Tier2 -split ' ')) | Select-Object -Unique
     )
 ) {
     if ([String]::IsNullOrEmpty($SkuPartNumber)) { continue }
-    $Sku = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
+    $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
 
     if (-Not $Sku) {
-        Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant."
+        Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant. Licenses must be purchased to before creating Cloud Administrator accounts."
     }
-    if (-Not ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') })) {
-        Throw "License SkuPartNumber $LicenseSkuPartNumber does not contain an Exchange Online service plan."
+    if ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') }) {
+        if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
+            $SkuPartNumberWithExchangeServicePlan = $Sku.SkuPartNumber
+            Write-Verbose "Detected Exchange Online service plan in SkuPartNumber $SkuPartNumberWithExchangeServicePlan."
+        }
+        else {
+            Throw "There can only be one license configured containing an Exchange Online service plan: Make your choice between $SkuPartNumberWithExchangeServicePlan and $($Sku.SkuPartNumber)."
+        }
     }
+}
+if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
+    Throw "One of the configured SkuPartNumbers must contain an Exchange Online service plan."
 }
 #endregion ---------------------------------------------------------------------
 
@@ -963,17 +980,75 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #region [COMMON] LOOP ENVIRONMENT ----------------------------------------------
     .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants -scriptParameterOnly $true 1> $null
 
+    $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
     $LicenseSkuPartNumber = Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier"
     $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
     $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
     $GroupObj = $null
     $UserObj = $null
-    $License = $null
+    $TenantLicensed = $null
 
     if (-Not [string]::IsNullOrEmpty($GroupId)) {
-        $GroupObj = Get-MgGroup -GroupId $GroupId
+        $GroupObj = Get-MgBetaGroup -GroupId $GroupId
     }
     #endregion ---------------------------------------------------------------------
+
+    #region Group Validation -------------------------------------------------------
+    if ($GroupObj) {
+        $GroupDescription = Get-Variable -ValueOnly -name "GroupDescription_Tier$Tier"
+        if (-Not $GroupObj.Description) {
+            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $Tier identification"
+            try {
+                Update-MgBetaGroup -GroupId -Description $GroupDescription -ErrorAction Stop 1> $null
+            }
+            catch {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+                $persistentError = $true
+                return
+            }
+        }
+        elseif ($GroupObj.Description -ne $GroupDescription) {
+            $return.Error += .\Common__0000_Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Internal configuration error."
+                ErrorId          = '500'
+                Category         = 'InvalidData'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
+            }
+            $persistentError = $true
+            return
+        }
+
+        if ( (-Not $DedicatedAccount) -and
+            ($GroupObj.GroupType -Contains 'DynamicMembership') -and
+            ($GroupObj.MembershipRuleProcessingState -eq 'On')
+        ) {
+            $return.Error += .\Common__0000_Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Internal configuration error."
+                ErrorId          = '500'
+                Category         = 'InvalidData'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Cloud Administrator Creation'
+                CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership."
+            }
+            return
+        }
+    }
+    #endregion
 
     #region [COMMON] PARAMETER VALIDATION ------------------------------------------
     $regex = '^[^\s]+@[^\s]+\.[^\s]+$|^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
@@ -1061,9 +1136,25 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         UserId         = $ReferralUserId
         Property       = $userProperties
         ExpandProperty = $userExpandPropeties
-        ErrorAction    = 'SilentlyContinue'
+        ErrorAction    = 'Stop'
     }
-    $refUserObj = Get-MgUser @params
+    try {
+        $refUserObj = Get-MgBetaUser @params
+    }
+    catch {
+        $return.Error += .\Common__0000_Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Referral User ID does not exist in directory."
+            ErrorId           = '404'
+            Category          = 'ObjectNotFound'
+            TargetName        = $ReferralUserId
+            TargetObject      = $null
+            TargetType        = 'UserId'
+            RecommendedAction = 'Provide an existing User Principal Name, or Object ID (UUID).'
+            CategoryActivity  = 'ReferralUserId user validation'
+            CategoryReason    = 'Referral User ID does not exist in directory.'
+        }
+        return
+    }
 
     if ($null -eq $refUserObj) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1081,11 +1172,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if (
-    ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
-    ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
-    ($refUserObj.UserPrincipalName -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
-    ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
-    ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
+        ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
+        ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
+        ($refUserObj.UserPrincipalName -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
+        ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
+        ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
@@ -1187,11 +1278,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         return
     }
 
-    $timeNow = (Get-Date).ToUniversalTime()
-
     if (
         ($null -ne $refUserObj.EmployeeHireDate) -and
-        ($timeNow -lt $refUserObj.EmployeeHireDate)
+        ($return.Job.StartTime -lt $refUserObj.EmployeeHireDate)
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
@@ -1208,7 +1297,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     if (
         ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
-        ($timeNow -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
+        ($return.Job.StartTime -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
@@ -1222,9 +1311,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         return
     }
-
-    $tenant = Get-MgOrganization
-    $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 
     if ($true -eq $tenant.OnPremisesSyncEnabled -and ($true -ne $refUserObj.OnPremisesSyncEnabled)) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1272,34 +1358,16 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #endregion ---------------------------------------------------------------------
 
     #region No Dedicated User Account required -------------------------------------
-    $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
     if (-Not $DedicatedAccount) {
         #region Group Membership Assignment --------------------------------------------
         if ($GroupObj) {
-            if (
-                $GroupObj.GroupType -Contains 'DynamicMembership' -and
-                ($GroupObj.MembershipRuleProcessingState -eq 'On')
-            ) {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
-                    Message          = "${ReferralUserId}: Internal configuration error."
-                    ErrorId          = '500'
-                    Category         = 'InvalidData'
-                    TargetName       = $refUserObj.UserPrincipalName
-                    TargetObject     = $refUserObj.Id
-                    TargetType       = 'UserId'
-                    CategoryActivity = 'Cloud Administrator Creation'
-                    CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership."
-                }
-                return
-            }
-
             $params = @{
                 ConsistencyLevel = 'eventual'
                 GroupId          = $GroupObj.Id
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($refUserObj.Id)'"
             }
-            if (-Not (Get-MgGroupMember @params)) {
+            if (-Not (Get-MgBetaGroupMember @params)) {
                 Write-Verbose "Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
                 New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $refUserObj.Id
             }
@@ -1650,7 +1718,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             "proxyAddresses/any(x:x eq 'smtp:$($BodyParams.Mail)')"
         ) -join ' '
     }
-    $duplicatesObj = Get-MgUser @params
+    $duplicatesObj = Get-MgBetaUser @params
 
     if ($userCount -gt 1) {
         Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
@@ -1676,7 +1744,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ExpandProperty = $userExpandPropeties
         ErrorAction    = 'SilentlyContinue'
     }
-    $existingUserObj = Get-MgUser @params
+    $existingUserObj = Get-MgBetaUser @params
 
     if ($null -ne $existingUserObj) {
         if ($null -ne $existingUserObj.OnPremisesSyncEnabled) {
@@ -1701,42 +1769,97 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             UserId        = $existingUserObj.Id
             BodyParameter = $BodyParams
             Confirm       = $false
+            ErrorAction   = 'Stop'
         }
-        Update-MgUser @params 1> $null
+
+        try {
+            Update-MgBetaUser @params 1> $null
+        }
+        catch {
+            $return.Error += .\Common__0000_Write-Error.ps1 @{
+                Message          = $Error[0].Exception.Message
+                ErrorId          = '500'
+                Category         = $Error[0].CategoryInfo.Category
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = $Error[0].CategoryInfo.Reason
+            }
+            return
+        }
 
         if ($BodyParamsNull.Count -gt 0) {
-            # Workaround as properties cannot be nulled using Update-MgUser at the moment ...
+            # Workaround as properties cannot be nulled using Update-MgBetaUser at the moment ...
             $params = @{
-                OutputType = 'PSObject'
-                Method     = 'PATCH'
-                Uri        = "https://graph.microsoft.com/v1.0/users/$($existingUserObj.Id)"
-                Body       = $BodyParamsNull
+                OutputType  = 'PSObject'
+                Method      = 'PATCH'
+                Uri         = "https://graph.microsoft.com/beta/users/$($existingUserObj.Id)"
+                Body        = $BodyParamsNull
+                ErrorAction = 'Stop'
             }
-            Invoke-MgGraphRequest @params 1> $null
+            try {
+                Invoke-MgGraphRequest @params 1> $null
+            }
+            catch {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+                return
+            }
         }
-        $UserObj = Get-MgUser -UserId $existingUserObj.Id -ErrorAction SilentlyContinue
+        $UserObj = Get-MgBetaUser -UserId $existingUserObj.Id
+
+        Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     }
     else {
         #region License Availability Validation ----------------------------------------
-        $License = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
-        if ($License.ConsumedUnits -ge $License.Enabled) {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
-                Message           = "${ReferralUserId}: License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
-                ErrorId           = '503'
-                Category          = 'LimitsExceeded'
-                TargetName        = $refUserObj.UserPrincipalName
-                TargetObject      = $refUserObj.Id
-                TargetType        = 'UserId'
-                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
-                CategoryActivity  = 'License Availability Validation'
-                CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ') | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+        foreach ($Sku in $TenantLicensed) {
+            if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
+                    ErrorId           = '503'
+                    Category          = 'LimitsExceeded'
+                    TargetName        = $refUserObj.UserPrincipalName
+                    TargetObject      = $refUserObj.Id
+                    TargetType        = 'UserId'
+                    RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                    CategoryActivity  = 'License Availability Validation'
+                    CategoryReason    = "License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
+                }
+                $persistentError = $true
             }
-            $persistentError = $true
-            return
+            else {
+                Write-Verbose "License SkuPartNumber $($Sku.SkuPartNumber) has at least 1 free license available to continue"
+            }
         }
+        if ($persistentError) { return }
         #endregion ---------------------------------------------------------------------
 
-        $UserObj = New-MgUser -BodyParameter $BodyParams -ErrorAction SilentlyContinue -Confirm:$false
+        try {
+            $UserObj = New-MgBetaUser -BodyParameter $BodyParams -ErrorAction Stop
+        }
+        catch {
+            $return.Error += .\Common__0000_Write-Error.ps1 @{
+                Message          = $Error[0].Exception.Message
+                ErrorId          = '500'
+                Category         = $Error[0].CategoryInfo.Category
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = $Error[0].CategoryInfo.Reason
+            }
+            return
+        }
 
         # Wait for user provisioning consistency
         $DoLoop = $true
@@ -1752,13 +1875,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Filter           = "Id eq '$($newUser.Id)'"
                 ErrorAction      = 'SilentlyContinue'
             }
-            $UserObj = Get-MgUser @params
+            $UserObj = Get-MgBetaUser @params
 
             if ($null -ne $UserObj) {
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgUser -UserId $newUser.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
+                Remove-MgBetaUser -UserId $newUser.Id -ErrorAction SilentlyContinue 1> $null
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1781,7 +1904,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         } While ($DoLoop)
 
-        Write-Verbose "Created Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+        Write-Verbose "Created new Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     }
 
     if ($null -eq $UserObj) {
@@ -1809,9 +1932,24 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Write-Warning "Correcting Manager reference to $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
             }
             $NewManager = @{
-                '@odata.id' = 'https://graph.microsoft.com/v1.0/users/' + $refUserObj.Id
+                '@odata.id' = 'https://graph.microsoft.com/beta/users/' + $refUserObj.Id
             }
-            Set-MgUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager 1> $null
+            try {
+                Set-MgBetaUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager -ErrorAction Stop 1> $null
+            }
+            catch {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+                return
+            }
         }
     }
     elseif (
@@ -1819,49 +1957,97 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ($null -ne $existingUserObj.Manager)
     ) {
         Write-Warning "Removing Manager reference to $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id))"
-        Remove-MgUserManagerByRef -UserId $existingUserObj.Id
-    }
-    #endregion ---------------------------------------------------------------------
-
-    #region License Availability Validation ----------------------------------------
-    if (-Not $License) {
-        $License = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
-        if ($License.ConsumedUnits -ge $License.Enabled) {
+        try {
+            Remove-MgBetaUserManagerByRef -UserId $existingUserObj.Id -ErrorAction Stop
+        }
+        catch {
             $return.Error += .\Common__0000_Write-Error.ps1 @{
-                Message           = "${ReferralUserId}: License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
-                ErrorId           = '503'
-                Category          = 'LimitsExceeded'
-                TargetName        = $refUserObj.UserPrincipalName
-                TargetObject      = $refUserObj.Id
-                TargetType        = 'UserId'
-                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
-                CategoryActivity  = 'License Availability Validation'
-                CategoryReason    = "License SkuPartNumber $LicenseSkuPartNumber has run out of free licenses."
+                Message          = $Error[0].Exception.Message
+                ErrorId          = '500'
+                Category         = $Error[0].CategoryInfo.Category
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = $Error[0].CategoryInfo.Reason
             }
-            $persistentError = $true
             return
         }
     }
     #endregion ---------------------------------------------------------------------
 
-    #region Direct License Assignment ----------------------------------------------
-    $userLicObj = Get-MgUserLicenseDetail -UserId $UserObj.Id
-    if ($GroupObj) {
-        #TODO remove any direct license assignment to enforce group-based licensing
+    #region License Availability Validation ----------------------------------------
+    if (-Not $TenantLicensed) {
+        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique) | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+        foreach ($Sku in $TenantLicensed) {
+            if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
+                    ErrorId           = '503'
+                    Category          = 'LimitsExceeded'
+                    TargetName        = $refUserObj.UserPrincipalName
+                    TargetObject      = $refUserObj.Id
+                    TargetType        = 'UserId'
+                    RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                    CategoryActivity  = 'License Availability Validation'
+                    CategoryReason    = "License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
+                }
+                $persistentError = $true
+            }
+            else {
+                Write-Verbose "License SkuPartNumber $($Sku.SkuPartNumber) has at least 1 free license available to continue"
+            }
+        }
+        if ($persistentError) { return }
     }
-    elseif (-Not ($userLicObj | Where-Object SkuPartNumber -eq $LicenseSkuPartNumber)) {
+    #endregion ---------------------------------------------------------------------
+
+    #region Direct License Assignment ----------------------------------------------
+    if (-Not $GroupObj) {
         Write-Verbose "Implying direct license assignment is required as no GroupId was provided for group-based licensing."
+        $UserLicensed = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
         $params = @{
             UserId         = $UserObj.Id
-            AddLicenses    = @(
-                @{
-                    SkuId         = $License.SkuId
-                    DisabledPlans = $License.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
-                }
-            )
+            AddLicenses    = @()
             RemoveLicenses = @()
+            ErrorAction    = 'Stop'
         }
-        Set-MgUserLicense @params 1> $null
+
+        foreach ($SkuPartNumber in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique)) {
+            if (-Not ($UserLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber)) {
+                Write-Verbose "Adding missing license $SkuPartNumber"
+                $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber
+                $license = @{
+                    SkuId = $Sku.SkuId
+                }
+                if ($SkuPartNumber -eq $SkuPartNumberWithExchangeServicePlan) {
+                    $license.DisabledPlans = $Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
+                }
+                $params.AddLicenses += $license
+            }
+        }
+
+        if (
+            ($params.AddLicenses.Count -gt 0) -or
+            ($params.RemoveLicenses.Count -gt 0)
+        ) {
+            try {
+                Set-MgBetaUserLicense @params 1> $null
+            }
+            catch {
+                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+                return
+            }
+        }
     }
     #endregion ---------------------------------------------------------------------
 
@@ -1877,9 +2063,24 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($UserObj.Id)'"
             }
-            if (-Not (Get-MgGroupMember @params)) {
+            if (-Not (Get-MgBetaGroupMember @params)) {
                 Write-Verbose "Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
-                New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id
+                try {
+                    New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop
+                }
+                catch {
+                    $return.Error += .\Common__0000_Write-Error.ps1 @{
+                        Message          = $Error[0].Exception.Message
+                        ErrorId          = '500'
+                        Category         = $Error[0].CategoryInfo.Category
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'Account Provisioning'
+                        CategoryReason   = $Error[0].CategoryInfo.Reason
+                    }
+                    return
+                }
             }
         }
 
@@ -1896,12 +2097,12 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($UserObj.Id)'"
             }
-            if ($null -ne (Get-MgGroupMember @params)) {
+            if ($null -ne (Get-MgBetaGroupMember @params)) {
                 Write-Verbose "OK: Detected group memnbership."
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
+                Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1933,11 +2134,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     $WaitSec = 7
 
     do {
-        $userLicObj = Get-MgUserLicenseDetail -UserId $UserObj.Id
+        $UserLicensed = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
         if (
-            ($null -ne $userLicObj) -and
+            ($null -ne $UserLicensed) -and
             (
-                $userLicObj.ServicePlans | Where-Object -FilterScript {
+                $UserLicensed.ServicePlans | Where-Object -FilterScript {
                     ($_.AppliesTo -eq 'User') -and
                     ($_.ProvisioningStatus -eq 'Success') -and
                     ($_.ServicePlanName -Match 'EXCHANGE')
@@ -1948,7 +2149,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
+            Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1986,7 +2187,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgUser -UserId $UserObj.Id -ErrorAction SilentlyContinue -Confirm:$false 1> $null
+            Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -2018,11 +2219,27 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         DeliverToMailboxAndForward    = $false
         HiddenFromAddressListsEnabled = $true
         WarningAction                 = 'SilentlyContinue'
+        ErrorAction                   = 'Stop'
     }
-    Set-Mailbox @params 1> $null
+    try {
+        Set-Mailbox @params 1> $null
+    }
+    catch {
+        $return.Error += .\Common__0000_Write-Error.ps1 @{
+            Message          = $Error[0].Exception.Message
+            ErrorId          = '500'
+            Category         = $Error[0].CategoryInfo.Category
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'UserId'
+            CategoryActivity = 'Account Provisioning'
+            CategoryReason   = $Error[0].CategoryInfo.Reason
+        }
+        return
+    }
 
     $userExMbObj = Get-Mailbox -Identity $userExObj.Identity
-    $UserObj = Get-MgUser -UserId $UserObj.Id -Property $userProperties -ExpandProperty $userExpandPropeties
+    $UserObj = Get-MgBetaUser -UserId $UserObj.Id -Property $userProperties -ExpandProperty $userExpandPropeties
     #endregion ---------------------------------------------------------------------
 
     #region Set User Photo ---------------------------------------------------------
@@ -2051,6 +2268,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Method          = 'GET'
                 Uri             = $url
                 TimeoutSec      = 10
+                ErrorAction     = 'Stop'
             }
             $response = Invoke-WebRequest @params
 
@@ -2072,11 +2290,26 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ($response) {
         Write-Verbose 'Uploading User Photo to Microsoft Graph'
         $params = @{
-            InFile = 'nonExistat.lat'
-            UserId = $UserObj.Id
-            Data   = ([System.IO.MemoryStream]::new($response.Content))
+            InFile      = 'nonExistat.lat'
+            UserId      = $UserObj.Id
+            Data        = ([System.IO.MemoryStream]::new($response.Content))
+            ErrorAction = 'Stop'
         }
-        Set-MgUserPhotoContent @params 1> $null
+        try {
+            Set-MgBetaUserPhotoContent @params 1> $null
+        }
+        catch {
+            $return.Error += .\Common__0000_Write-Warning.ps1 @{
+                Message          = $Error[0].Exception.Message
+                ErrorId          = '500'
+                Category         = $Error[0].CategoryInfo.Category
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = $Error[0].CategoryInfo.Reason
+            }
+        }
     }
     else {
         Write-Error "Failed to retrieve User Photo from all URLs"
@@ -2141,13 +2374,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     $params = @{
         ReferralUserId = $ReferralUserId[$_]
         Tier           = $Tier[$_]
-        UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl)) { $null } else { $UserPhotoUrl[$_] }
+        UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl) -or [string]::IsNullOrEmpty($UserPhotoUrl[$_])) { $null } else { $UserPhotoUrl[$_] }
     }
     ProcessReferralUser @params
 }
 #endregion ---------------------------------------------------------------------
 
-#region Output Return Data --------------------------------------------
+#region Output Return Data -----------------------------------------------------
 $return.Job.EndTime = (Get-Date).ToUniversalTime()
 $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
 

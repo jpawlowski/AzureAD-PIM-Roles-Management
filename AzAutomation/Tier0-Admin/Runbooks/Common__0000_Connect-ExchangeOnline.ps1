@@ -11,7 +11,7 @@
 #>
 
 #Requires -Version 5.1
-#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0' }
+#Requires -Modules @{ ModuleName='ExchangeOnlineManagement'; ModuleVersion='3.0'; MaximumVersion='3.65535' }
 
 [CmdletBinding()]
 Param(
