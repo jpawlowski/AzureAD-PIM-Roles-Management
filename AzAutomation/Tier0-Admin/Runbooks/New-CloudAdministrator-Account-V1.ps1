@@ -1415,8 +1415,8 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
         if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
 
-        if (-Not $return.Data) { $return.Data = @() }
-        $return.Data += $data
+        if (-Not $return.Output) { $return.Output = @() }
+        $return.Output += $data
 
         if ($OutText) {
             Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
@@ -2357,8 +2357,8 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
     if ($PhotoUrl ) { $data.UserPhotoUrl = $PhotoUrl }
 
-    if (-Not $return.Data) { $return.Data = @() }
-    $return.Data += $data
+    if (-Not $return.Output) { $return.Output = @() }
+    $return.Output += $data
 
     if ($OutText) {
         Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
