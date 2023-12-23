@@ -55,9 +55,10 @@ foreach ($Item in $Variable) {
     if (
         $params.Value -and
         $Item.Type -and
-        ($params.Value.GetType().Name -ne $Item.Type)
+        ($Item.Type -eq 'Boolean') -and
+        (($params.Value -ne $false) -and ($params.Value -ne $true))
     ) {
-        Write-Warning "Type of environment variable $($Item.sourceName) is '$($params.Value.GetType().Name)' while '$($Item.Type)' was expected so it is ignored"
+        Write-Warning "Environment variable $($Item.sourceName) does not seem to be a boolean so it is ignored"
         $params.Value = $null
     }
     if (

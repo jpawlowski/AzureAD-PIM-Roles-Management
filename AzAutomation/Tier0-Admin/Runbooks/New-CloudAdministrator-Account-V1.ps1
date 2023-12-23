@@ -802,8 +802,8 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common__0000_Import-Modules.ps1 -Modules $-MgModules 1> $null
-.\Common__0002_Add-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common__0000_Import-Modules.ps1 -Modules $ImportPsModules 1> $null
+.\Common__0002_Import-AzAutomationVariableToPSEnv.ps1 1> $null
 .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -1047,7 +1047,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             return
         }
 
-        if ( (-Not $DedicatedAccount) -and
+        if (($DedicatedAccount -eq $false) -and
             ($GroupObj.GroupType -Contains 'DynamicMembership') -and
             ($GroupObj.MembershipRuleProcessingState -eq 'On')
         ) {
@@ -1373,7 +1373,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #endregion ---------------------------------------------------------------------
 
     #region No Dedicated User Account required -------------------------------------
-    if (-Not $DedicatedAccount) {
+    if ($DedicatedAccount -eq $false) {
         #region Group Membership Assignment --------------------------------------------
         if ($GroupObj) {
             $params = @{
@@ -1505,7 +1505,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $BodyParams.DisplayName += Get-Variable -ValueOnly -Name "UserDisplayNameSuffix_Tier$Tier"
     }
 
-    if ($AccountTypeEmployeeType) {
+    if ($AccountTypeEmployeeType -eq $true) {
         if ([string]::IsNullOrEmpty($refUserObj.EmployeeType)) {
             Write-Verbose "Creating property EmployeeType"
             $BodyParams.EmployeeType = if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefix_Tier$Tier") {
@@ -1621,7 +1621,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if (
-        (-Not $ReferenceManager) -and
+        ($ReferenceManager -eq $false) -and
         [string]::IsNullOrEmpty($BodyParams.OnPremisesExtensionAttributes.$extAttrRef)
     ) {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -1937,7 +1937,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #endregion ---------------------------------------------------------------------
 
     #region Update Manager Reference -----------------------------------------------
-    if ($ReferenceManager) {
+    if ($ReferenceManager -eq $true) {
         if (
             (-Not $existingUserObj) -or
             ($existingUserObj.Manager.Id -ne $refUserObj.Id)
@@ -1970,7 +1970,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $existingUserObj -and
         ($null -ne $existingUserObj.Manager)
     ) {
-        Write-Warning "Removing Manager reference to $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id))"
+        Write-Warning "Removing Manager reference to $($existingUserObj.Manager.DisplayName) ($($existingUserObj.Manager.Id))"
         try {
             Remove-MgBetaUserManagerByRef -UserId $existingUserObj.Id -ErrorAction Stop
         }
