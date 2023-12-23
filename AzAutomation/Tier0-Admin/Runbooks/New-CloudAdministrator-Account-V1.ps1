@@ -1969,7 +1969,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     elseif (
         $existingUserObj -and
-        ($null -ne $existingUserObj.Manager)
+        ($null -ne $existingUserObj.Manager.Id)
     ) {
         Write-Warning "Removing Manager reference to $($existingUserObj.Manager.DisplayName) ($($existingUserObj.Manager.Id))"
         try {
