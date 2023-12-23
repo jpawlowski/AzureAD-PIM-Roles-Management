@@ -23,7 +23,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
     @{ Name = 'Az.Accounts'; MinimumVersion = '2.8'; MaximumVersion = '2.65535' }
-    @{ Name = 'Az.Automation'; MinimumVersion = '1.9'; MaximumVersion = '1.65535' }
+    @{ Name = 'Az.Automation'; MinimumVersion = '1.7'; MaximumVersion = '1.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
