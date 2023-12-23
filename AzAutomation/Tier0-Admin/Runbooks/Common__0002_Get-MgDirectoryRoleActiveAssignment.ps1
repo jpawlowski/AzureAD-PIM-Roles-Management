@@ -17,22 +17,22 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
-    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
 $return = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
-    $return = Get-MgUserTransitiveMemberOfAsDirectoryRole `
+    $return = Get-MgBetaUserTransitiveMemberOfAsDirectoryRole `
         -UserId (Get-MgContext).Account `
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }
 else {
-    $ServicePrincipal = Get-MgServicePrincipalByAppId -AppId (Get-MgContext).ClientId
-    $return = Get-MgServicePrincipalTransitiveMemberOfAsDirectoryRole `
+    $ServicePrincipal = Get-MgBetaServicePrincipalByAppId -AppId (Get-MgContext).ClientId
+    $return = Get-MgBetaServicePrincipalTransitiveMemberOfAsDirectoryRole `
         -ServicePrincipalId $ServicePrincipal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar

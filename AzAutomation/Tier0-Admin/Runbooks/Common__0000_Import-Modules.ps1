@@ -12,7 +12,12 @@ Param(
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
-$OrigVerbosePreference = $global:VerbosePreference
+# Works only when running locally
+$OrigVerbosePreference = $VerbosePreference
+$VerbosePreference = 'SilentlyContinue'
+
+# Works only when running in Azure Automation sandbox
+$OrigGlobalVerbosePreference = $global:VerbosePreference
 $global:VerbosePreference = 'SilentlyContinue'
 
 $Missing = @()
@@ -31,6 +36,7 @@ If ($Missing.Count -gt 0) {
     Throw $Missing
 }
 
-$global:VerbosePreference = $OrigVerbosePreference
+$VerbosePreference = $OrigVerbosePreference
+$global:VerbosePreference = $OrigGlobalVerbosePreference
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

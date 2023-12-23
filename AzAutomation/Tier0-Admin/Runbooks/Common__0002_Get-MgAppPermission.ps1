@@ -17,8 +17,8 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
-    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -28,8 +28,8 @@ $AppRoleAssignments = $null
 $PermissionGrants = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
-    $Principal = Get-MgUser -UserId (Get-MgContext).Account
-    $AppRoleAssignments = Get-MgUserAppRoleAssignment `
+    $Principal = Get-MgBetaUser -UserId (Get-MgContext).Account
+    $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment `
         -UserId $Principal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
@@ -42,8 +42,8 @@ if ((Get-MgContext).AuthType -eq 'Delegated') {
         -ErrorAction SilentlyContinue
 }
 else {
-    $Principal = Get-MgServicePrincipalByAppId -AppId (Get-MgContext).ClientId
-    $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment `
+    $Principal = Get-MgBetaServicePrincipalByAppId -AppId (Get-MgContext).ClientId
+    $AppRoleAssignments = Get-MgBetaServicePrincipalAppRoleAssignment `
         -ServicePrincipalId $Principal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
@@ -83,10 +83,10 @@ foreach ($Item in $App | Select-Object -Unique) {
     }
 
     if ($AppId) {
-        $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')"
+        $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')"
     }
     elseif ($DisplayName) {
-        $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'"
+        $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'"
     }
 
     if (-Not $AppResource) {

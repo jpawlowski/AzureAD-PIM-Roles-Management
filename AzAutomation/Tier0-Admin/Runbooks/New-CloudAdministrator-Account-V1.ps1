@@ -230,7 +230,6 @@ Param (
 # interesting aspects of the dependencies, e.g. when performing a code audit for security reasons.
 
 $ImportPsModules = @(
-    @{ Name = 'Az.Resources'; MinimumVersion = '6.0'; MaximumVersion = '6.65535' }
     @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
@@ -998,6 +997,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants -scriptParameterOnly $true 1> $null
 
     $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
+    $UpdatedUserOnly = $false
     $LicenseSkuPartNumber = Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier"
     $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
     $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
@@ -1831,7 +1831,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         }
         $UserObj = Get-MgBetaUser -UserId $existingUserObj.Id
-
+        $UpdatedUserOnly = $true
         Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
     }
     else {
@@ -1896,7 +1896,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgBetaUser -UserId $newUser.Id -ErrorAction SilentlyContinue 1> $null
+                if (-Not $UpdatedUserOnly) {
+                    Remove-MgBetaUser -UserId $newUser.Id -ErrorAction SilentlyContinue 1> $null
+                }
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
@@ -2117,11 +2119,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
-                Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+                if (-Not $UpdatedUserOnly) {
+                    Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+                }
                 $DoLoop = $false
 
                 $return.Error += .\Common__0000_Write-Error.ps1 @{
-                    Message           = "${ReferralUserId}: Group assignment timeout for $($newUser.UserPrincipalName)."
+                    Message           = "${ReferralUserId}: Group assignment timeout for $($UserObj.UserPrincipalName)."
                     ErrorId           = '504'
                     Category          = 'OperationTimeout'
                     TargetName        = $refUserObj.UserPrincipalName
@@ -2164,11 +2168,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+            if (-Not $UpdatedUserOnly) {
+                Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+            }
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
-                Message           = "${ReferralUserId}: Exchange Online license activation timeout for $($newUser.UserPrincipalName)."
+                Message           = "${ReferralUserId}: Exchange Online license activation timeout for $($UserObj.UserPrincipalName)."
                 ErrorId           = '504'
                 Category          = 'OperationTimeout'
                 TargetName        = $refUserObj.UserPrincipalName
@@ -2202,11 +2208,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
-            Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+            if (-Not $UpdatedUserOnly) {
+                Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+            }
             $DoLoop = $false
 
             $return.Error += .\Common__0000_Write-Error.ps1 @{
-                Message           = "${ReferralUserId}: Mailbox provisioning timeout for $($newUser.UserPrincipalName)."
+                Message           = "${ReferralUserId}: Mailbox provisioning timeout for $($UserObj.UserPrincipalName)."
                 ErrorId           = '504'
                 Category          = 'OperationTimeout'
                 TargetName        = $refUserObj.UserPrincipalName
@@ -2385,6 +2393,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 0..$($ReferralUserId.Count) | ForEach-Object {
     if ([string]::IsNullOrEmpty($ReferralUserId[$_])) { return }
     if ([string]::IsNullOrEmpty($Tier[$_])) { return }
+    [System.GC]::Collect()
     $params = @{
         ReferralUserId = $ReferralUserId[$_]
         Tier           = $Tier[$_]
