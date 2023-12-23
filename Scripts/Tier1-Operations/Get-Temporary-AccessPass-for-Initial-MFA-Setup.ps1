@@ -35,8 +35,8 @@
     Version: 1.0
 #>
 #Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
-#Requires -Modules @{ ModuleName='Az.Automation'; ModuleVersion='1.9' }
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.8' }
+#Requires -Modules @{ ModuleName='Az.Automation'; ModuleVersion='1.7' }
 
 Param (
     [string]$TenantId = '8cb0668a-9ecd-4147-b144-fa23663291a8',

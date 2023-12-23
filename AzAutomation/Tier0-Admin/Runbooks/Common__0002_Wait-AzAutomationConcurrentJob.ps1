@@ -24,9 +24,11 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     .\Common__0001_Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
+    #region [COMMON] ENVIRONMENT ---------------------------------------------------
     .\Common__0000_Import-Modules.ps1 -Modules @(
-        @{ Name = 'Az.Automation'; MinimumVersion = '1.9'; MaximumVersion = '1.65535' }
+        @{ Name = 'Az.Automation'; MinimumVersion = '1.7'; MaximumVersion = '1.65535' }
     ) 1> $null
+    #endregion ---------------------------------------------------------------------
 
     $DoLoop = $true
     $RetryCount = 1

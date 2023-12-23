@@ -36,9 +36,9 @@
     Version: 1.3
 #>
 #Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
-#Requires -Modules @{ ModuleName='Az.Automation'; ModuleVersion='1.9' }
-#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.8' }
+#Requires -Modules @{ ModuleName='Az.Automation'; ModuleVersion='1.7' }
+#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Authentication'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
@@ -260,6 +260,34 @@ if ($PSCmdlet.ShouldProcess(
         }
         @{
             Name    = 'Microsoft.Graph.Applications'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Identity.SignIns'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Identity.DirectoryManagement'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Users'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Users.Actions'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Users.Functions'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Groups'
+            Version = '2.0'
+        }
+        @{
+            Name    = 'Microsoft.Graph.Beta.Applications'
             Version = '2.0'
         }
         @{
@@ -638,7 +666,7 @@ if ($automationAccount.Identity.PrincipalId) {
                 roleTemplateId = '31392ffb-586c-42d1-9346-e59415a2cc4e'
             }
             @{
-                DisplayName    = 'Group Administrator'
+                DisplayName    = 'Groups Administrator'
                 roleTemplateId = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
             }
             @{

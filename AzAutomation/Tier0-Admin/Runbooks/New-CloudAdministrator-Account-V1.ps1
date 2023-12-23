@@ -230,15 +230,11 @@ Param (
 # interesting aspects of the dependencies, e.g. when performing a code audit for security reasons.
 
 $ImportPsModules = @(
-    @{ Name = 'Az.Accounts'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Az.Resources'; MinimumVersion = '6.0'; MaximumVersion = '6.65535' }
-    @{ Name = 'Microsoft.Graph.Authentication'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Identity.SignIns'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.0'; MaximumVersion = '3.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 )
 
 $MgGraphScopes = @(
@@ -256,7 +252,7 @@ $MgGraphDirectoryRoles = @(
         TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
     }
     @{
-        DisplayName = 'Group Administrator'
+        DisplayName = 'Groups Administrator'
         TemplateId  = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
     }
     @{
@@ -806,7 +802,7 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common__0000_Import-Modules.ps1 -Modules $ImportPsModules 1> $null
+.\Common__0000_Import-Modules.ps1 -Modules $-MgModules 1> $null
 .\Common__0002_Add-AzAutomationVariableToPSEnv.ps1 1> $null
 .\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
@@ -815,6 +811,7 @@ if (
 $persistentError = $false
 $Iteration = 0
 $return = @{
+    Output      = @()
     Information = @()
     Warning     = @()
     Error       = @()
@@ -1162,15 +1159,14 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     catch {
         $return.Error += .\Common__0000_Write-Error.ps1 @{
-            Message           = "${ReferralUserId}: Referral User ID does not exist in directory."
-            ErrorId           = '404'
-            Category          = 'ObjectNotFound'
-            TargetName        = $ReferralUserId
-            TargetObject      = $null
-            TargetType        = 'UserId'
-            RecommendedAction = 'Provide an existing User Principal Name, or Object ID (UUID).'
-            CategoryActivity  = 'ReferralUserId user validation'
-            CategoryReason    = 'Referral User ID does not exist in directory.'
+            Message          = $Error[0].Exception.Message
+            ErrorId          = '500'
+            Category         = $Error[0].CategoryInfo.Category
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'UserId'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = $Error[0].CategoryInfo.Reason
         }
         return
     }
@@ -1434,7 +1430,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
         if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
 
-        if (-Not $return.Output) { $return.Output = @() }
         $return.Output += $data
 
         if ($OutText) {
@@ -2376,7 +2371,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
     if ($PhotoUrl ) { $data.UserPhotoUrl = $PhotoUrl }
 
-    if (-Not $return.Output) { $return.Output = @() }
     $return.Output += $data
 
     if ($OutText) {

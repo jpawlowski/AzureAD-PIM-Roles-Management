@@ -70,12 +70,12 @@ else {
     }
 
     foreach ($Item in $Roles) {
-        $roleTemplateId = if ($Item -is [String]) { $Item } else { $Item.roleTemplateId }
+        $roleTemplateId = if ($Item -is [String]) { $Item } elseif ($Item.roleTemplateId) { $Item.roleTemplateId } else { $Item.TemplateId }
         $DisplayName = if ($Item -is [String]) { $Item } else { $Item.DisplayName }
         $Optional = if ($Item -is [String]) { $false } else { $Item.Optional }
         $AssignedRole = $RoleAssignment | Where-Object { ($_.roleTemplateId -eq $roleTemplateId) -or ($_.DisplayName -eq $DisplayName) }
         if ($AssignedRole) {
-            Write-Verbose "Confirmed role $($AssignedRole.DisplayName) ($($AssignedRole.roleTemplateId))"
+            Write-Verbose "Confirmed directory role $($AssignedRole.DisplayName) ($($AssignedRole.roleTemplateId))"
             $activeRoles += $AssignedRole
         }
         elseif ($Optional) {

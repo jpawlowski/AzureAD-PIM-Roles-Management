@@ -23,8 +23,8 @@
     Version: 1.0
 #>
 #Requires -Version 5.1
-#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.12' }
-#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.8' }
+#Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.8' }
+#Requires -Modules @{ ModuleName='Az.Resources'; ModuleVersion='6.0' }
 
 [CmdletBinding(
     SupportsShouldProcess,

@@ -19,9 +19,11 @@ Param(
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
+#region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
     @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.0'; MaximumVersion = '3.65535' }
 ) 1> $null
+#endregion ---------------------------------------------------------------------
 
 $params = @{
     Organization = $Organization
@@ -53,8 +55,11 @@ if (-Not ($Connection)) {
     }
 
     try {
+        $OrigVerbosePreference = $global:VerbosePreference
+        $global:VerbosePreference = 'SilentlyContinue'
         Write-Information 'Connecting to Exchange Online ...'
         Connect-ExchangeOnline @params 1> $null
+        $global:VerbosePreference = $OrigVerbosePreference
     }
     catch {
         Throw "Failed to connect to Exchange Online"

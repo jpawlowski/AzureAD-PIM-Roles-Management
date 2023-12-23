@@ -17,12 +17,15 @@ if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and mus
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-    .\Common__0000_Import-Modules.ps1 -Modules @(
-        @{ Name = 'Az.Automation'; MinimumVersion = '1.9'; MaximumVersion = '1.65535' }
-    ) 1> $null
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
     .\Common__0001_Connect-AzAccount.ps1 1> $null
+    #endregion ---------------------------------------------------------------------
+
+    #region [COMMON] ENVIRONMENT ---------------------------------------------------
+    .\Common__0000_Import-Modules.ps1 -Modules @(
+        @{ Name = 'Az.Automation'; MinimumVersion = '1.7'; MaximumVersion = '1.65535' }
+    ) 1> $null
     #endregion ---------------------------------------------------------------------
 
     $AA = Get-AzAutomationAccount

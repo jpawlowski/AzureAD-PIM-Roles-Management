@@ -15,10 +15,12 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
 .\Common__0001_Connect-MgGraph.ps1 1> $null
 #endregion ---------------------------------------------------------------------
 
+#region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
     @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
+#endregion ---------------------------------------------------------------------
 
 $return = $null
 
