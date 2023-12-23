@@ -810,12 +810,14 @@ if (
 #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
 $persistentError = $false
 $Iteration = 0
+
+# To improve memory usage, return arrays are kept separate until the very end
+$returnOutput = @()
+$returnInformation = @()
+$returnWarning = @()
+$returnError = @()
 $return = @{
-    Output      = @()
-    Information = @()
-    Warning     = @()
-    Error       = @()
-    Job         = @{
+    Job = @{
         Runbook   = @{}
         StartTime = (Get-Date).ToUniversalTime()
         EndTime   = @{}
@@ -843,7 +845,7 @@ else {
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
 if (-Not (.\Common__0002_Wait-AzAutomationConcurrentJob.ps1)) {
-    $return.Error += .\Common__0000_Write-Error.ps1 @{
+    $script:returnError += .\Common__0000_Write-Error.ps1 @{
         Message           = "Maximum job runtime was reached."
         ErrorId           = '504'
         Category          = 'OperationTimeout'
@@ -975,9 +977,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     #region [COMMON] LOOP HANDLING -------------------------------------------------
     # Only process items if there was no error during script initialization before
-    if (($Iteration -eq 0) -and ($return.Error.Count -gt 0)) { $persistentError = $true }
+    if (($Iteration -eq 0) -and ($returnError.Count -gt 0)) { $persistentError = $true }
     if ($persistentError) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: Skipped processing."
             ErrorId           = '500'
             Category          = 'OperationStopped'
@@ -1019,7 +1021,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Update-MgBetaGroup -GroupId -Description $GroupDescription -ErrorAction Stop 1> $null
             }
             catch {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message          = $Error[0].Exception.Message
                     ErrorId          = '500'
                     Category         = $Error[0].CategoryInfo.Category
@@ -1034,7 +1036,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         }
         elseif ($GroupObj.Description -ne $GroupDescription) {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
                 Category         = 'InvalidData'
@@ -1052,7 +1054,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             ($GroupObj.GroupType -Contains 'DynamicMembership') -and
             ($GroupObj.MembershipRuleProcessingState -eq 'On')
         ) {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
                 Category         = 'InvalidData'
@@ -1070,7 +1072,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #region [COMMON] PARAMETER VALIDATION ------------------------------------------
     $regex = '^[^\s]+@[^\s]+\.[^\s]+$|^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     if ($ReferralUserId -notmatch $regex) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: ReferralUserId is invalid"
             ErrorId           = '400'
             Category          = 'SyntaxError'
@@ -1085,7 +1087,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     $regex = '^[0-2]$'
     if ($Tier -notmatch $regex) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: Tier $Tier is invalid"
             ErrorId           = '400'
             Category          = 'SyntaxError'
@@ -1100,7 +1102,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     $regex = '(?:^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$|^$)'
     if ($UserPhotoUrl -notmatch $regex) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: UserPhotoUrl $UserPhotoUrl is invalid"
             ErrorId           = '400'
             Category          = 'SyntaxError'
@@ -1159,7 +1161,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $refUserObj = Get-MgBetaUser @params
     }
     catch {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = $Error[0].Exception.Message
             ErrorId          = '500'
             Category         = $Error[0].CategoryInfo.Category
@@ -1173,7 +1175,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ($null -eq $refUserObj) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message           = "${ReferralUserId}: Referral User ID does not exist in directory."
             ErrorId           = '404'
             Category          = 'ObjectNotFound'
@@ -1194,7 +1196,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
         ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
             ErrorId          = '403'
             Category         = 'PermissionDenied'
@@ -1208,7 +1210,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if (($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$') {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must not use a onmicrosoft.com subdomain."
             ErrorId          = '403'
             Category         = 'PermissionDenied'
@@ -1222,7 +1224,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if (-Not $refUserObj.AccountEnabled) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts."
             ErrorId          = '403'
             Category         = 'NotEnabled'
@@ -1236,7 +1238,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ($refUserObj.UserType -ne 'Member') {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must be of type Member."
             ErrorId          = '403'
             Category         = 'InvalidType'
@@ -1250,7 +1252,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ([string]::IsNullOrEmpty($refUserObj.DisplayName)) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must have display name set."
             ErrorId          = '403'
             Category         = 'InvalidType'
@@ -1264,7 +1266,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ($refUserObj.DisplayName -match '^[^\s]+@[^\s]+\.[^\s]+$') {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID display name must be an e-mail address."
             ErrorId          = '403'
             Category         = 'InvalidType'
@@ -1281,7 +1283,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         (-Not $refUserObj.Manager) -or
         (-Not $refUserObj.Manager.Id)
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must have manager property set."
             ErrorId          = '403'
             Category         = 'ResourceUnavailable'
@@ -1298,7 +1300,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ($null -ne $refUserObj.EmployeeHireDate) -and
         ($return.Job.StartTime -lt $refUserObj.EmployeeHireDate)
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
             ErrorId          = '403'
             Category         = 'ResourceUnavailable'
@@ -1315,7 +1317,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
         ($return.Job.StartTime -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
             ErrorId          = '403'
             Category         = 'OperationStopped'
@@ -1329,7 +1331,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ($true -eq $tenant.OnPremisesSyncEnabled -and ($true -ne $refUserObj.OnPremisesSyncEnabled)) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
             ErrorId          = '403'
             Category         = 'InvalidType'
@@ -1345,7 +1347,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction SilentlyContinue
 
     if ($null -eq $refUserExObj) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
             ErrorId          = '403'
             Category         = 'NotEnabled'
@@ -1359,7 +1361,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUserExObj.RecipientTypeDetails) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox."
             ErrorId          = '403'
             Category         = 'InvalidType'
@@ -1389,7 +1391,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         }
         else {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
                 Category         = 'InvalidData'
@@ -1431,15 +1433,13 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
         if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
 
-        $return.Output += $data
-
         if ($OutText) {
             Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
         }
         #endregion ---------------------------------------------------------------------
 
         Write-Verbose "-------ENDLOOP $ReferralUserId ---"
-        return
+        return $data
     }
     #endregion
 
@@ -1583,7 +1583,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         [string]::IsNullOrEmpty($BodyParams.EmployeeType) -and
         [string]::IsNullOrEmpty($BodyParams.OnPremisesExtensionAttributes.$extAttrAccountType)
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Internal configuration error."
             ErrorId          = '500'
             Category         = 'InvalidData'
@@ -1603,7 +1603,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             (-Not [string]::IsNullOrEmpty($BodyParams.OnPremisesExtensionAttributes.$extAttrRef)) -or
             (-Not [string]::IsNullOrEmpty($refUserObj.OnPremisesExtensionAttributes.$extAttrRef))
         ) {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
                 Category         = 'ResourceExists'
@@ -1625,7 +1625,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         ($ReferenceManager -eq $false) -and
         [string]::IsNullOrEmpty($BodyParams.OnPremisesExtensionAttributes.$extAttrRef)
     ) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Internal configuration error."
             ErrorId          = '500'
             Category         = 'InvalidData'
@@ -1699,7 +1699,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     if ($deletedUserList.'@odata.count' -gt 0) {
         foreach ($deletedUserObj in $deletedUserList.Value) {
-            $return.Information += .\Common__0000_Write-Information.ps1 @{
+            $script:returnInformation += .\Common__0000_Write-Information.ps1 @{
                 Message          = "${ReferralUserId}: Soft-deleted admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was permanently deleted before re-creation."
                 Category         = 'ResourceExists'
                 TargetName       = $refUserObj.UserPrincipalName
@@ -1738,7 +1738,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ($userCount -gt 1) {
         Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
 
-        $return.Warning += .\Common__0000_Write-Warning.ps1 @{
+        $script:returnWarning += .\Common__0000_Write-Warning.ps1 @{
             Message           = "${ReferralUserId}: Admin account must be mutually exclusive."
             ErrorId           = '103'
             Category          = 'ResourceExists'
@@ -1763,7 +1763,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     if ($null -ne $existingUserObj) {
         if ($null -ne $existingUserObj.OnPremisesSyncEnabled) {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message           = "${ReferralUserId}: Conflicting Admin account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) $( if ($existingUserObj.OnPremisesSyncEnabled) { 'is' } else { 'was' } ) synced from on-premises."
                 ErrorId           = '500'
                 Category          = 'ResourceExists'
@@ -1791,7 +1791,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             Update-MgBetaUser @params 1> $null
         }
         catch {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = $Error[0].Exception.Message
                 ErrorId          = '500'
                 Category         = $Error[0].CategoryInfo.Category
@@ -1817,7 +1817,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Invoke-MgGraphRequest @params 1> $null
             }
             catch {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message          = $Error[0].Exception.Message
                     ErrorId          = '500'
                     Category         = $Error[0].CategoryInfo.Category
@@ -1839,7 +1839,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ') | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
             if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
                     ErrorId           = '503'
                     Category          = 'LimitsExceeded'
@@ -1863,7 +1863,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             $UserObj = New-MgBetaUser -BodyParameter $BodyParams -ErrorAction Stop
         }
         catch {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = $Error[0].Exception.Message
                 ErrorId          = '500'
                 Category         = $Error[0].CategoryInfo.Category
@@ -1901,7 +1901,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 }
                 $DoLoop = $false
 
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: Account provisioning consistency timeout for $($newUser.UserPrincipalName)."
                     ErrorId           = '504'
                     Category          = 'OperationTimeout'
@@ -1925,7 +1925,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
 
     if ($null -eq $UserObj) {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Could not create or update Tier $Tier Cloud Administrator account $($BodyParams.UserPrincipalName): $($Error[0].Message)"
             ErrorId          = '503'
             Category         = 'NotSpecified'
@@ -1955,7 +1955,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Set-MgBetaUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager -ErrorAction Stop 1> $null
             }
             catch {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message          = $Error[0].Exception.Message
                     ErrorId          = '500'
                     Category         = $Error[0].CategoryInfo.Category
@@ -1978,7 +1978,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             Remove-MgBetaUserManagerByRef -UserId $existingUserObj.Id -ErrorAction Stop
         }
         catch {
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message          = $Error[0].Exception.Message
                 ErrorId          = '500'
                 Category         = $Error[0].CategoryInfo.Category
@@ -1998,7 +1998,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique) | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
             if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
                     ErrorId           = '503'
                     Category          = 'LimitsExceeded'
@@ -2052,7 +2052,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Set-MgBetaUserLicense @params 1> $null
             }
             catch {
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message          = $Error[0].Exception.Message
                     ErrorId          = '500'
                     Category         = $Error[0].CategoryInfo.Category
@@ -2086,7 +2086,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                     New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop
                 }
                 catch {
-                    $return.Error += .\Common__0000_Write-Error.ps1 @{
+                    $script:returnError += .\Common__0000_Write-Error.ps1 @{
                         Message          = $Error[0].Exception.Message
                         ErrorId          = '500'
                         Category         = $Error[0].CategoryInfo.Category
@@ -2124,7 +2124,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 }
                 $DoLoop = $false
 
-                $return.Error += .\Common__0000_Write-Error.ps1 @{
+                $script:returnError += .\Common__0000_Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: Group assignment timeout for $($UserObj.UserPrincipalName)."
                     ErrorId           = '504'
                     Category          = 'OperationTimeout'
@@ -2173,7 +2173,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             $DoLoop = $false
 
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message           = "${ReferralUserId}: Exchange Online license activation timeout for $($UserObj.UserPrincipalName)."
                 ErrorId           = '504'
                 Category          = 'OperationTimeout'
@@ -2213,7 +2213,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             $DoLoop = $false
 
-            $return.Error += .\Common__0000_Write-Error.ps1 @{
+            $script:returnError += .\Common__0000_Write-Error.ps1 @{
                 Message           = "${ReferralUserId}: Mailbox provisioning timeout for $($UserObj.UserPrincipalName)."
                 ErrorId           = '504'
                 Category          = 'OperationTimeout'
@@ -2248,7 +2248,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         Set-Mailbox @params 1> $null
     }
     catch {
-        $return.Error += .\Common__0000_Write-Error.ps1 @{
+        $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = $Error[0].Exception.Message
             ErrorId          = '500'
             Category         = $Error[0].CategoryInfo.Category
@@ -2322,7 +2322,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             Set-MgBetaUserPhotoContent @params 1> $null
         }
         catch {
-            $return.Error += .\Common__0000_Write-Warning.ps1 @{
+            $script:returnError += .\Common__0000_Write-Warning.ps1 @{
                 Message          = $Error[0].Exception.Message
                 ErrorId          = '500'
                 Category         = $Error[0].CategoryInfo.Category
@@ -2380,14 +2380,14 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
     if ($PhotoUrl ) { $data.UserPhotoUrl = $PhotoUrl }
 
-    $return.Output += $data
-
     if ($OutText) {
         Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
     }
     #endregion ---------------------------------------------------------------------
 
     Write-Verbose "-------ENDLOOP $ReferralUserId ---"
+
+    return $data
 }
 
 0..$($ReferralUserId.Count) | ForEach-Object {
@@ -2399,11 +2399,15 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         Tier           = $Tier[$_]
         UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl) -or [string]::IsNullOrEmpty($UserPhotoUrl[$_])) { $null } else { $UserPhotoUrl[$_] }
     }
-    ProcessReferralUser @params
+    $returnOutput += ProcessReferralUser @params
 }
 #endregion ---------------------------------------------------------------------
 
 #region Output Return Data -----------------------------------------------------
+$return.Output = $returnOutput
+$return.Information = $returnInformation
+$return.Warning = $returnWarning
+$return.Error = $returnError
 $return.Job.EndTime = (Get-Date).ToUniversalTime()
 $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
 
