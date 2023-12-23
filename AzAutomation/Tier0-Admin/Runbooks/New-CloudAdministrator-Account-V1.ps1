@@ -233,6 +233,7 @@ $ImportPsModules = @(
     @{ Name = 'Az.Resources'; MinimumVersion = '6.0'; MaximumVersion = '6.65535' }
     @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 )
@@ -1714,7 +1715,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Method     = 'DELETE'
                 Uri        = "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)"
             }
-            Invoke-MgGraphRequest @params
+            Invoke-MgGraphRequest @params 1> $null
         }
     }
     #endregion ---------------------------------------------------------------------
