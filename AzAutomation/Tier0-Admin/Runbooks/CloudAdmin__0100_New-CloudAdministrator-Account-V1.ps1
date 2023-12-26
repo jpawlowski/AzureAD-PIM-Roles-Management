@@ -8,8 +8,8 @@
 .LICENSEURI
 .PROJECTURI
 .ICONURI
-.EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS
+.EXTERNALMODULEDEPENDENCIES Microsoft.Graph,Az
+.REQUIREDSCRIPTS CloudAdmin__0000_Common_0000_Get-ConfigurationConstants.ps1,Common__0000_Convert-PSEnvToPSLocalVariable.ps1,Common__0000_Get-RandomPassword.ps1,Common__0000_Import-Modules.ps1,Common__0000_Submit-Webhook.ps1,Common__0000_Write-Error.ps1,Common__0000_Write-Information.ps1,Common__0000_Write-JsonOutput.ps1,Common__0000_Write-Warning.ps1,Common__0001_Connect-ExchangeOnline.ps1,Common__0001_Connect-MgGraph.ps1,Common__0003_Import-AzAutomationVariableToPSEnv.ps1,Common__0002_Wait-AzAutomationConcurrentJob.ps1,Common__0003_Confirm-MgAppPermission.ps1,Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -20,7 +20,7 @@
 
 .DESCRIPTION
     Create a dedicated cloud native account for administrative purposes that can perform privileged tasks in Tier 0.
-    For Tier 1 and Tier 2, creating a dedicated user account is optional so that only precondition check will be performed before adding the user to the respective security group.
+    For Tier 1 and Tier 2, the creation of a dedicated user account is optional depending on your custom configuration, so that only a precondition check is performed before the user is added to the respective security group.
 
     For dedicated admin accounts, User Principal Name and mail address will use the initial .onmicrosoft.com domain of the respective Entra ID tenant.
     The admin account will be referred to the main user account from ReferralUserId by using the manager property as well as using the same Employee information (if set).
@@ -47,7 +47,7 @@
 
 .PARAMETER OutputJson
     Output the result in JSON format.
-    This is automatically implied when running in Azure Automation and no Webhook parameter was set.
+    This is useful when output data needs to be processed in other IT systems after the job was completed.
 
 .PARAMETER OutputText
     Output the generated User Principal Name only.
@@ -70,7 +70,7 @@
         10. If tenant has on-premises directory sync enabled, referral user ID must be a hybrid user account.
         11. Referral user ID must have a mailbox of type UserMailbox.
 
-    In case an existing Cloud Administrator account was found for referral user ID, it must by a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
+    In case an existing Cloud Administrator account was found for referral user ID, it must be a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
     If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
     The user part of the Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
 
@@ -280,503 +280,6 @@ $MgAppPermissions = @(
         # }
     }
 )
-
-$Constants = @(
-    #region General Constants
-    @{
-        sourceName    = "AV_CloudAdmin_AccountTypeExtensionAttribute"
-        mapToVariable = 'AccountTypeExtensionAttribute'
-        defaultValue  = 15
-        Regex         = '^([1-9]|1[012345])$'
-    }
-    @{
-        sourceName    = "AV_CloudAdmin_AccountTypeEmployeeType"
-        mapToVariable = 'AccountTypeEmployeeType'
-        defaultValue  = $true
-        type          = 'Boolean'
-    }
-    @{
-        sourceName    = "AV_CloudAdmin_ReferenceExtensionAttribute"
-        mapToVariable = 'ReferenceExtensionAttribute'
-        defaultValue  = 14
-        Regex         = '^([1-9]|1[012345])$'
-    }
-    @{
-        sourceName    = "AV_CloudAdmin_ReferenceManager"
-        mapToVariable = 'ReferenceManager'
-        defaultValue  = $false
-        type          = 'Boolean'
-    }
-    @{
-        sourceName    = "AV_CloudAdmin_Webhook"
-        mapToVariable = 'Webhook'
-        defaultValue  = $null
-        Regex         = '^https:\/\/.+$'
-    }
-    #endregion
-
-    #region Tier 0 Constants
-    @{
-        sourceName    = "AV_CloudAdminTier0_LicenseSkuPartNumber"
-        mapToVariable = 'LicenseSkuPartNumber_Tier0'
-        defaultValue  = 'EXCHANGEDESKLESS'
-        Regex         = '^[A-Z][A-Z_ ]+[A-Z]$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GroupId"
-        mapToVariable = 'GroupId_Tier0'
-        defaultValue  = $null
-        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier0'
-        defaultValue  = 'Tier 0 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName             = "AV_CloudAdminTier0_UserPhotoUrl"
-        respectScriptParameter = 'UserPhotoUrl'
-        mapToVariable          = 'PhotoUrl_Tier0'
-        defaultValue           = $null
-        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_DedicatedAccount"
-        mapToVariable = 'DedicatedAccount_Tier0'
-        defaultValue  = $true
-        Type          = 'boolean'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypePrefix"
-        mapToVariable = 'AccountTypeEmployeeTypePrefix_Tier0'
-        defaultValue  = 'Tier 0 Cloud Administrator'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypePrefixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypePrefixSeparator_Tier0'
-        defaultValue  = ' ('
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypeSuffix"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffix_Tier0'
-        defaultValue  = ')'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypeSuffixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffixSeparator_Tier0'
-        defaultValue  = ''
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeExtensionAttributePrefix"
-        mapToVariable = 'AccountTypeExtensionAttributePrefix_Tier0'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeExtensionAttributePrefixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributePrefixSeparator_Tier0'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeExtensionAttributeSuffix"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffix_Tier0'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_AccountTypeExtensionAttributeSuffixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffixSeparator_Tier0'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserDisplayNamePrefix"
-        mapToVariable = 'UserDisplayNamePrefix_Tier0'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserDisplayNamePrefixSeparator"
-        mapToVariable = 'UserDisplayNamePrefixSeparator_Tier0'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserDisplayNameSuffix"
-        mapToVariable = 'UserDisplayNameSuffix_Tier0'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserDisplayNameSuffixSeparator"
-        mapToVariable = 'UserDisplayNameSuffixSeparator_Tier0'
-        defaultValue  = ' '
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GivenNamePrefix"
-        mapToVariable = 'GivenNamePrefix_Tier0'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GivenNamePrefixSeparator"
-        mapToVariable = 'GivenNamePrefixSeparator_Tier0'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GivenNameSuffix"
-        mapToVariable = 'GivenNameSuffix_Tier0'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_GivenNameSuffixSeparator"
-        mapToVariable = 'GivenNameSuffixSeparator_Tier0'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserPrincipalNamePrefix"
-        mapToVariable = 'UserPrincipalNamePrefix_Tier0'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserPrincipalNamePrefixSeparator"
-        mapToVariable = 'UserPrincipalNamePrefixSeparator_Tier0'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserPrincipalNameSuffix"
-        mapToVariable = 'UserPrincipalNameSuffix_Tier0'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier0_UserPrincipalNameSuffixSeparator"
-        mapToVariable = 'UserPrincipalNameSuffixSeparator_Tier0'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    #endregion
-
-    #region Tier 1 Constants
-    @{
-        sourceName    = "AV_CloudAdminTier1_LicenseSkuPartNumber"
-        mapToVariable = 'LicenseSkuPartNumber_Tier1'
-        defaultValue  = 'EXCHANGEDESKLESS'
-        Regex         = '^[A-Z][A-Z_ ]+[A-Z]$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GroupId"
-        mapToVariable = 'GroupId_Tier1'
-        defaultValue  = $null
-        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier1'
-        defaultValue  = 'Tier 1 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName             = "AV_CloudAdminTier1_UserPhotoUrl"
-        respectScriptParameter = 'UserPhotoUrl'
-        mapToVariable          = 'PhotoUrl_Tier1'
-        defaultValue           = $null
-        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_DedicatedAccount"
-        mapToVariable = 'DedicatedAccount_Tier1'
-        defaultValue  = $false
-        Type          = 'boolean'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypePrefix"
-        mapToVariable = 'AccountTypeEmployeeTypePrefix_Tier1'
-        defaultValue  = 'Tier 1 Cloud Administrator'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypePrefixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypePrefixSeparator_Tier1'
-        defaultValue  = ' ('
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypeSuffix"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffix_Tier1'
-        defaultValue  = ')'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypeSuffixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffixSeparator_Tier1'
-        defaultValue  = ''
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeExtensionAttributePrefix"
-        mapToVariable = 'AccountTypeExtensionAttributePrefix_Tier1'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeExtensionAttributePrefixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributePrefixSeparator_Tier1'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeExtensionAttributeSuffix"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffix_Tier1'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_AccountTypeExtensionAttributeSuffixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffixSeparator_Tier1'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserDisplayNamePrefix"
-        mapToVariable = 'UserDisplayNamePrefix_Tier1'
-        defaultValue  = 'A1C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserDisplayNamePrefixSeparator"
-        mapToVariable = 'UserDisplayNamePrefixSeparator_Tier1'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserDisplayNameSuffix"
-        mapToVariable = 'UserDisplayNameSuffix_Tier1'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserDisplayNameSuffixSeparator"
-        mapToVariable = 'UserDisplayNameSuffixSeparator_Tier1'
-        defaultValue  = ' '
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GivenNamePrefix"
-        mapToVariable = 'GivenNamePrefix_Tier1'
-        defaultValue  = 'A1C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GivenNamePrefixSeparator"
-        mapToVariable = 'GivenNamePrefixSeparator_Tier1'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GivenNameSuffix"
-        mapToVariable = 'GivenNameSuffix_Tier1'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_GivenNameSuffixSeparator"
-        mapToVariable = 'GivenNameSuffixSeparator_Tier1'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserPrincipalNamePrefix"
-        mapToVariable = 'UserPrincipalNamePrefix_Tier1'
-        defaultValue  = 'A1C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserPrincipalNamePrefixSeparator"
-        mapToVariable = 'UserPrincipalNamePrefixSeparator_Tier1'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserPrincipalNameSuffix"
-        mapToVariable = 'UserPrincipalNameSuffix_Tier1'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier1_UserPrincipalNameSuffixSeparator"
-        mapToVariable = 'UserPrincipalNameSuffixSeparator_Tier1'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    #endregion
-
-    #region Tier 2 Constants
-    @{
-        sourceName    = "AV_CloudAdminTier2_LicenseSkuPartNumber"
-        mapToVariable = 'LicenseSkuPartNumber_Tier2'
-        defaultValue  = ''
-        Regex         = '^[A-Z][A-Z_ ]+[A-Z]$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GroupId"
-        mapToVariable = 'GroupId_Tier2'
-        defaultValue  = $null
-        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier2'
-        defaultValue  = 'Tier 2 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName             = "AV_CloudAdminTier2_UserPhotoUrl"
-        respectScriptParameter = 'UserPhotoUrl'
-        mapToVariable          = 'PhotoUrl_Tier2'
-        defaultValue           = $null
-        Regex                  = '^https:\/\/.+(?:\.png|\.jpg|\.jpeg|\?.+)$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_DedicatedAccount"
-        mapToVariable = 'DedicatedAccount_Tier2'
-        defaultValue  = $false
-        Type          = 'boolean'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypePrefix"
-        mapToVariable = 'AccountTypeEmployeeTypePrefix_Tier2'
-        defaultValue  = 'Tier 2 Cloud Administrator'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypePrefixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypePrefixSeparator_Tier2'
-        defaultValue  = ' ('
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypeSuffix"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffix_Tier2'
-        defaultValue  = ')'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypeSuffixSeparator"
-        mapToVariable = 'AccountTypeEmployeeTypeSuffixSeparator_Tier2'
-        defaultValue  = ''
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeExtensionAttributePrefix"
-        mapToVariable = 'AccountTypeExtensionAttributePrefix_Tier2'
-        defaultValue  = 'A0C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeExtensionAttributePrefixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributePrefixSeparator_Tier2'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeExtensionAttributeSuffix"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffix_Tier2'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_AccountTypeExtensionAttributeSuffixSeparator"
-        mapToVariable = 'AccountTypeExtensionAttributeSuffixSeparator_Tier2'
-        defaultValue  = '__'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserDisplayNamePrefix"
-        mapToVariable = 'UserDisplayNamePrefix_Tier2'
-        defaultValue  = 'A2C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserDisplayNamePrefixSeparator"
-        mapToVariable = 'UserDisplayNamePrefixSeparator_Tier2'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserDisplayNameSuffix"
-        mapToVariable = 'UserDisplayNameSuffix_Tier2'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserDisplayNameSuffixSeparator"
-        mapToVariable = 'UserDisplayNameSuffixSeparator_Tier2'
-        defaultValue  = ' '
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GivenNamePrefix"
-        mapToVariable = 'GivenNamePrefix_Tier2'
-        defaultValue  = 'A2C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GivenNamePrefixSeparator"
-        mapToVariable = 'GivenNamePrefixSeparator_Tier2'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GivenNameSuffix"
-        mapToVariable = 'GivenNameSuffix_Tier2'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_GivenNameSuffixSeparator"
-        mapToVariable = 'GivenNameSuffixSeparator_Tier2'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserPrincipalNamePrefix"
-        mapToVariable = 'UserPrincipalNamePrefix_Tier2'
-        defaultValue  = 'A2C'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserPrincipalNamePrefixSeparator"
-        mapToVariable = 'UserPrincipalNamePrefixSeparator_Tier2'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserPrincipalNameSuffix"
-        mapToVariable = 'UserPrincipalNameSuffix_Tier2'
-        defaultValue  = $null
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
-        sourceName    = "AV_CloudAdminTier2_UserPrincipalNameSuffixSeparator"
-        mapToVariable = 'UserPrincipalNameSuffixSeparator_Tier2'
-        defaultValue  = '-'
-        Regex         = '^.{1,2}$'
-    }
-    #endregion
-)
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] PARAMETER COUNT VALIDATION ------------------------------------
@@ -803,8 +306,8 @@ if (
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules $ImportPsModules 1> $null
-.\Common__0002_Import-AzAutomationVariableToPSEnv.ps1 1> $null
-.\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
+.\Common__0003_Import-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable (.\CloudAdmin__0000_Common_0000_Get-ConfigurationConstants.ps1) 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
@@ -817,30 +320,9 @@ $returnInformation = @()
 $returnWarning = @()
 $returnError = @()
 $return = @{
-    Job = @{
-        Runbook   = @{}
-        StartTime = (Get-Date).ToUniversalTime()
-        EndTime   = @{}
-        RunTime   = @{}
-    }
+    Job = .\Common__0003_Get-AzAutomationJobInfo.ps1
 }
 if ($JobReference) { $return.Job.Reference = $JobReference }
-if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-    $return.Job.AutomationAccount = @{}
-    $return.Job.AutomationAccount = Get-AzAutomationAccount
-    if ($PSPrivateMetadata.JobId) {
-        $return.Job.Id = $PSPrivateMetadata.JobId
-        $params = @{
-            ResourceGroupName     = $return.Job.AutomationAccount.ResourceGroupName
-            AutomationAccountName = $return.Job.AutomationAccount.AutomationAccountName
-            RunbookName           = (Get-AzAutomationJob -AutomationAccountName $return.Job.AutomationAccount.AutomationAccountName -ResourceGroupName $return.Job.AutomationAccount.ResourceGroupName -Id $PSPrivateMetadata.JobId).RunbookName
-        }
-        $return.Job.Runbook = Get-AzAutomationRunbook @params
-    }
-}
-else {
-    $return.Job.Runbook.RunbookName = (Get-Item $MyInvocation.MyCommand).BaseName
-}
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
@@ -1298,7 +780,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     if (
         ($null -ne $refUserObj.EmployeeHireDate) -and
-        ($return.Job.StartTime -lt $refUserObj.EmployeeHireDate)
+        ($return.Job.CreationTime -lt $refUserObj.EmployeeHireDate)
     ) {
         $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID will start to work at $($refUserObj.EmployeeHireDate | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up for active employees."
@@ -1315,7 +797,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     if (
         ($null -ne $refUserObj.EmployeeLeaveDateTime) -and
-        ($return.Job.StartTime -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
+        ($return.Job.CreationTime -ge $refUserObj.EmployeeLeaveDateTime.AddDays(-45))
     ) {
         $script:returnError += .\Common__0000_Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID is scheduled for deactivation at $($refUserObj.EmployeeLeaveDateTime | Get-Date -Format 'o') Universal Time. A Cloud Administrator account can only be set up a maximum of 45 days before the planned leaving date."
@@ -1776,7 +1258,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             return
         }
-        Write-Verbose "Updating account $($existingUserObj.UserPrincipalName) ($($existingUserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+
         $BodyParams.Remove('UserPrincipalName')
         $BodyParams.Remove('AccountEnabled')
         $BodyParams.Remove('PasswordProfile')
@@ -1832,7 +1314,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         $UserObj = Get-MgBetaUser -UserId $existingUserObj.Id
         $UpdatedUserOnly = $true
-        Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+        Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
     }
     else {
         #region License Availability Validation ----------------------------------------
@@ -1921,7 +1403,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         } While ($DoLoop)
 
-        Write-Verbose "Created new Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+        Write-Verbose "Created new Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
     }
 
     if ($null -eq $UserObj) {

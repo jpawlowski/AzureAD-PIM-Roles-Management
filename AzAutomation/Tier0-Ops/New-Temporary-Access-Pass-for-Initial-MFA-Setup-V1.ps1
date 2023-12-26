@@ -1,3 +1,19 @@
+<#PSScriptInfo
+.VERSION 1.5.3
+.GUID 053d16aa-2595-4b1d-a021-41d7934a6a9b
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Create a Temporary Access Pass code for new hires that have not setup any Authentication Methods so far
@@ -29,11 +45,6 @@
 
 .PARAMETER Simulate
     Same as -WhatIf parameter but makes it available for Azure Automation.
-
-.NOTES
-    Filename: New-Temporary-Access-Pass-for-Initial-MFA-Setup-V1.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.5.3
 #>
 
 #Requires -Version 5.1

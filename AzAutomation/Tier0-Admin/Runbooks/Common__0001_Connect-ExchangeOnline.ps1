@@ -1,13 +1,28 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID 2d55eb0b-3e2e-425a-a7de-5d12cbe5a149
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS Common__0000_Import-Modules.ps1
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Connect to Microsoft Exchange Online
 
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
+
 .PARAMETER Scopes
 
-.NOTES
-    Original name: Common__0001_Connect-ExchangeOnline.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 0.9.0
 #>
 
 [CmdletBinding()]
@@ -17,7 +32,7 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(

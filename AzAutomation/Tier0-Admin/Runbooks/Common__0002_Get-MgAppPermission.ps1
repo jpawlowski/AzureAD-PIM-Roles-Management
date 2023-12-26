@@ -1,6 +1,25 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID b39dc20f-f5de-4f6b-958e-41762df89805
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS Common__0001_Connect-MgGraph.ps1,Common__0000_Import-Modules.ps1
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Get permissions to other applications of current application
+
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
 [CmdletBinding()]
@@ -9,7 +28,7 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region CONNECTIONS ------------------------------------------------------------
 .\Common__0001_Connect-MgGraph.ps1 1> $null
@@ -28,30 +47,28 @@ $AppRoleAssignments = $null
 $PermissionGrants = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
-    $Principal = Get-MgBetaUser -UserId (Get-MgContext).Account
     $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment `
-        -UserId $Principal.Id `
+        -UserId $global:MyMgPrincipal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 
     $PermissionGrants = Get-MgOauth2PermissionGrant `
         -All `
-        -Filter "PrincipalId eq '$($Principal.Id)'" `
+        -Filter "PrincipalId eq '$($global:MyMgPrincipal.Id)'" `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 }
 else {
-    $Principal = Get-MgBetaServicePrincipalByAppId -AppId (Get-MgContext).ClientId
     $AppRoleAssignments = Get-MgBetaServicePrincipalAppRoleAssignment `
-        -ServicePrincipalId $Principal.Id `
+        -ServicePrincipalId $global:MyMgPrincipal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 
     $PermissionGrants = Get-MgOauth2PermissionGrant `
         -All `
-        -Filter "ClientId eq '$($Principal.Id)'" `
+        -Filter "ClientId eq '$($global:MyMgPrincipal.Id)'" `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 }

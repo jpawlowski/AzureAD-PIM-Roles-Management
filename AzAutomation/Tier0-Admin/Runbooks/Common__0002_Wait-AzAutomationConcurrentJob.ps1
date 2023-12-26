@@ -1,11 +1,25 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID 7c2ab51e-4863-474e-bfcf-6854d3c3a688
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS Common__0002_Connect-AzAccount.ps1
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Wait for other concurrent jobs of the same runbook in Azure Automation
 
-.NOTES
-    Original name: Common__0002_Wait-AzAutomationConcurrentJob.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.0.0
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
 #Requires -Version 5.1
@@ -14,14 +28,14 @@
 Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 $return = $null
 
-if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+if ($env:AZURE_AUTOMATION_RUNBOOK_Name) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common__0001_Connect-AzAccount.ps1 1> $null
+    .\Common__0002_Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $DoLoop = $true
@@ -29,12 +43,9 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     $MaxRetry = 120
     $WaitSec = 30
 
-    $AA = Get-AzAutomationAccount
-    $RunbookName = (Get-AzAutomationJob -AutomationAccountName $AA.AutomationAccountName -ResourceGroupName $AA.ResourceGroupName -Id $PSPrivateMetadata.JobId).RunbookName
-
     do {
         try {
-            $jobs = Get-AzAutomationJob -ResourceGroupName $AA.ResourceGroupName -AutomationAccountName $AA.AutomationAccountName -RunbookName $RunbookName -ErrorAction Stop
+            $jobs = Get-AzAutomationJob -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -RunbookName $env:AZURE_AUTOMATION_RUNBOOK_Name -ErrorAction Stop
         }
         catch {
             Throw $_

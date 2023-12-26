@@ -1,23 +1,38 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID a775a4d9-9195-4410-a2bf-b1eeaa0da599
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Import variables from script parameter and $env to local script scope
 
-.NOTES
-    Original name: Common__0000_Convert-PSEnvToPSLocalConstant.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.0.0
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
 [CmdletBinding()]
 Param(
     [Parameter(mandatory = $true)]
+    [AllowEmptyCollection()]
     [Array]$Variable,
 
     [Boolean]$scriptParameterOnly
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 foreach ($Item in $Variable) {
     # Script parameters be of type array/collection and be processed during a loop,

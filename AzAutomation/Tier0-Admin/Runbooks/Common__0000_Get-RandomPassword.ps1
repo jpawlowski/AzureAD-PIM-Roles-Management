@@ -1,11 +1,25 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID 710022f9-8ea6-49a9-8a1a-0714ff253fe0
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Get a random password
 
-.NOTES
-    Original name: Common__0000_Get-RandomPassword.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.0.0
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
 [CmdletBinding()]
@@ -17,7 +31,7 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region [COMMON] FUNCTIONS -----------------------------------------------------
 function Get-RandomCharacter($length, $characters) {

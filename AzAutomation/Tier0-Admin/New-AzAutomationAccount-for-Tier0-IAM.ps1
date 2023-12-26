@@ -1,3 +1,19 @@
+<#PSScriptInfo
+.VERSION 1.3.0
+.GUID cf9c08b9-1649-46b4-89ca-23f58831782d
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Create a new Azure Automation Account including System-Assigned Managed Identity for IAM automations in Tier 0 environment
@@ -29,12 +45,8 @@
 
 .PARAMETER Runbooks
     Path to a folder with runbooks to upload.
-
-.NOTES
-    Filename: New-AzAutomationAccount-for-Tier0-IAM.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 1.3
 #>
+
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName='Az.Accounts'; ModuleVersion='2.8' }
 #Requires -Modules @{ ModuleName='Az.Automation'; ModuleVersion='1.7' }

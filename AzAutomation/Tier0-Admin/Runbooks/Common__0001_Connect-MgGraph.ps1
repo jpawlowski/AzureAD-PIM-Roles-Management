@@ -1,13 +1,36 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID 05273e10-2a70-42aa-82d3-7881324beead
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES Microsoft.Graph.Authentication,Microsoft.Graph.Identity.SignIns,Microsoft.Graph.Applications,Microsoft.Graph.Users
+.REQUIREDSCRIPTS Common__0000_Import-Modules.ps1
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Connect to Microsoft Graph and validate available application scopes
 
-.PARAMETER Scopes
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 
 .NOTES
-    Original name: Common__0001_Connect-MgGraph.ps1
-    Author: Julian Pawlowski <metres_topaz.0v@icloud.com>
-    Version: 0.9.0
+    Provides detailled info about the current connection principal using the following environment variables:
+
+    $env:MG_PRINCIPAL_TYPE          'Delegated' for interactive sessions, or 'Application' when using a Managed Identity.
+    $env:MG_PRINCIPAL_ID            Object ID of the current principal connected to Microsoft Graph.
+    $env:MG_PRINCIPAL_DISPLAYNAME   Display Name of the current principal connected to Microsoft Graph.
+                                    In case of a System-Assigned Managed Identity, it is also the name of the Azure Automation account in use.
+
+.PARAMETER Scopes
+
 #>
 
 [CmdletBinding()]
@@ -16,12 +39,14 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common__0000_Import-Modules.ps1 -Modules @(
     @{ Name = 'Microsoft.Graph.Authentication'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Identity.SignIns'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -91,5 +116,16 @@ if ($MissingScopes) {
         Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingScopes -join "`n")"
     }
 }
+
+$Principal = $null
+if ((Get-MgContext).AuthType -eq 'Delegated') {
+    [Environment]::SetEnvironmentVariable('MG_PRINCIPAL_TYPE', 'Delegated')
+    $Principal = Get-MgUser -UserId (Get-MgContext).Account -ErrorAction Stop
+} else {
+    [Environment]::SetEnvironmentVariable('MG_PRINCIPAL_TYPE', 'Application')
+    $Principal = Get-MgServicePrincipalByAppId -AppId (Get-MgContext).ClientId -ErrorAction Stop
+}
+[Environment]::SetEnvironmentVariable('MG_PRINCIPAL_ID', $Principal.Id)
+[Environment]::SetEnvironmentVariable('MG_PRINCIPAL_DISPLAYNAME', $Principal.DisplayName)
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

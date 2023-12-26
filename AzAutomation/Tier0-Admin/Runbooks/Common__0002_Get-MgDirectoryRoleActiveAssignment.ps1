@@ -1,6 +1,25 @@
+<#PSScriptInfo
+.VERSION 1.0.0
+.GUID 3e9f0b5b-be2f-4c10-bdfa-25d8b4550e67
+.AUTHOR Julian Pawlowski
+.COMPANYNAME Workoho GmbH
+.COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
+.TAGS
+.LICENSEURI
+.PROJECTURI
+.ICONURI
+.EXTERNALMODULEDEPENDENCIES
+.REQUIREDSCRIPTS Common__0001_Connect-MgGraph.ps1,Common__0000_Import-Modules.ps1
+.EXTERNALSCRIPTDEPENDENCIES
+.RELEASENOTES
+#>
+
 <#
 .SYNOPSIS
     Get active directory roles of current user
+
+.DESCRIPTION
+    Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
 #Requires -Version 5.1
@@ -9,7 +28,7 @@
 Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name) ---"
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region CONNECTIONS ------------------------------------------------------------
 .\Common__0001_Connect-MgGraph.ps1 1> $null
@@ -26,14 +45,13 @@ $return = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
     $return = Get-MgBetaUserTransitiveMemberOfAsDirectoryRole `
-        -UserId (Get-MgContext).Account `
+        -UserId $global:MyMgPrincipal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }
 else {
-    $ServicePrincipal = Get-MgBetaServicePrincipalByAppId -AppId (Get-MgContext).ClientId
     $return = Get-MgBetaServicePrincipalTransitiveMemberOfAsDirectoryRole `
-        -ServicePrincipalId $ServicePrincipal.Id `
+        -ServicePrincipalId $global:MyMgPrincipal.Id `
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }
