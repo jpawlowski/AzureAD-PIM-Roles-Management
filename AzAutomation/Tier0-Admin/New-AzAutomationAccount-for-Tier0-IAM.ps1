@@ -357,7 +357,7 @@ if ($PSCmdlet.ShouldProcess(
     $Files = Get-ChildItem $Runbooks -File -Filter *.ps1 -Depth 0 -ErrorAction SilentlyContinue
 
     Write-Output "   Common runbooks:"
-    foreach ($File in $Files | Where-Object Name -match '^Common__' | Sort-Object -Property Name) {
+    foreach ($File in $Files | Where-Object Name -match '^Common_[0-9]+__' | Sort-Object -Property Name) {
         $ExistingRunbook = $ExistingRunbooks | Where-Object Name -eq $File.BaseName
         $Params = @{
             ResourceGroupName     = $ResourceGroupName
