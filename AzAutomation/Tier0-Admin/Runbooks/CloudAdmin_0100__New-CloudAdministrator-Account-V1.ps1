@@ -306,7 +306,7 @@ if (
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Modules.ps1 -Modules $ImportPsModules 1> $null
-.\Common__0003_Import-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common_0003__Import-AzAutomationVariableToPSEnv.ps1 1> $null
 .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable (.\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1) 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -320,13 +320,13 @@ $returnInformation = @()
 $returnWarning = @()
 $returnError = @()
 $return = @{
-    Job = .\Common__0003_Get-AzAutomationJobInfo.ps1
+    Job = .\Common_0003__Get-AzAutomationJobInfo.ps1
 }
 if ($JobReference) { $return.Job.Reference = $JobReference }
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
-if (-Not (.\Common__0002_Wait-AzAutomationConcurrentJob.ps1)) {
+if (-Not (.\Common_0002__Wait-AzAutomationConcurrentJob.ps1)) {
     $script:returnError += .\Common_0000__Write-Error.ps1 @{
         Message           = "Maximum job runtime was reached."
         ErrorId           = '504'
@@ -339,13 +339,13 @@ if (-Not (.\Common__0002_Wait-AzAutomationConcurrentJob.ps1)) {
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] OPEN CONNECTIONS ----------------------------------------------
-.\Common__0001_Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
+.\Common_0001__Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
 $tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
 $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
-.\Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
-.\Common__0003_Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
-.\Common__0001_Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
+.\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
+.\Common_0003__Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
+.\Common_0001__Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region Group Validation -------------------------------------------------------
@@ -393,7 +393,7 @@ ForEach (
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
     }
     elseif ($GroupObj.IsAssignableToRole) {
-        .\Common__0003_Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
+        .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
             @{
                 DisplayName = 'Privileged Role Administrator'
                 TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'

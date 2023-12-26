@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common__0002_Connect-AzAccount.ps1
+.REQUIREDSCRIPTS Common_0002__Connect-AzAccount.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -35,7 +35,7 @@ $return = $null
 if ($env:AZURE_AUTOMATION_RUNBOOK_Name) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common__0002_Connect-AzAccount.ps1 1> $null
+    .\Common_0002__Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $DoLoop = $true

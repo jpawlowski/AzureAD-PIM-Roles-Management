@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common__0002_Get-MgAppPermission.ps1
+.REQUIREDSCRIPTS Common_0002__Get-MgAppPermission.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -52,7 +52,7 @@ Param(
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
-$AppPermissions = .\Common__0002_Get-MgAppPermission.ps1
+$AppPermissions = .\Common_0002__Get-MgAppPermission.ps1
 
 foreach ($Permission in ($Permissions | Select-Object -Unique)) {
 #TODO

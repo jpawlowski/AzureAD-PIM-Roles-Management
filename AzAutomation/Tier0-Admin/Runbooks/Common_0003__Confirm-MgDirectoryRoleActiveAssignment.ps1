@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common__0002_Get-MgDirectoryRoleActiveAssignment.ps1
+.REQUIREDSCRIPTS Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -54,7 +54,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 
 $activeRoles = @()
 $missingRoles = @()
-$RoleAssignment = .\Common__0002_Get-MgDirectoryRoleActiveAssignment.ps1
+$RoleAssignment = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
 $GlobalAdmin = $RoleAssignment | Where-Object roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'
 $PrivRoleAdmin = $RoleAssignment | Where-Object roleTemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814'
 

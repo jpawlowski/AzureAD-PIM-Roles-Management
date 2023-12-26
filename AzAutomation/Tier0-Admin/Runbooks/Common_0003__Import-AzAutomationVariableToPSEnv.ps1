@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common__0002_Connect-AzAccount.ps1
+.REQUIREDSCRIPTS Common_0002__Connect-AzAccount.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -33,7 +33,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common__0002_Connect-AzAccount.ps1 1> $null
+    .\Common_0002__Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName
