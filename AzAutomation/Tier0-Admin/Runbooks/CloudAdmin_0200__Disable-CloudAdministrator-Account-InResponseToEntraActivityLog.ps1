@@ -40,9 +40,9 @@ $ImportPsModules = @(
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 $ErrorActionPreference = "stop"
-.\Common__0000_Import-Modules.ps1 -Modules $ImportPsModules 1> $null
+.\Common_0000__Import-Modules.ps1 -Modules $ImportPsModules 1> $null
 .\Common__0003_Import-AzAutomationVariableToPSEnv.ps1 1> $null
-.\Common__0000_Convert-PSEnvToPSLocalVariable.ps1 -Variable (.\CloudAdmin__0000_Common_0000_Get-ConfigurationConstants.ps1) 1> $null
+.\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable (.\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1) 1> $null
 #endregion ---------------------------------------------------------------------
 
 if ($WebhookData) {

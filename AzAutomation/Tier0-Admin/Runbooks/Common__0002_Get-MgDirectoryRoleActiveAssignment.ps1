@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common__0001_Connect-MgGraph.ps1,Common__0000_Import-Modules.ps1
+.REQUIREDSCRIPTS Common__0001_Connect-MgGraph.ps1,Common_0000__Import-Modules.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -35,7 +35,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common__0000_Import-Modules.ps1 -Modules @(
+.\Common_0000__Import-Modules.ps1 -Modules @(
     @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
