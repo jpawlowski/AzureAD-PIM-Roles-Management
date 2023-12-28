@@ -48,27 +48,27 @@ $PermissionGrants = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
     $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment `
-        -UserId $global:MyMgPrincipal.Id `
+        -UserId $env:MG_PRINCIPAL_ID `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 
     $PermissionGrants = Get-MgOauth2PermissionGrant `
         -All `
-        -Filter "PrincipalId eq '$($global:MyMgPrincipal.Id)'" `
+        -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 }
 else {
     $AppRoleAssignments = Get-MgBetaServicePrincipalAppRoleAssignment `
-        -ServicePrincipalId $global:MyMgPrincipal.Id `
+        -ServicePrincipalId $env:MG_PRINCIPAL_ID `
         -ConsistencyLevel eventual `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 
     $PermissionGrants = Get-MgOauth2PermissionGrant `
         -All `
-        -Filter "ClientId eq '$($global:MyMgPrincipal.Id)'" `
+        -Filter "ClientId eq '$($env:MG_PRINCIPAL_ID)'" `
         -CountVariable countVar `
         -ErrorAction SilentlyContinue
 }

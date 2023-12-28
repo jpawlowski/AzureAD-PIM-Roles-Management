@@ -32,7 +32,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 
 $return = $null
 
-if ($env:AZURE_AUTOMATION_RUNBOOK_Name) {
+if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
     .\Common_0002__Connect-AzAccount.ps1 1> $null

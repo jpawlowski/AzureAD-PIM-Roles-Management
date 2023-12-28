@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.3.0
+.VERSION 1.3.1
 .GUID cf9c08b9-1649-46b4-89ca-23f58831782d
 .AUTHOR Julian Pawlowski
 .COMPANYNAME Workoho GmbH
@@ -382,7 +382,7 @@ if ($PSCmdlet.ShouldProcess(
     }
 
     Write-Output "   Runbooks:"
-    foreach ($File in $Files | Where-Object Name -notmatch '^Common__' | Sort-Object -Property Name) {
+    foreach ($File in $Files | Where-Object Name -notmatch '^Common_[0-9]+__' | Sort-Object -Property Name) {
         $ExistingRunbook = $ExistingRunbooks | Where-Object Name -eq $File.BaseName
         $Params = @{
             ResourceGroupName     = $ResourceGroupName

@@ -45,13 +45,13 @@ $return = $null
 
 if ((Get-MgContext).AuthType -eq 'Delegated') {
     $return = Get-MgBetaUserTransitiveMemberOfAsDirectoryRole `
-        -UserId $global:MyMgPrincipal.Id `
+        -UserId $env:MG_PRINCIPAL_ID `
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }
 else {
     $return = Get-MgBetaServicePrincipalTransitiveMemberOfAsDirectoryRole `
-        -ServicePrincipalId $global:MyMgPrincipal.Id `
+        -ServicePrincipalId $env:MG_PRINCIPAL_ID `
         -ConsistencyLevel eventual `
         -CountVariable countVar
 }

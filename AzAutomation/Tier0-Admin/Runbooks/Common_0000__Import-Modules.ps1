@@ -30,19 +30,30 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 # Works only when running locally
+$OrigVerbosePreference = $VerbosePreference
 $VerbosePreference = 'SilentlyContinue'
 
 # Works only when running in Azure Automation sandbox
 $OrigGlobalVerbosePreference = $global:VerbosePreference
 $global:VerbosePreference = 'SilentlyContinue'
 
+Import-Module PowerShellGet
+
+$VerbosePreference = $OrigVerbosePreference
+$global:VerbosePreference = $OrigGlobalVerbosePreference
+
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---" -Verbose
+
+$VerbosePreference = 'SilentlyContinue'
+$global:VerbosePreference = 'SilentlyContinue'
+
 $Missing = @()
 
 foreach ($Module in $Modules) {
     try {
+        Write-Debug "Importing module $($Module.Name)"
         $Module.ErrorAction = 'Stop'
         Import-Module @Module
     }

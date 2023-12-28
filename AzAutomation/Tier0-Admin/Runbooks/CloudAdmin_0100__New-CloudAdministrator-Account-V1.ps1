@@ -307,7 +307,8 @@ if (
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Modules.ps1 -Modules $ImportPsModules 1> $null
 .\Common_0003__Import-AzAutomationVariableToPSEnv.ps1 1> $null
-.\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable (.\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1) 1> $null
+$Constants = .\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1
+.\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------

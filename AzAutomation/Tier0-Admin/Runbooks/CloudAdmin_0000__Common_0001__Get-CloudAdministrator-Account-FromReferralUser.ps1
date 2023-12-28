@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 0.9.0
+.VERSION 0.0.1
 .GUID c9836025-b441-474a-8c61-f7c3d17ebb23
 .AUTHOR Julian Pawlowski
 .COMPANYNAME Workoho GmbH
