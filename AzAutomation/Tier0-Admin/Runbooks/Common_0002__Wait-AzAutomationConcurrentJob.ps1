@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0002__Connect-AzAccount.ps1
+.REQUIREDSCRIPTS Common_0001__Connect-AzAccount.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -22,8 +22,6 @@
     Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param()
 
@@ -35,7 +33,7 @@ $return = $null
 if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common_0002__Connect-AzAccount.ps1 1> $null
+    .\Common_0001__Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $DoLoop = $true
@@ -73,7 +71,7 @@ if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountNa
         }
         else {
             $RetryCount += 1
-            Write-Verbose "$(Get-Date -Format yyyy-MM-dd-hh-mm-ss.ffff) Waiting for concurrent jobs: I am at rank $($currentJob.jobRanking) ..."
+            Write-Verbose "$(Get-Date -Format yyyy-MM-dd-hh-mm-ss.ffff) Waiting for concurrent jobs: I am at rank $($currentJob.jobRanking) ..." -Verbose
             Start-Sleep -Seconds $WaitSec
         }
     } While ($DoLoop)

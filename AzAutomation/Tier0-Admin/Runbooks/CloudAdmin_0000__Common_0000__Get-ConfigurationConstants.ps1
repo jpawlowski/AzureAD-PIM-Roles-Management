@@ -16,10 +16,20 @@
 
 <#
 .SYNOPSIS
-    Returns an array of Constants that are shared between all Cloud Administrator scripts
+    Returns an array of Constants that are shared between all Cloud Administrator scripts.
 
 .DESCRIPTION
-    ...
+    These constants are transformed using Common_0000__Convert-PSEnvToPSLocalVariable.ps1.
+    Values come from local environment variables and are validated against the Regex or Type property,
+    otherwise a default value is used.
+    Script variables that are already set (e.g. via script parameters) may take higher priority using
+    the respectScriptParameter property.
+
+    In Azure Automation sandbox, environment variables are synchronzed with Azure Automation Variables
+    before. See Common_0002__Import-AzAutomationVariableToPSEnv.ps1 for more details.
+
+    That way, flexible configuration can be provided with easy control as part of the Azure Automation Account.
+    Also, script runtime parameters can be reduced to the absolute minimum to improve security.
 #>
 
 [OutputType([array])]
@@ -30,6 +40,12 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 
 $Constants = [array] @(
     #region General Constants
+    @{
+        sourceName    = "AV_CloudAdmin_RestrictedAdminUnitId"
+        mapToVariable = 'CloudAdminRestrictedAdminUnitId'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
     @{
         sourceName    = "AV_CloudAdmin_AccountTypeExtensionAttribute"
         mapToVariable = 'AccountTypeExtensionAttribute'

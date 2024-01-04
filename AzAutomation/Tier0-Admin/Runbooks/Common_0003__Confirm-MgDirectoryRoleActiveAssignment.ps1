@@ -54,11 +54,9 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 
 $activeRoles = @()
 $missingRoles = @()
-$RoleAssignment = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
-$GlobalAdmin = $RoleAssignment | Where-Object roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'
-$PrivRoleAdmin = $RoleAssignment | Where-Object roleTemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814'
-
-Write-Verbose "Detected assigned directory roles: $($RoleAssignment.DisplayName -join ', ')"
+$RoleAssignments = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
+$GlobalAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq '62e90394-69f5-4237-9190-012177145e10' }
+$PrivRoleAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814' }
 
 if ($GlobalAdmin) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -70,7 +68,7 @@ if ($GlobalAdmin) {
     else {
         Write-Warning 'Running with Global Administrator permissions: You should reconsider following the principle of least privilege.'
     }
-    $activeRoles = $RoleAssignment
+    $activeRoles = $RoleAssignments
 }
 else {
     if ($PrivRoleAdmin) {
@@ -84,12 +82,13 @@ else {
     }
 
     foreach ($Item in $Roles) {
+        $DirectoryScopeId = if ($Item -is [String]) { '/' } elseif ($Item.DirectoryScopeId) { $Item.DirectoryScopeId } else { '/' }
         $roleTemplateId = if ($Item -is [String]) { $Item } elseif ($Item.roleTemplateId) { $Item.roleTemplateId } else { $Item.TemplateId }
         $DisplayName = if ($Item -is [String]) { $Item } else { $Item.DisplayName }
         $Optional = if ($Item -is [String]) { $false } else { $Item.Optional }
-        $AssignedRole = $RoleAssignment | Where-Object { ($_.roleTemplateId -eq $roleTemplateId) -or ($_.DisplayName -eq $DisplayName) }
+        $AssignedRole = $RoleAssignments | Where-Object { ($_.DirectoryScopeId -eq $DirectoryScopeId) -and (($_.RoleDefinition.TemplateId -eq $roleTemplateId) -or ($_.RoleDefinition.DisplayName -eq $DisplayName)) }
         if ($AssignedRole) {
-            Write-Verbose "Confirmed directory role $($AssignedRole.DisplayName) ($($AssignedRole.roleTemplateId))"
+            Write-Verbose "Confirmed directory role $($AssignedRole.RoleDefinition.DisplayName) ($($AssignedRole.RoleDefinition.TemplateId)), Directory Scope $($AssignedRole.DirectoryScopeId)"
             $activeRoles += $AssignedRole
         }
         elseif ($Optional) {

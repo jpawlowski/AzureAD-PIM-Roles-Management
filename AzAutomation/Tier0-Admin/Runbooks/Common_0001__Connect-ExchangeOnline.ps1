@@ -46,7 +46,14 @@ $params = @{
     ShowProgress = $false
 }
 
-$Connection = Get-ConnectionInformation
+$Connection = $null
+
+try {
+    $Connection = Get-ConnectionInformation -ErrorAction Stop
+}
+catch {
+    Write-Output '' 1> $null
+}
 
 if (
     ($Connection) -and
@@ -56,10 +63,16 @@ if (
     )
 ) {
     $Connection | Where-Object Organization -eq $params.Organization | ForEach-Object {
-        Disconnect-ExchangeOnline `
-            -ConnectionId $_.ConnectionId `
-            -Confirm:$false `
-            -InformationAction SilentlyContinue
+        try {
+            Disconnect-ExchangeOnline `
+                -ConnectionId $_.ConnectionId `
+                -Confirm:$false `
+                -InformationAction SilentlyContinue `
+                -ErrorAction Stop 1> $null
+        }
+        catch {
+            Write-Output '' 1> $null
+        }
     }
     $Connection = $null
 }

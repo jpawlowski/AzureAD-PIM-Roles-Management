@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES Microsoft.Graph,Az
-.REQUIREDSCRIPTS CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1,Common_0000__Convert-PSEnvToPSLocalVariable.ps1,Common_0000__Get-RandomPassword.ps1,Common_0000__Import-Modules.ps1,Common_0000__Submit-Webhook.ps1,Common_0000__Write-Error.ps1,Common_0000__Write-Information.ps1,Common_0000__Write-JsonOutput.ps1,Common_0000__Write-Warning.ps1,Common_0001__Connect-ExchangeOnline.ps1,Common_0001__Connect-MgGraph.ps1,Common_0003__Import-AzAutomationVariableToPSEnv.ps1,Common_0002__Wait-AzAutomationConcurrentJob.ps1,Common_0003__Confirm-MgAppPermission.ps1,Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1
+.REQUIREDSCRIPTS CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1,Common_0000__Convert-PSEnvToPSLocalVariable.ps1,Common_0000__Get-RandomPassword.ps1,Common_0000__Import-Modules.ps1,Common_0000__Submit-Webhook.ps1,Common_0000__Write-Error.ps1,Common_0000__Write-Information.ps1,Common_0000__Write-JsonOutput.ps1,Common_0000__Write-Warning.ps1,Common_0001__Connect-ExchangeOnline.ps1,Common_0001__Connect-MgGraph.ps1,Common_0002__Import-AzAutomationVariableToPSEnv.ps1,Common_0002__Wait-AzAutomationConcurrentJob.ps1,Common_0003__Confirm-MgAppPermission.ps1,Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -223,65 +223,6 @@ Param (
     [Object]$JobReference
 )
 
-#region [COMMON] SCRIPT CONFIGURATION PARAMETERS -------------------------------
-#
-# IMPORTANT: You should actually NOT change these parameters here. Instead, use the environment variables described above.
-# These parameters here exist quite far up in this file so that you get a quick idea of some
-# interesting aspects of the dependencies, e.g. when performing a code audit for security reasons.
-
-$ImportPsModules = @(
-    @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Beta.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-)
-
-$MgGraphScopes = @(
-    'User.ReadWrite.All'
-    'Directory.Read.All'
-    'Group.ReadWrite.All'
-    'Organization.Read.All'
-    'OnPremDirectorySynchronization.Read.All'
-    'Mail.Send'
-)
-
-$MgGraphDirectoryRoles = @(
-    @{
-        DisplayName = 'Exchange Recipient Administrator'
-        TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
-    }
-    @{
-        DisplayName = 'Groups Administrator'
-        TemplateId  = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
-    }
-    @{
-        DisplayName = 'License Administrator'
-        TemplateId  = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
-    }
-    @{
-        DisplayName = 'User Administrator'
-        TemplateId  = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-    }
-)
-
-$MgAppPermissions = @(
-    @{
-        DisplayName = 'Office 365 Exchange Online'
-        AppId       = '00000002-0000-0ff1-ce00-000000000000'
-        AppRoles    = @(
-            'Exchange.ManageAsApp'
-        )
-        # Oauth2PermissionScopes = @{
-        #     Admin = @(
-        #     )
-        #     '<User-ObjectId>' = @(
-        #     )
-        # }
-    }
-)
-#endregion ---------------------------------------------------------------------
-
 #region [COMMON] PARAMETER COUNT VALIDATION ------------------------------------
 if (
     ($ReferralUserId.Count -gt 1) -and
@@ -305,8 +246,14 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common_0000__Import-Modules.ps1 -Modules $ImportPsModules 1> $null
-.\Common_0003__Import-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common_0000__Import-Modules.ps1 -Modules @(
+    @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+) 1> $null
+.\Common_0002__Import-AzAutomationVariableToPSEnv.ps1 1> $null
 $Constants = .\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1
 .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
@@ -340,12 +287,64 @@ if (-Not (.\Common_0002__Wait-AzAutomationConcurrentJob.ps1)) {
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] OPEN CONNECTIONS ----------------------------------------------
-.\Common_0001__Connect-MgGraph.ps1 -Scopes $MgGraphScopes 1> $null
+.\Common_0001__Connect-MgGraph.ps1 -Scopes @(
+    'User.ReadWrite.All'
+    'Directory.Read.All'
+    'Group.ReadWrite.All'
+    'Organization.Read.All'
+    'OnPremDirectorySynchronization.Read.All'
+    'Mail.Send'
+) 1> $null
 $tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
 $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
-.\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles $MgGraphDirectoryRoles 1> $null
-.\Common_0003__Confirm-MgAppPermission.ps1 -Permissions $MgAppPermissions 1> $null
+
+.\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles @(
+    @{
+        DisplayName = 'Exchange Recipient Administrator'
+        TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+    }
+
+    # Restricted Admin Unit for Tier0
+    @{
+        DisplayName      = 'Groups Administrator'
+        TemplateId       = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
+        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
+    }
+    @{
+        DisplayName      = 'License Administrator'
+        TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
+    }
+    @{
+        DisplayName      = 'User Administrator'
+        TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
+    }
+
+    # Regular Users
+    @{
+        DisplayName      = 'User Administrator'
+        TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+        DirectoryScopeId = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
+    }
+) 1> $null
+
+# .\Common_0003__Confirm-MgAppPermission.ps1 -Permissions @(
+#     @{
+#         DisplayName = 'Office 365 Exchange Online'
+#         AppId       = '00000002-0000-0ff1-ce00-000000000000'
+#         AppRoles    = @(
+#             'Exchange.ManageAsApp'
+#         )
+#         # Oauth2PermissionScopes = @{
+#         #     Admin = @(
+#         #     )
+#         #     '<User-ObjectId>' = @(
+#         #     )
+#         # }
+#     }
+# ) 1> $null
 .\Common_0001__Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -399,6 +398,11 @@ ForEach (
                 DisplayName = 'Privileged Role Administrator'
                 TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
             }
+        ) 1> $null
+    }
+    elseif ($GroupObj.IsManagementRestricted) {
+        .\Common_0001__Connect-MgGraph.ps1 -WarningAction SilentlyContinue -Scopes @(
+            'Directory.Write.Restricted'
         ) 1> $null
     }
     if ('Private' -ne $GroupObj.Visibility) {
@@ -886,6 +890,8 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             return
         }
+
+        Write-Verbose "Nominated ordinary user account $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) as Tier $Tier Cloud Administrator account" -Verbose
         #endregion ---------------------------------------------------------------------
 
         #region Add Return Data --------------------------------------------------------
@@ -1399,7 +1405,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for user provisioning consistency ..."
+                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for user provisioning consistency ..." -Verbose
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
@@ -1622,7 +1628,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for group assignment ..."
+                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for group assignment ..." -Verbose
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
@@ -1671,7 +1677,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         else {
             $RetryCount += 1
-            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange license assignment ..."
+            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange license assignment ..." -Verbose
             Start-Sleep -Seconds $WaitSec
         }
     } While ($DoLoop)
@@ -1711,7 +1717,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         else {
             $RetryCount += 1
-            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for mailbox creation ..."
+            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for mailbox creation ..." -Verbose
             Start-Sleep -Seconds $WaitSec
         }
     } While ($DoLoop)

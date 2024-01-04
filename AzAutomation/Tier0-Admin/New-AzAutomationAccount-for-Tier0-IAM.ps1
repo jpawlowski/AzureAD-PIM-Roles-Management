@@ -36,12 +36,14 @@
 .PARAMETER Location
     Azure Location
 
+.PARAMETER CloudAdministrationRestrictedAdminUnit
+    Display name of the restricted management administrative unit that contains Tiering groups.
+
+.PARAMETER CloudAdministratorsAdminUnit
+    Display name of the administrative unit where the managed identity should have User Administrator role permissions to create and update dedicated Cloud Admin accounts.
+
 .PARAMETER Plan
     Plan, defaults to Free, may upgrade to Basic
-
-.PARAMETER AppScopeID
-    Scope ID to limit access for Microsoft Entra roles for app roles, e.g. '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
-    IMPORTANT: Not functional from Microsoft Graph API side as of December 2023.
 
 .PARAMETER Runbooks
     Path to a folder with runbooks to upload.
@@ -55,30 +57,33 @@
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.SignIns'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Identity.Governance'; ModuleVersion='2.0' }
 #Requires -Modules @{ ModuleName='Microsoft.Graph.Applications'; ModuleVersion='2.0' }
+#Requires -Modules @{ ModuleName='Microsoft.Graph.Beta.Applications'; ModuleVersion='2.0' }
 
 [CmdletBinding(
     SupportsShouldProcess,
     ConfirmImpact = 'High'
 )]
 Param (
-    [Parameter(Position = 0, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [string]$TenantId,
 
-    [Parameter(Position = 1, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [string]$Subscription,
 
-    [Parameter(Position = 2, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [string]$ResourceGroupName,
 
-    [Parameter(Position = 3, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [string]$Name,
 
-    [Parameter(Position = 4, mandatory = $true)]
-
+    [Parameter(mandatory = $true)]
     [string]$Location,
-    [string]$Plan,
-    [string]$AppScopeID,
 
+    [Parameter(mandatory = $true)]
+    [string]$CloudAdministrationRestrictedAdminUnit,
+
+    [string]$CloudAdministratorsAdminUnit,
+    [string]$Plan,
     [Array]$Runbooks = (Join-Path (Get-Item $MyInvocation.MyCommand).Directory 'Runbooks')
 )
 
@@ -86,10 +91,107 @@ if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
     Throw 'This script must be run interactively by a privileged administrator account.'
 }
 
+$MgScopes = @(
+    'AdministrativeUnit.Read.All'
+    'AdministrativeUnit.ReadWrite.All'
+    'Application.Read.All'
+    'Application.ReadWrite.All'
+    'Directory.Read.All'
+    'Directory.ReadWrite.All'
+    'Directory.Write.Restricted'
+    'AppRoleAssignment.Read.All'
+    'AppRoleAssignment.ReadWrite.All'
+    'RoleManagement.Read.Directory'
+    'RoleManagement.ReadWrite.Directory'
+)
+$MissingMgScopes = @()
+
+foreach ($MgScope in $MgScopes) {
+    if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
+        Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
+    }
+}
+
+if (-Not (Get-MgContext)) {
+    Connect-MgGraph `
+        -Scopes $MgScopes `
+        -ContextScope Process `
+        -Verbose:$Verbose
+}
+
+foreach ($MgScope in $MgScopes) {
+    if ($MgScope -notin @((Get-MgContext).Scopes)) {
+        $MissingMgScopes += $MgScope
+    }
+}
+
+if ($MissingMgScopes) {
+    Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
+}
+
+$CloudAdminRestrictedAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministrationRestrictedAdminUnit)'"
+
+if (-Not $CloudAdminRestrictedAdminUnit) {
+    if ($PSCmdlet.ShouldProcess(
+            "Create Restricted Management Administrative Unit in Microsoft Entra",
+            "Do you confirm to create Restricted Management Administrative Unit ?",
+            'Create Restricted Management Administrative Unit in Microsoft Entra'
+        )) {
+
+        $params = @{
+            DisplayName                  = $CloudAdministrationRestrictedAdminUnit
+            Visibility                   = 'HiddenMembership'
+            IsMemberManagementRestricted = $true
+        }
+        $CloudAdminRestrictedAdminUnit = New-MgBetaAdministrativeUnit @params
+
+    }
+    elseif ($WhatIfPreference) {
+        Write-Verbose 'What If: Restricted Management Administrative Unit would have been created in Microsoft Entra.'
+    }
+    else {
+        Write-Verbose 'Creation of Restricted Management Administrative Unit in Microsoft Entra was denied.'
+    }
+}
+
+if (-Not $CloudAdminRestrictedAdminUnit.IsMemberManagementRestricted) {
+    Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' must be management restricted."
+}
+
+if (-Not $CloudAdminRestrictedAdminUnit.Visibility -or ($CloudAdminRestrictedAdminUnit.Visibility -ne 'HiddenMembership')) {
+    Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' visibility must be HiddenMembership."
+}
+
+$CloudAdminsAdminUnit = $null
+if ($CloudAdministratorsAdminUnit) {
+    $CloudAdminsAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministratorsAdminUnit)'"
+
+    if (-Not $CloudAdminsAdminUnit) {
+        if ($PSCmdlet.ShouldProcess(
+                "Create Cloud Admin Accounts Administrative Unit in Microsoft Entra",
+                "Do you confirm to create Cloud Admin Accounts Administrative Unit ?",
+                'Create Cloud Admin Accounts Administrative Unit in Microsoft Entra'
+            )) {
+
+            $params = @{
+                DisplayName                  = $CloudAdministratorsAdminUnit
+            }
+            $CloudAdminsAdminUnit = New-MgBetaAdministrativeUnit @params
+
+        }
+        elseif ($WhatIfPreference) {
+            Write-Verbose 'What If: Cloud Admin Accounts Administrative Unit would have been created in Microsoft Entra.'
+        }
+        else {
+            Write-Verbose 'Creation of Cloud Admin Accounts Administrative Unit in Microsoft Entra was denied.'
+        }
+    }
+}
+
 try {
     if (
-    (-Not (Get-AzContext)) -or
-    ($TenantId -ne (Get-AzContext).Tenant)
+        (-Not (Get-AzContext)) -or
+        ($TenantId -ne (Get-AzContext).Tenant)
     ) {
         Connect-AzAccount `
             -TenantId $TenantId `
@@ -140,12 +242,32 @@ if (-Not $automationAccount) {
 }
 
 if ($PSCmdlet.ShouldProcess(
-        "Set Automation Variables in $($automationAccount.AutomationAccountName)",
+        "Set Automation Variables in $(..AutomationAccountName)",
         "Do you confirm to set Automation Variables in $($automationAccount.AutomationAccountName) ?",
         'Set Automation Variables in Azure Automation Account'
     )) {
 
     $Variables = @(
+        @{
+            Name  = 'AV_CloudAdmin_RestrictedAdminUnitId'
+            Value = [String]''
+        }
+        @{
+            Name  = 'AV_CloudAdmin_AccountTypeExtensionAttribute'
+            Value = [String]'15'
+        }
+        @{
+            Name  = 'AV_CloudAdmin_AccountTypeEmployeeType'
+            Value = [boolean]$true
+        }
+        @{
+            Name  = 'AV_CloudAdmin_ReferenceExtensionAttribute'
+            Value = [String]'14'
+        }
+        @{
+            Name  = 'AV_CloudAdmin_ReferenceManager'
+            Value = [boolean]$false
+        }
         @{
             Name  = 'AV_CloudAdmin_Webhook'
             Value = [String]''
@@ -155,15 +277,7 @@ if ($PSCmdlet.ShouldProcess(
             Value = [String]'EXCHANGEDESKLESS'
         }
         @{
-            Name  = 'AV_CloudAdminTier1_LicenseSkuPartNumber'
-            Value = [String]'EXCHANGEDESKLESS'
-        }
-        @{
             Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
-            Value = [String]''
-        }
-        @{
-            Name  = 'AV_CloudAdminTier1_UserPhotoUrl'
             Value = [String]''
         }
         @{
@@ -495,49 +609,19 @@ if ($automationAccount.Identity.PrincipalId) {
             'Assign Microsoft Entra app permissions to System-Assigned Managed Identity of Azure Automation Account'
         )) {
 
-        $MgScopes = @(
-            'Application.ReadWrite.All'
-            'Directory.ReadWrite.All'
-            'AppRoleAssignment.ReadWrite.All'
-            'RoleManagement.ReadWrite.Directory'
-        )
-        $MissingMgScopes = @()
-
-        foreach ($MgScope in $MgScopes) {
-            if ($WhatIfPreference -and ($MgScope -like '*Write*')) {
-                Write-Verbose "WhatIf: Removed $MgScope from required Microsoft Graph scopes"
-            }
-        }
-
-        if (-Not (Get-MgContext)) {
-            Connect-MgGraph `
-                -Scopes $MgScopes `
-                -ContextScope Process `
-                -Verbose:$Verbose
-        }
-
-        foreach ($MgScope in $MgScopes) {
-            if ($MgScope -notin @((Get-MgContext).Scopes)) {
-                $MissingMgScopes += $MgScope
-            }
-        }
-
-        if ($MissingMgScopes) {
-            Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
-        }
-
-        $ManagedIdentity = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'ManagedIdentity' and DisplayName eq '$Name'"
-
         $AppPermissions = @{
             # Microsoft Graph
             '00000003-0000-0000-c000-000000000000' = @{
                 AppRoles = @(
                     'Directory.Read.All'
+                    'Directory.Write.Restricted'
+                    'Group.Read.All'
                     'Group.ReadWrite.All'
                     'Mail.Send'
                     'OnPremDirectorySynchronization.Read.All'
                     'Organization.Read.All'
                     'Policy.Read.All'
+                    'User.Read.All'
                     'User.ReadWrite.All'
                     'UserAuthenticationMethod.ReadWrite.All'
                 )
@@ -569,14 +653,14 @@ if ($automationAccount.Identity.PrincipalId) {
         $AppPermissions.GetEnumerator() | ForEach-Object {
             $ServicePrincipal = $null
             if ($_.key -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') {
-                $ServicePrincipal = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and appId eq '$($_.key)'"
+                $ServicePrincipal = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and appId eq '$($_.key)'"
             }
             else {
-                $ServicePrincipal = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($_.key)'"
+                $ServicePrincipal = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($_.key)'"
             }
             Write-Output "   $($ServicePrincipal.DisplayName.ToUpper())"
-            $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $ManagedIdentity.Id | Where-Object ResourceId -eq $ServicePrincipal.Id
-            $PermissionGrants = Get-MgOauth2PermissionGrant -All -Filter "ClientId eq '$($ManagedIdentity.Id)' and ResourceId eq '$($ServicePrincipal.Id)'"
+            $AppRoleAssignments = Get-MgBetaServicePrincipalAppRoleAssignment -ServicePrincipalId $automationAccount.Identity.PrincipalId | Where-Object ResourceId -eq $ServicePrincipal.Id
+            $PermissionGrants = Get-MgBetaOauth2PermissionGrant -All -Filter "ClientId eq '$($automationAccount.Identity.PrincipalId)' and ResourceId eq '$($ServicePrincipal.Id)'"
 
             $Permissions = $_.Value
             $Permissions.GetEnumerator() | ForEach-Object {
@@ -598,12 +682,12 @@ if ($automationAccount.Identity.PrincipalId) {
                         if ($AppRoleAssignments | Where-Object AppRoleId -eq $AppRole.Id) { continue }
 
                         $params = @{
-                            PrincipalId = $ManagedIdentity.Id
+                            PrincipalId = $automationAccount.Identity.PrincipalId
                             ResourceId  = $ServicePrincipal.Id
                             AppRoleId   = $AppRole.Id
                         }
-                        $null = New-MgServicePrincipalAppRoleAssignment `
-                            -ServicePrincipalId $ManagedIdentity.Id `
+                        $null = New-MgBetaServicePrincipalAppRoleAssignment `
+                            -ServicePrincipalId $automationAccount.Identity.PrincipalId `
                             -BodyParameter $params
                     }
                 }
@@ -612,7 +696,7 @@ if ($automationAccount.Identity.PrincipalId) {
                     Write-Output "      Delegated:"
 
                     $_.Value.GetEnumerator() | ForEach-Object {
-                        $ClientId = $ManagedIdentity.Id
+                        $ClientId = $automationAccount.Identity.PrincipalId
                         $ResourceId = $ServicePrincipal.Id
                         $PrincipalId = $_.Key
                         $ConsentType = if ($PrincipalId -eq 'Admin') { 'AllPrincipals' } else { 'Principal' }
@@ -640,7 +724,7 @@ if ($automationAccount.Identity.PrincipalId) {
                             $params = @{
                                 Scope = $scopes -join ' '
                             }
-                            Update-MgOauth2PermissionGrant -OAuth2PermissionGrantId $PermissionGrant.Id -BodyParameter $params
+                            Update-MgBetaOauth2PermissionGrant -OAuth2PermissionGrantId $PermissionGrant.Id -BodyParameter $params
                         }
                         else {
                             $params = @{
@@ -652,7 +736,7 @@ if ($automationAccount.Identity.PrincipalId) {
                             if ($PrincipalId -ne 'Admin') {
                                 $params.PrincipalId = $PrincipalId
                             }
-                            $null = New-MgOauth2PermissionGrant -BodyParameter $params
+                            $null = New-MgBetaOauth2PermissionGrant -BodyParameter $params
                         }
                     }
                 }
@@ -680,10 +764,12 @@ if ($automationAccount.Identity.PrincipalId) {
             @{
                 DisplayName    = 'Groups Administrator'
                 roleTemplateId = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
+                isScopable     = $true
             }
             @{
                 DisplayName    = 'License Administrator'
                 roleTemplateId = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                isScopable     = $true
             }
             @{
                 DisplayName    = 'Privileged Authentication Administrator'
@@ -696,12 +782,12 @@ if ($automationAccount.Identity.PrincipalId) {
             @{
                 DisplayName    = 'User Administrator'
                 roleTemplateId = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+                isScopable     = $true
             }
         )
 
-        $ManagedIdentity = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'ManagedIdentity' and DisplayName eq '$Name'"
-        $RoleDefinitions = Get-MgRoleManagementDirectoryRoleDefinition
-        $RoleAssignments = Get-MgRoleManagementDirectoryRoleAssignment -All -Filter "PrincipalId eq '$($ManagedIdentity.Id)'"
+        $RoleDefinitions = Get-MgBetaRoleManagementDirectoryRoleDefinition
+        $RoleAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignment -All -Filter "PrincipalId eq '$($automationAccount.Identity.PrincipalId)'"
 
         foreach ($Role in $EntraRoles) {
             $RoleDefinition = $null
@@ -719,7 +805,13 @@ if ($automationAccount.Identity.PrincipalId) {
                 continue
             }
 
-            Write-Output "   - $($RoleDefinition.Id)`n     $($RoleDefinition.DisplayName)"
+            if ($Role.isScopable) {
+                Write-Output "   - $($RoleDefinition.Id)`n     $($RoleDefinition.DisplayName)"
+
+            }
+            else {
+                Write-Output "   - $($RoleDefinition.Id)`n     $($RoleDefinition.DisplayName)"
+            }
 
             if ($RoleAssignments | Where-Object RoleDefinitionId -eq $RoleDefinition.Id) { continue }
 
@@ -728,8 +820,8 @@ if ($automationAccount.Identity.PrincipalId) {
                 RoleDefinitionId = $RoleDefinition.Id
                 DirectoryScopeId = '/'
             }
-            if ($Role.AppScopeId) { $params.AppScopeId = $Role.AppScopeId }
-            $null = New-MgRoleManagementDirectoryRoleAssignment `
+            # if ($Role.isScopable) { $params.DirectoryScopeId = $Role.DirectoryScopeId }
+            $null = New-MgBetaRoleManagementDirectoryRoleAssignment `
                 -BodyParameter $params
         }
     }

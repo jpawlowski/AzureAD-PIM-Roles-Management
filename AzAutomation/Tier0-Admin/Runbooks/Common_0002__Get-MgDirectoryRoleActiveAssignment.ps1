@@ -22,41 +22,21 @@
     Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
-#region CONNECTIONS ------------------------------------------------------------
-.\Common_0001__Connect-MgGraph.ps1 1> $null
-#endregion ---------------------------------------------------------------------
-
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Modules.ps1 -Modules @(
-    @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-    @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Identity.Governance'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
-$return = $null
+$roleAssignments = Get-MgRoleManagementDirectoryRoleAssignment -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" -ExpandProperty roleDefinition
 
-if ((Get-MgContext).AuthType -eq 'Delegated') {
-    $return = Get-MgBetaUserTransitiveMemberOfAsDirectoryRole `
-        -UserId $env:MG_PRINCIPAL_ID `
-        -ConsistencyLevel eventual `
-        -CountVariable countVar
-}
-else {
-    $return = Get-MgBetaServicePrincipalTransitiveMemberOfAsDirectoryRole `
-        -ServicePrincipalId $env:MG_PRINCIPAL_ID `
-        -ConsistencyLevel eventual `
-        -CountVariable countVar
-}
-
-Write-Verbose "Received directory roles: $($return.DisplayName -join ', ')"
+Write-Verbose "Received directory roles: $($roleAssignments.RoleDefinition.DisplayName -join ', ')"
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $return
+return $roleAssignments

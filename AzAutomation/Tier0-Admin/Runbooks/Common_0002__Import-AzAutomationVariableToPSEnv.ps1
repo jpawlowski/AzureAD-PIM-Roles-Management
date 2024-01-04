@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0002__Connect-AzAccount.ps1
+.REQUIREDSCRIPTS Common_0001__Connect-AzAccount.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -22,8 +22,6 @@
     Common runbook that can be used by other runbooks. It can not be started as an Azure Automation job directly.
 #>
 
-#Requires -Version 5.1
-
 [CmdletBinding()]
 Param()
 
@@ -33,7 +31,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common_0002__Connect-AzAccount.ps1 1> $null
+    .\Common_0001__Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
     $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName

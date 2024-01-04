@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0001__Connect-MgGraph.ps1,Common_0002__Connect-AzAccount.ps1
+.REQUIREDSCRIPTS Common_0001__Connect-MgGraph.ps1,Common_0001__Connect-AzAccount.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -27,10 +27,6 @@ Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-
-#region CONNECTIONS ------------------------------------------------------------
-.\Common_0002__Connect-AzAccount.ps1 1> $null
-#endregion ---------------------------------------------------------------------
 
 $Job = @{}
 
