@@ -56,7 +56,6 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdmin_AccountTypeEmployeeType"
         mapToVariable = 'AccountTypeEmployeeType'
         defaultValue  = $true
-        type          = 'Boolean'
     }
     @{
         sourceName    = "AV_CloudAdmin_ReferenceExtensionAttribute"
@@ -68,7 +67,6 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdmin_ReferenceManager"
         mapToVariable = 'ReferenceManager'
         defaultValue  = $false
-        type          = 'Boolean'
     }
     @{
         sourceName    = "AV_CloudAdmin_Webhook"
@@ -79,6 +77,12 @@ $Constants = [array] @(
     #endregion
 
     #region Tier 0 Constants
+    @{
+        sourceName    = "AV_CloudAdminTier0_AccountRestrictedAdminUnitId"
+        mapToVariable = 'AccountRestrictedAdminUnitId_Tier0'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
     @{
         sourceName    = "AV_CloudAdminTier0_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier0'
@@ -108,7 +112,12 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier0_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier0'
         defaultValue  = $true
-        Type          = 'boolean'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AccountDomain"
+        mapToVariable = 'AccountDomain_Tier0'
+        defaultValue  = 'onmicrosoft.com'
+        Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
     }
     @{
         sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypePrefix"
@@ -234,6 +243,12 @@ $Constants = [array] @(
 
     #region Tier 1 Constants
     @{
+        sourceName    = "AV_CloudAdminTier1_AccountAdminUnitId"
+        mapToVariable = 'AccountAdminUnitId_Tier1'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
         sourceName    = "AV_CloudAdminTier1_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier1'
         defaultValue  = 'EXCHANGEDESKLESS'
@@ -262,7 +277,12 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier1_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier1'
         defaultValue  = $false
-        Type          = 'boolean'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AccountDomain"
+        mapToVariable = 'AccountDomain_Tier1'
+        defaultValue  = 'onmicrosoft.com'
+        Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
     }
     @{
         sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypePrefix"
@@ -388,6 +408,12 @@ $Constants = [array] @(
 
     #region Tier 2 Constants
     @{
+        sourceName    = "AV_CloudAdminTier2_AccountAdminUnitId"
+        mapToVariable = 'AccountAdminUnitId_Tier2'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
         sourceName    = "AV_CloudAdminTier2_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier2'
         defaultValue  = ''
@@ -416,7 +442,12 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier2_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier2'
         defaultValue  = $false
-        Type          = 'boolean'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AccountDomain"
+        mapToVariable = 'AccountDomain_Tier2'
+        defaultValue  = 'onmicrosoft.com'
+        Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
     }
     @{
         sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypePrefix"

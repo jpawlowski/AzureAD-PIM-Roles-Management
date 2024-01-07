@@ -44,7 +44,7 @@ Import-Module PowerShellGet
 $VerbosePreference = $OrigVerbosePreference
 $global:VerbosePreference = $OrigGlobalVerbosePreference
 
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---" -Verbose
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 $VerbosePreference = 'SilentlyContinue'
 $global:VerbosePreference = 'SilentlyContinue'

@@ -24,39 +24,73 @@
 
 [CmdletBinding()]
 Param(
-    [Int32]$lowerChars,
-    [Int32]$upperChars,
-    [Int32]$numbers,
-    [Int32]$symbols
+    [Parameter(Mandatory)]
+    [Int32]$length,
+
+    [Int32]$minLower = 0,
+    [Int32]$minUpper = 0,
+    [Int32]$minNumber = 0,
+    [Int32]$minSpecial = 0
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
 #region [COMMON] FUNCTIONS -----------------------------------------------------
-function Get-RandomCharacter($length, $characters) {
+function Get-RandomCharacter([Int32]$length, [string]$characters) {
     if ($length -lt 1) { return '' }
-    $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
+    if (Get-Command Get-SecureRandom -ErrorAction SilentlyContinue) {
+        $random = 1..$length | ForEach-Object { Get-SecureRandom -Maximum $characters.Length }
+    }
+    else {
+        $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
+    }
     $private:ofs = ''
     return [string]$characters[$random]
 }
 function Get-ScrambleString([string]$inputString) {
     $characterArray = $inputString.ToCharArray()
-    $scrambledStringArray = $characterArray | Get-Random -Count $characterArray.Length
-    $outputString = -join $scrambledStringArray
-    return $outputString
+    if (Get-Command Get-SecureRandom -ErrorAction SilentlyContinue) {
+        return -join ($characterArray | Get-SecureRandom -Count $characterArray.Length)
+    }
+    else {
+        return -join ($characterArray | Get-Random -Count $characterArray.Length)
+    }
 }
 #endregion ---------------------------------------------------------------------
 
-if ($null -eq $lowerChars) { $lowerChars = 8 }
-if ($null -eq $upperChars) { $upperChars = 8 }
-if ($null -eq $numbers) { $numbers = 8 }
-if ($null -eq $symbols) { $symbols = 8 }
-$Password = Get-RandomCharacter -length $lowerChars -characters 'abcdefghiklmnoprstuvwxyz'
-$Password += Get-RandomCharacter -length $upperChars -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
-$Password += Get-RandomCharacter -length $numbers -characters '1234567890'
-$Password += Get-RandomCharacter -length $symbols -characters "@#$%^&*-_!+=[]{}|\:',.?/`~`"();<>"
-$Password = Get-ScrambleString $Password
+# Define character sets
+$lowerChars = 'abcdefghijklmnopqrstuvwxyz'
+$upperChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+$numberChars = '0123456789'
+$specialChars = "~`!@#$%^&*()_-+={[}]|\:;`"'<,>.?/"
+
+# Calculate the number of characters needed for each set
+$totalChars = $minLower + $minUpper + $minNumber + $minSpecial
+$remainingChars = $length - $totalChars
+$lowerCharsNeeded = [Math]::Max($minLower - $remainingChars, 0)
+$upperCharsNeeded = [Math]::Max($minUpper - $remainingChars, 0)
+$numberCharsNeeded = [Math]::Max($minNumber - $remainingChars, 0)
+$specialCharsNeeded = [Math]::Max($minSpecial - $remainingChars, 0)
+
+# Generate the password
+$password = ''
+if ($lowerCharsNeeded -gt 0) {
+    $password += Get-RandomCharacter -length $lowerCharsNeeded -characters $lowerChars
+}
+if ($upperCharsNeeded -gt 0) {
+    $password += Get-RandomCharacter -length $upperCharsNeeded -characters $upperChars
+}
+if ($numberCharsNeeded -gt 0) {
+    $password += Get-RandomCharacter -length $numberCharsNeeded -characters $numberChars
+}
+if ($specialCharsNeeded -gt 0) {
+    $password += Get-RandomCharacter -length $specialCharsNeeded -characters $specialChars
+}
+$remainingChars = $length - $password.Length
+if ($remainingChars -gt 0) {
+    $password += Get-RandomCharacter -length $remainingChars -characters ($lowerChars + $upperChars + $numberChars + $specialChars)
+}
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $Password
+return Get-ScrambleString $password

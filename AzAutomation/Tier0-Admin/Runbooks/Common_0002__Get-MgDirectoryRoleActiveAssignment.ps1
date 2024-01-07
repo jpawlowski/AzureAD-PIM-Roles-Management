@@ -36,7 +36,7 @@ Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFile
 
 $roleAssignments = Get-MgRoleManagementDirectoryRoleAssignment -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" -ExpandProperty roleDefinition
 
-Write-Verbose "Received directory roles: $($roleAssignments.RoleDefinition.DisplayName -join ', ')"
+Write-Verbose "Received directory roles:`n$($roleAssignments | ConvertTo-Json)"
 
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $roleAssignments

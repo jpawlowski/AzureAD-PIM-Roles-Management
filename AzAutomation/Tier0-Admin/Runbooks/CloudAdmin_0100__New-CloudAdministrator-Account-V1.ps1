@@ -25,7 +25,7 @@
     For dedicated admin accounts, User Principal Name and mail address will use the initial .onmicrosoft.com domain of the respective Entra ID tenant.
     The admin account will be referred to the main user account from ReferralUserId by using the manager property as well as using the same Employee information (if set).
     To identify as a Cloud Administrator account, the EmployeeType property will be used so that it can be used as an alternative to the UPN naming convention.
-    Also, extensionAttribute will be used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix of 'AxC__' is added where 'x' represents the respective Tier level.
+    Also, an extension attribute is used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix/suffix is added to represent the respective Tier level.
     Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
 
     NOTE: This script uses the Microsoft Graph Beta API as it requires support for Restricted Management Administrative Units which is not available in the stable API.
@@ -86,11 +86,14 @@
     * For example: AV_CloudAdminTier0_GroupId, AV_CloudAdminTier1_GroupId, AV_CloudAdminTier2_GroupId      *
     ********************************************************************************************************
 
+    AV_CloudAdmin_RestrictedAdminUnitId - [String] - Default Value: $null
+        ...
+
     AV_CloudAdmin_AccountTypeExtensionAttribute - [Integer] - Default Value: 15
         Save user account type information in this extension attribute. Content from the referral user will be copied and the Cloud Administrator
         information is added either as prefix or suffix (see AV_CloudAdminTier<Tier>_ExtensionAttribute* settings below).
 
-    AV_CloudAdmin_AccountTypeEmployeeType
+    AV_CloudAdmin_AccountTypeEmployeeType - [Boolean] - Default Value: $true
         ...
 
     AV_CloudAdmin_ReferenceExtensionAttribute - [Integer] - Default Value: 14
@@ -99,8 +102,14 @@
     AV_CloudAdmin_ReferenceManager - [Boolean] - Default Value: $false
         ...
 
-    AV_CloudAdmin_Webhook - [String] - Default Value: <empty>
+    AV_CloudAdmin_Webhook - [String] - Default Value: $null
         Send return data in JSON format as POST to this webhook URL.
+
+    AV_CloudAdminTier0_AccountRestrictedAdminUnitId
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountAdminUnitId
+        Tier 1 and 2 only, see AV_CloudAdminTier0_AccountRestrictedAdminUnitId for Tier 0.
 
     AV_CloudAdminTier<Tier>_UserPhotoUrl - [String] - Default Value: <empty>
         Default value for script parameter UserPhotoUrl. If no parameter was provided, this value will be used instead.
@@ -120,6 +129,9 @@
         ...
 
     AV_CloudAdminTier<Tier>_DedicatedAccount - [Boolean] - Default Value: $true for Tier 0, $false for Tier 1 and 2
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountDomain - [String] - Default Value: onmicrosoft.com
         ...
 
     AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypePrefix - [String] - Default Value: 
@@ -202,7 +214,6 @@
 #>
 
 #region TODO:
-#- Multiple licenses support
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
 #- Install PowerShell modules that are mentioned as "requires" but do not update existing ones, just to support the initial run of the script
 #endregion
@@ -247,30 +258,18 @@ if (
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Modules.ps1 -Modules @(
-    @{ Name = 'Microsoft.Graph.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
+    @{ Name = 'Microsoft.Graph.Beta.Identity.DirectoryManagement'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Users'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Groups'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
+
+# NOTE: Connection to Microsoft Azure is implicitly established as required
 .\Common_0002__Import-AzAutomationVariableToPSEnv.ps1 1> $null
+
 $Constants = .\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1
 .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
-#endregion ---------------------------------------------------------------------
-
-#region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
-$persistentError = $false
-$Iteration = 0
-
-# To improve memory usage, return arrays are kept separate until the very end
-$returnOutput = @()
-$returnInformation = @()
-$returnWarning = @()
-$returnError = @()
-$return = @{
-    Job = .\Common_0003__Get-AzAutomationJobInfo.ps1
-}
-if ($JobReference) { $return.Job.Reference = $JobReference }
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
@@ -286,7 +285,7 @@ if (-Not (.\Common_0002__Wait-AzAutomationConcurrentJob.ps1)) {
 }
 #endregion ---------------------------------------------------------------------
 
-#region [COMMON] OPEN CONNECTIONS ----------------------------------------------
+#region [COMMON] OPEN CONNECTIONS: Microsoft Graph -----------------------------
 .\Common_0001__Connect-MgGraph.ps1 -Scopes @(
     'User.ReadWrite.All'
     'Directory.Read.All'
@@ -295,57 +294,192 @@ if (-Not (.\Common_0002__Wait-AzAutomationConcurrentJob.ps1)) {
     'OnPremDirectorySynchronization.Read.All'
     'Mail.Send'
 ) 1> $null
+#endregion ---------------------------------------------------------------------
+
+#region License Existance Validation -------------------------------------------
+$TenantLicensed = Get-MgSubscribedSku -All
+$SkuPartNumberWithExchangeServicePlan = $null
+ForEach (
+    $SkuPartNumber in @(
+        @(($LicenseSkuPartNumber_Tier0 -split ' '); ($LicenseSkuPartNumber_Tier1 -split ' '); ($LicenseSkuPartNumber_Tier2 -split ' ')) | Select-Object -Unique
+    )
+) {
+    if ([String]::IsNullOrEmpty($SkuPartNumber)) { continue }
+    $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
+
+    if (-Not $Sku) {
+        Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant. Licenses must be purchased before creating Cloud Administrator accounts."
+    }
+    if ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') }) {
+        if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
+            $SkuPartNumberWithExchangeServicePlan = $Sku.SkuPartNumber
+            Write-Verbose "Detected Exchange Online service plan in SkuPartNumber $SkuPartNumberWithExchangeServicePlan."
+        }
+        else {
+            Throw "There can only be one license configured containing an Exchange Online service plan: Make your choice between $SkuPartNumberWithExchangeServicePlan and $($Sku.SkuPartNumber)."
+        }
+    }
+}
+if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
+    Throw "One of the configured SkuPartNumbers must contain an Exchange Online service plan."
+}
+#endregion ---------------------------------------------------------------------
+
+#region Administrative Unit Validation -----------------------------------------
+$AllowPrivilegedRoleAdministratorInAzureAutomation = $false
+$AdminUnitIsMemberManagementRestricted = $false
+ForEach (
+    $AdminUnitId in @(
+        @($CloudAdminRestrictedAdminUnitId; $AccountRestrictedAdminUnitId_Tier0; $AccountAdminUnitId_Tier1; $AccountAdminUnitId_Tier2) | Select-Object -Unique
+    )
+) {
+    if ($AdminUnitId) { continue }
+
+    try {
+        $AdminUnit = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $AdminUnitId -ErrorAction Stop
+    }
+    catch {
+        Throw $_
+    }
+
+    if (-Not $AdminUnit) {
+        Throw "AdminUnitId $($AdminUnitId) does not exist."
+    }
+    if ($AdminUnitId -in @(
+            $CloudAdminRestrictedAdminUnitId
+            $AccountRestrictedAdminUnitId_Tier0
+        )
+    ) {
+        if (-Not $AdminUnit.IsMemberManagementRestricted) {
+            Throw "Admin Unit $($AdminUnit.DisplayName) ($($AdminUnit.Id)): Must have restricted management enabled to be used for Cloud Administration."
+        }
+        if ('HiddenMembership' -ne $AdminUnit.Visibility) {
+            Throw "Admin Unit $($AdminUnit.DisplayName) ($($AdminUnit.Id)): Must have HiddenMembership visibility to be used for Cloud Administration."
+        }
+    }
+    if ($AdminUnitId -in @(
+            $AccountAdminUnitId_Tier1
+            $AccountAdminUnitId_Tier2
+        )
+    ) {
+        if (-Not $AdminUnit.IsMemberManagementRestricted) {
+            Write-Warning "Admin Unit $($AdminUnit.DisplayName) ($($AdminUnit.Id)): Consider recreating with `-IsMemberManagementRestricted:$true` to increase security."
+        }
+        if ('HiddenMembership' -ne $AdminUnit.Visibility) {
+            Write-Warning "Admin Unit $($AdminUnit.DisplayName) ($($AdminUnit.Id)): Consider recreating with `-Visibility 'HiddenMembership'` to increase security."
+        }
+    }
+    if ($AdminUnit.IsMemberManagementRestricted) {
+        $AdminUnitIsMemberManagementRestricted = $true
+    }
+    if (
+        ($null -eq $AdminUnitObj.AdditionalProperties.membershipRuleProcessingState) -or
+        ($AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -ne 'On')
+    ) {
+        $AllowPrivilegedRoleAdministratorInAzureAutomation = $true
+        Write-Warning "Admin Unit $($AdminUnit.DisplayName) ($($AdminUnit.Id)): Consider changing membership rule to dynamic for automatic member assignment and avoid Privileged Role Administrator permissions. You may use property extensionAttribute$AccountTypeExtensionAttribute to identify Cloud Administrator account types."
+    }
+}
+if ($AdminUnitIsMemberManagementRestricted) {
+    .\Common_0001__Connect-MgGraph.ps1 -WarningAction SilentlyContinue -Scopes @(
+        'Directory.Write.Restricted'
+    ) 1> $null
+}
+#endregion ---------------------------------------------------------------------
+
+#region Required Microsoft Entra Directory Permissions Validation --------------
+$DirectoryPermissions = .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -AllowPrivilegedRoleAdministratorInAzureAutomation:$AllowPrivilegedRoleAdministratorInAzureAutomation -Roles @(
+    # Exchange Online to setup email forwarding
+    if ($DedicatedAccount_Tier0 -or $DedicatedAccount_Tier1 -or $DedicatedAccount_Tier2) {
+        @{
+            DisplayName = 'Exchange Recipient Administrator'
+            TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+        }
+    }
+
+    # Cloud Administration Admin Units
+    if ($AllowPrivilegedRoleAdministratorInAzureAutomation) {
+        @{
+            DisplayName = 'Privileged Role Administrator'
+            TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+        }
+    }
+
+    # Cloud Administration Groups
+    if ($GroupId_Tier0 -or $GroupId_Tier1 -or $GroupId_Tier2) {
+        @{
+            DisplayName      = 'Groups Administrator'
+            TemplateId       = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
+            DirectoryScopeId = if ($CloudAdminRestrictedAdminUnitId) { "/administrativeUnits/$CloudAdminRestrictedAdminUnitId" } else { '/' }
+        }
+    }
+
+    # Tier 0 Cloud Admin Accounts
+    if ($DedicatedAccount_Tier0) {
+        @{
+            DisplayName      = 'User Administrator'
+            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+            DirectoryScopeId = if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' }
+        }
+        if (-Not $GroupId_Tier0) {
+            @{
+                DisplayName      = 'License Administrator'
+                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DirectoryScopeId = if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' }
+            }
+        }
+    }
+
+    # Tier 1 Cloud Admin Accounts
+    if ($DedicatedAccount_Tier1) {
+        @{
+            DisplayName      = 'User Administrator'
+            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+            DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
+        }
+        if (-Not $GroupId_Tier1) {
+            @{
+                DisplayName      = 'License Administrator'
+                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
+            }
+        }
+    }
+
+    # Tier 2 Cloud Admin Accounts
+    if ($DedicatedAccount_Tier2) {
+        @{
+            DisplayName      = 'User Administrator'
+            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+            DirectoryScopeId = if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' }
+        }
+        if (-Not $GroupId_Tier2) {
+            @{
+                DisplayName      = 'License Administrator'
+                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DirectoryScopeId = if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' }
+            }
+        }
+    }
+)
+#endregion ---------------------------------------------------------------------
+
+#region [COMMON] INITIALIZE SCRIPT VARIABLES -----------------------------------
 $tenant = Get-MgOrganization -OrganizationId (Get-MgContext).TenantId
 $tenantDomain = $tenant.VerifiedDomains | Where-Object IsInitial -eq true
 $tenantBranding = Get-MgOrganizationBranding -OrganizationId $tenant.Id
+$persistentError = $false
+$Iteration = 0
 
-.\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -Roles @(
-    @{
-        DisplayName = 'Exchange Recipient Administrator'
-        TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
-    }
-
-    # Restricted Admin Unit for Tier0
-    @{
-        DisplayName      = 'Groups Administrator'
-        TemplateId       = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
-        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
-    }
-    @{
-        DisplayName      = 'License Administrator'
-        TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
-        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
-    }
-    @{
-        DisplayName      = 'User Administrator'
-        TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-        DirectoryScopeId = '/administrativeUnits/d40c5dd6-502a-4db2-9c36-7ee2939bcfcf'
-    }
-
-    # Regular Users
-    @{
-        DisplayName      = 'User Administrator'
-        TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-        DirectoryScopeId = '/administrativeUnits/2c7399f0-42dd-40de-b20b-b986ab85045c'
-    }
-) 1> $null
-
-# .\Common_0003__Confirm-MgAppPermission.ps1 -Permissions @(
-#     @{
-#         DisplayName = 'Office 365 Exchange Online'
-#         AppId       = '00000002-0000-0ff1-ce00-000000000000'
-#         AppRoles    = @(
-#             'Exchange.ManageAsApp'
-#         )
-#         # Oauth2PermissionScopes = @{
-#         #     Admin = @(
-#         #     )
-#         #     '<User-ObjectId>' = @(
-#         #     )
-#         # }
-#     }
-# ) 1> $null
-.\Common_0001__Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
+# To improve memory consumption, return arrays are kept separate until the end of this script
+$returnOutput = @()
+$returnInformation = @()
+$returnWarning = @()
+$returnError = @()
+$return = @{
+    Job = .\Common_0003__Get-AzAutomationJobInfo.ps1
+}
+if ($JobReference) { $return.Job.Reference = $JobReference }
 #endregion ---------------------------------------------------------------------
 
 #region Group Validation -------------------------------------------------------
@@ -355,14 +489,8 @@ ForEach (
     )
 ) {
     if ([string]::IsNullOrEmpty($GroupId)) { continue }
-    $params = @{
-        GroupId        = $GroupId
-        ExpandProperty = 'Owners'
-        ErrorAction    = 'Stop'
-    }
-
     try {
-        $GroupObj = Get-MgBetaGroup @params
+        $GroupObj = Get-MgBetaGroup -GroupId $GroupId -ExpandProperty 'Owners' -ErrorAction Stop
     }
     catch {
         Throw $_
@@ -392,15 +520,48 @@ ForEach (
     ) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
     }
-    elseif ($GroupObj.IsAssignableToRole) {
-        .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -WarningAction SilentlyContinue -Roles @(
-            @{
-                DisplayName = 'Privileged Role Administrator'
-                TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
-            }
-        ) 1> $null
+    if ($GroupObj.IsAssignableToRole) {
+        if ($GroupObj.IsManagementRestricted) {
+            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider recreating the group without role enablement to avoid Privileged Role Administrator role assignment. Using Management Restricted Administrative Unit only should be the preferred protection for Cloud Administration."
+        }
+        if (-Not (
+                $DirectoryPermissions | Where-Object {
+                    # Privileged Role Administrator
+                    ($_.TemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814') -or
+
+                    # Global Administrator
+                    ($_.TemplateId -eq '62e90394-69f5-4237-9190-012177145e10')
+                }
+            )
+        ) {
+            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Missing Privileged Role Administrator permission to change membership of this group. Preferably, add this group to a Management Restricted Administrative Unit instead of assinging the missing role."
+        }
     }
-    elseif ($GroupObj.IsManagementRestricted) {
+    if ($GroupObj.IsManagementRestricted) {
+        if ($CloudAdminRestrictedAdminUnitId) {
+            if (-Not (Get-MgBetaAdministrativeUnitMemberAsGroup -AdministrativeUnitId $CloudAdminRestrictedAdminUnitId -DirectoryObjectId $GroupObj.Id -ErrorAction SilentlyContinue)) {
+                Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group must be a member if Management Restricted Administrative Unit $CloudAdminRestrictedAdminUnitId to be used for Cloud Administration."
+            }
+        }
+        else {
+            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group is Management Restricted by undefined Administrative Unit. Please add the respective Administrative Unit ID to configuration variable `$env:AV_CloudAdmin_RestrictedAdminUnitId"
+        }
+
+        if (
+            ($GroupObj.GroupType -Contains 'DynamicMembership') -and
+            ($GroupObj.MembershipRuleProcessingState -eq 'On')
+        ) {
+            if ($GroupObj.Id -eq $GroupId_Tier0) {
+                Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not use dynamic membership to be used for Cloud Administration in Tier 0."
+            }
+            else {
+                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider disabling dynamic group membership for increased security."
+            }
+            if ($GroupObj.MembershipRule -notmatch '(?m)^.*user\..+$') {
+                Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must only use dynamic membership rule addressing user objects."
+            }
+        }
+
         .\Common_0001__Connect-MgGraph.ps1 -WarningAction SilentlyContinue -Scopes @(
             'Directory.Write.Restricted'
         ) 1> $null
@@ -414,7 +575,6 @@ ForEach (
             Throw $_
         }
     }
-    #TODO check for assigned roles and remove them
     if ($GroupObj.Owners) {
         foreach ($owner in $GroupObj.Owners) {
             Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)"
@@ -429,33 +589,24 @@ ForEach (
 }
 #endregion ---------------------------------------------------------------------
 
-#region License Existance Validation -------------------------------------------
-$TenantLicensed = Get-MgSubscribedSku -All
-$SkuPartNumberWithExchangeServicePlan = $null
-ForEach (
-    $SkuPartNumber in @(
-        @(($LicenseSkuPartNumber_Tier0 -split ' '); ($LicenseSkuPartNumber_Tier1 -split ' '); ($LicenseSkuPartNumber_Tier2 -split ' ')) | Select-Object -Unique
-    )
-) {
-    if ([String]::IsNullOrEmpty($SkuPartNumber)) { continue }
-    $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
+#region [COMMON] OPEN CONNECTIONS: Exchange Online -----------------------------
+.\Common_0003__Confirm-MgAppPermission.ps1 -Permissions @(
+    @{
+        DisplayName = 'Office 365 Exchange Online'
+        AppId       = '00000002-0000-0ff1-ce00-000000000000'
+        AppRoles    = @(
+            'Exchange.ManageAsApp'
+        )
+        # Oauth2PermissionScopes = @{
+        #     Admin = @(
+        #     )
+        #     '<User-ObjectId>' = @(
+        #     )
+        # }
+    }
+) 1> $null
 
-    if (-Not $Sku) {
-        Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant. Licenses must be purchased to before creating Cloud Administrator accounts."
-    }
-    if ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') }) {
-        if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
-            $SkuPartNumberWithExchangeServicePlan = $Sku.SkuPartNumber
-            Write-Verbose "Detected Exchange Online service plan in SkuPartNumber $SkuPartNumberWithExchangeServicePlan."
-        }
-        else {
-            Throw "There can only be one license configured containing an Exchange Online service plan: Make your choice between $SkuPartNumberWithExchangeServicePlan and $($Sku.SkuPartNumber)."
-        }
-    }
-}
-if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
-    Throw "One of the configured SkuPartNumbers must contain an Exchange Online service plan."
-}
+.\Common_0001__Connect-ExchangeOnline.ps1 -Organization $tenantDomain.Name 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region Process Referral User --------------------------------------------------
@@ -474,7 +625,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             TargetObject      = $null
             RecommendedAction = 'Try again later.'
             CategoryActivity  = 'Persisent Error'
-            CategoryReason    = "No other items are processed due to persisent error before."
+            CategoryReason    = "No other items are processed due to persistent error before."
         }
         return
     }
@@ -487,13 +638,18 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
     $UpdatedUserOnly = $false
+    $AdminUnitId = if ($Tier -eq 0) { Get-Variable -ValueOnly -Name "AccountRestrictedAdminUnitId_Tier0" } else { Get-Variable -ValueOnly -Name "AccountAdminUnitId_Tier$Tier" }
     $LicenseSkuPartNumber = Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier"
     $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
     $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
+    $AdminUnitObj = $null
     $GroupObj = $null
     $UserObj = $null
     $TenantLicensed = $null
 
+    if (-Not [string]::IsNullOrEmpty($AdminUnitId)) {
+        $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $AdminUnitId
+    }
     if (-Not [string]::IsNullOrEmpty($GroupId)) {
         $GroupObj = Get-MgBetaGroup -GroupId $GroupId
     }
@@ -847,7 +1003,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         return
     }
 
-    if ('UserMailbox' -ne $refUserExObj.RecipientType -or 'UserMailbox' -ne $refUserExObj.RecipientTypeDetails) {
+    if (('UserMailbox' -ne $refUserExObj.RecipientType) -or ('UserMailbox' -ne $refUserExObj.RecipientTypeDetails)) {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox."
             ErrorId          = '403'
@@ -864,6 +1020,21 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     #region No Dedicated User Account required -------------------------------------
     if ($DedicatedAccount -eq $false) {
+        Write-Verbose "NO dedicated account required for Tier $Tier Cloud Administration, assigning ordinary user account directly instead."
+
+        if ($PhotoUrlUser) {
+            $script:returnInformation += .\Common_0000__Write-Information.ps1 @{
+                Message          = "${ReferralUserId}: User photo was not updated for ordinary user account."
+                Category         = 'NotEnabled'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'Account Provisioning'
+                CategoryReason   = "Only dedicated Cloud Administration accounts may have their user photo updated."
+                Tags             = 'UserId', 'Account Provisioning'
+            }
+        }
+
         #region Group Membership Assignment --------------------------------------------
         if ($GroupObj) {
             $params = @{
@@ -920,7 +1091,8 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             }
         }
 
-        if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
+        if ($UserPhotoUrl) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
+        if ($AdminUnitObj) { $data.AdministrativeUnit = $AdminUnitObj }
 
         if ($OutText) {
             Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
@@ -933,6 +1105,8 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #endregion
 
     #region Prepare New User Account Properties ------------------------------------
+    Write-Verbose "Dedicated account is required for Tier $Tier Cloud Administration"
+
     $UserPrefix = if (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") {
         (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") +
         $(if (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "UserPrincipalNamePrefixSeparator_Tier$Tier" } else { '' } )
@@ -944,6 +1118,38 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         (Get-Variable -ValueOnly -Name "UserPrincipalNameSuffix_Tier$Tier")
     }
     else { '' }
+
+    $AccountDomain = if ((Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier") -eq 'onmicrosoft.com') { $tenantDomain.Name } else { Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier" }
+
+    if (-Not ($tenant.VerifiedDomains | Where-Object Name -eq $AccountDomain)) {
+        $script:returnError += .\Common_0000__Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Missing verified domain."
+            ErrorId           = '500'
+            Category          = 'InvalidData'
+            TargetName        = $refUserObj.UserPrincipalName
+            TargetObject      = $refUserObj.Id
+            TargetType        = 'UserId'
+            RecommendedAction = "Add domain $AccountDomain to the list of verified domains of the tenant first."
+            CategoryActivity  = 'Cloud Administrator Creation'
+            CategoryReason    = "Domain $AccountDomain is not a verified domain of the tenant."
+        }
+        return
+    }
+
+    if (-Not ($tenant.VerifiedDomains | Where-Object { ($_.Name -eq $AccountDomain) -and ($_.Capabilities.Split(', ') -contains 'Email') })) {
+        $script:returnError += .\Common_0000__Write-Error.ps1 @{
+            Message           = "${ReferralUserId}: Missing email capability."
+            ErrorId           = '500'
+            Category          = 'InvalidData'
+            TargetName        = $refUserObj.UserPrincipalName
+            TargetObject      = $refUserObj.Id
+            TargetType        = 'UserId'
+            RecommendedAction = "Enable email capability for verfified domain $AccountDomain."
+            CategoryActivity  = 'Cloud Administrator Creation'
+            CategoryReason    = "Domain $AccountDomain has no email capability enabled."
+        }
+        return
+    }
 
     $BodyParamsNull = @{
         JobTitle = $null
@@ -966,14 +1172,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             extensionAttribute14 = $null
             extensionAttribute15 = $null
         }
-        UserPrincipalName             = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $tenantDomain.Name
-        Mail                          = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $tenantDomain.Name
+        UserPrincipalName             = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $AccountDomain
+        Mail                          = $UserPrefix + ($refUserObj.UserPrincipalName).Split('@')[0] + $UserSuffix + '@' + $AccountDomain
         MailNickname                  = $UserPrefix + $refUserObj.MailNickname + $UserSuffix
-        PasswordProfile               = @{
-            Password                             = .\Common_0000__Get-RandomPassword.ps1 -lowerChars 32 -upperChars 32 -numbers 32 -symbols 32
-            ForceChangePasswordNextSignIn        = $false
-            ForceChangePasswordNextSignInWithMfa = $false
-        }
         PasswordPolicies              = 'DisablePasswordExpiration'
     }
 
@@ -1268,7 +1469,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
         $BodyParams.Remove('UserPrincipalName')
         $BodyParams.Remove('AccountEnabled')
-        $BodyParams.Remove('PasswordProfile')
         $params = @{
             UserId        = $existingUserObj.Id
             BodyParameter = $BodyParams
@@ -1324,7 +1524,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
     }
     else {
-        #region License Availability Validation ----------------------------------------
+        #region License Availability Validation Before New Account Creation ------------
         $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ') | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
             if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
@@ -1347,6 +1547,12 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         if ($persistentError) { return }
         #endregion ---------------------------------------------------------------------
+
+        $BodyParams.PasswordProfile = @{
+            Password                             = .\Common_0000__Get-RandomPassword.ps1 -length 128 -minLower 8 -minUpper 8 -minNumber 8 -minSpecial 8
+            ForceChangePasswordNextSignIn        = $false
+            ForceChangePasswordNextSignInWithMfa = $false
+        }
 
         try {
             $UserObj = New-MgBetaUser -BodyParameter $BodyParams -ErrorAction Stop
@@ -1428,6 +1634,93 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     #endregion ---------------------------------------------------------------------
 
+    #region Update Admninistrative Unit Membership ---------------------------------
+    $params = @{
+        ConsistencyLevel     = 'eventual'
+        AdministrativeUnitId = $AdminUnitObj.Id
+        DirectoryObjectId    = $UserObj.Id
+        ErrorAction          = 'SilentlyContinue'
+    }
+    if ($AdminUnitObj -and ($null -eq (Get-MgBetaAdministrativeUnitMemberAsUser @params))) {
+        if (-not $AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -or ($AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -ne 'On')) {
+            Write-Verbose "Adding account to Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id))"
+            $params = @{
+                OutputType  = 'PSObject'
+                Method      = 'POST'
+                Headers     = @{ ConsistencyLevel = 'eventual' }
+                Uri         = "https://graph.microsoft.com/beta/directory/administrativeUnits/$($AdminUnitObj.Id)/members/`$ref"
+                Body        = @{
+                    '@odata.id' = "https://graph.microsoft.com/beta/users/$($UserObj.Id)"
+                }
+                ErrorAction = 'Stop'
+            }
+
+            try {
+                Invoke-MgGraphRequest @params 1> $null
+            }
+            catch {
+                $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+                return
+            }
+        }
+        else {
+            Write-Verbose "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)) as dynamic membership processing enabled; skipping manually adding account and wait for dynamic processing instead."
+        }
+
+        # Wait for admin unit membership
+        $DoLoop = $true
+        $RetryCount = 1
+        $MaxRetry = 30
+        $WaitSec = 7
+
+        do {
+            $params = @{
+                ConsistencyLevel     = 'eventual'
+                AdministrativeUnitId = $AdminUnitObj.Id
+                DirectoryObjectId    = $UserObj.Id
+                ErrorAction          = 'SilentlyContinue'
+            }
+            if ($null -ne (Get-MgBetaAdministrativeUnitMemberAsUser @params)) {
+                Write-Verbose "OK: Detected admin unit membership."
+                $DoLoop = $false
+            }
+            elseif ($RetryCount -ge $MaxRetry) {
+                if (-Not $UpdatedUserOnly) {
+                    Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+                }
+                $DoLoop = $false
+
+                $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: Admin Unit assignment timeout for $($UserObj.UserPrincipalName)."
+                    ErrorId           = '504'
+                    Category          = 'OperationTimeout'
+                    TargetName        = $refUserObj.UserPrincipalName
+                    TargetObject      = $refUserObj.Id
+                    TargetType        = 'UserId'
+                    RecommendedAction = 'Try again later.'
+                    CategoryActivity  = 'Account Provisioning'
+                    CategoryReason    = "A timeout occured during provisioning wait after admin unit assignment."
+                }
+                return
+            }
+            else {
+                $RetryCount += 1
+                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for admin unit assignment ..." -Verbose
+                Start-Sleep -Seconds $WaitSec
+            }
+        } While ($DoLoop)
+    }
+    #endregion ---------------------------------------------------------------------
+
     #region Update Manager Reference -----------------------------------------------
     if ($ReferenceManager -eq $true) {
         if (
@@ -1482,7 +1775,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     #endregion ---------------------------------------------------------------------
 
-    #region License Availability Validation ----------------------------------------
+    #region License Availability Validation For Pre-Existing Account ---------------
     if (-Not $TenantLicensed) {
         $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique) | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
@@ -1560,7 +1853,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #region Group Membership Assignment --------------------------------------------
     if ($GroupObj) {
         if (
-            $GroupObj.GroupType -NotContains 'DynamicMembership' -or
+            ($GroupObj.GroupType -NotContains 'DynamicMembership') -or
             ($GroupObj.MembershipRuleProcessingState -ne 'On')
         ) {
             $params = @{
@@ -1570,7 +1863,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Filter           = "Id eq '$($UserObj.Id)'"
             }
             if (-Not (Get-MgBetaGroupMember @params)) {
-                Write-Verbose "Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
+                Write-Verbose "Adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
                 try {
                     New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop
                 }
@@ -1755,9 +2048,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #endregion ---------------------------------------------------------------------
 
     #region Set User Photo ---------------------------------------------------------
-    $PhotoUrls = @()
-    if ($PhotoUrlUser) { $PhotoUrls += $PhotoUrlUser }
-
     $SquareLogoRelativeUrl = if ($tenantBranding.SquareLogoRelativeUrl) {
         $tenantBranding.SquareLogoRelativeUrl
     }
@@ -1765,15 +2055,19 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $tenantBranding.SquareLogoDarkRelativeUrl
     }
     else { $null }
-    if ($SquareLogoRelativeUrl) {
-        foreach ($Cdn in $tenantBranding.CdnList) {
-            $PhotoUrls += 'https://' + $Cdn + '/' + $SquareLogoRelativeUrl
-        }
-    }
 
     $PhotoUrl = $null
     $response = $null
-    foreach ($url in $PhotoUrls) {
+    foreach (
+        $url in @(
+            if ($PhotoUrlUser) { $PhotoUrlUser }
+            if ($SquareLogoRelativeUrl) {
+                foreach ($Cdn in $tenantBranding.CdnList) {
+                    "https://$Cdn/$SquareLogoRelativeUrl"
+                }
+            }
+        )
+    ) {
         try {
             $params = @{
                 UseBasicParsing = $true
@@ -1800,6 +2094,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
     }
     if ($response) {
+        $ExoUserPhoto = $false
         Write-Verbose 'Uploading User Photo to Microsoft Graph'
         $params = @{
             InFile      = 'nonExistat.lat'
@@ -1811,15 +2106,49 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             Set-MgBetaUserPhotoContent @params 1> $null
         }
         catch {
-            $script:returnError += .\Common_0000__Write-Warning.ps1 @{
-                Message          = $Error[0].Exception.Message
-                ErrorId          = '500'
-                Category         = $Error[0].CategoryInfo.Category
-                TargetName       = $refUserObj.UserPrincipalName
-                TargetObject     = $refUserObj.Id
-                TargetType       = 'UserId'
-                CategoryActivity = 'Account Provisioning'
-                CategoryReason   = $Error[0].CategoryInfo.Reason
+            if ($AdminUnitObj) {
+                Write-Verbose "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see https://techcommunity.microsoft.com/t5/exchange-team-blog/deprecation-of-exchange-online-powershell-userphoto-cmdlets/ba-p/3955744"
+            }
+            else {
+                $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning: Update User Photo (Microsoft Graph PowerShell)'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+            }
+        }
+
+        # This is a workaround that is announced to stop working in April 2024 due to Deprecation of Exchange Online PowerShell UserPhoto cmdlets: https://go.microsoft.com/fwlink/p/?linkid=2249705
+        if ($ExoUserPhoto) {
+            Write-Verbose 'Uploading User Photo to Exchange Online'
+            $params = @{
+                Identity    = $userExObj.Identity
+                PictureData = $response.Content
+                Confirm     = $false
+                ErrorAction = 'Stop'
+            }
+            try {
+                Set-UserPhoto @params 1> $null
+            }
+            catch {
+                $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                    Message          = $Error[0].Exception.Message
+                    ErrorId          = '500'
+                    Category         = $Error[0].CategoryInfo.Category
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'Account Provisioning: Update User Photo (Exchange Online PowerShell)'
+                    CategoryReason   = $Error[0].CategoryInfo.Reason
+                }
+            }
+            finally {
+                Write-Warning "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): User Photo update used Exchange Online cmdlet Set-UserPhoto that is announced to stop working in April 2024 due to deprecation of Exchange Online PowerShell UserPhoto cmdlets, see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
             }
         }
     }
@@ -1866,8 +2195,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     else { $UserObj.Manager = @{} }
 
-    if ($UserPhotoUrl ) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
-    if ($PhotoUrl ) { $data.UserPhotoUrl = $PhotoUrl }
+    if ($UserPhotoUrl) { $data.Input.UserPhotoUrl = $UserPhotoUrl }
+    if ($PhotoUrl) { $data.UserPhotoUrl = $PhotoUrl }
+    if ($AdminUnitObj) { $data.AdministrativeUnit = $AdminUnitObj }
 
     if ($OutText) {
         Write-Output $(if ($data.UserPrincipalName) { $data.UserPrincipalName } else { $null })
