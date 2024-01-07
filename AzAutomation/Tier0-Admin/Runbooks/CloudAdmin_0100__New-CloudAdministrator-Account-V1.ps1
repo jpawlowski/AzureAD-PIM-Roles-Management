@@ -2107,7 +2107,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         catch {
             if ($AdminUnitObj) {
-                Write-Verbose "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see https://techcommunity.microsoft.com/t5/exchange-team-blog/deprecation-of-exchange-online-powershell-userphoto-cmdlets/ba-p/3955744"
+                Write-Verbose "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
             }
             else {
                 $script:returnError += .\Common_0000__Write-Error.ps1 @{
