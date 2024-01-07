@@ -214,8 +214,12 @@
 #>
 
 #region TODO:
+#- allow external accounts
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
 #- Install PowerShell modules that are mentioned as "requires" but do not update existing ones, just to support the initial run of the script
+#- review import modules / beta vs. v1.0 and check memory consumption in azure automation
+#- review documentation
+#- create visual
 #endregion
 
 [CmdletBinding()]
@@ -308,7 +312,7 @@ ForEach (
     $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber | Select-Object -Property Sku*, ServicePlans
 
     if (-Not $Sku) {
-        Throw "License SkuPartNumber $LicenseSkuPartNumber is not available to this tenant. Licenses must be purchased before creating Cloud Administrator accounts."
+        Throw "License SkuPartNumber $SkuPartNumber is not available to this tenant. Licenses must be purchased before creating Cloud Administrator accounts."
     }
     if ($Sku.ServicePlans | Where-Object -FilterScript { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') }) {
         if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
@@ -483,12 +487,14 @@ if ($JobReference) { $return.Job.Reference = $JobReference }
 #endregion ---------------------------------------------------------------------
 
 #region Group Validation -------------------------------------------------------
-ForEach (
-    $GroupId in @(
-        ($GroupId_Tier0, $GroupId_Tier2, $GroupId_Tier2) | Select-Object -Unique
-    )
-) {
+if ( @($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Group-Object | Where-Object { $_.Count -gt 1 } ) {
+    Throw "Configured group object IDs in AV_CloudAdminTier<Tier>_GroupId must be unique."
+}
+
+ForEach ($GroupId in @($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2)) {
     if ([string]::IsNullOrEmpty($GroupId)) { continue }
+    $ThisTier = if ($GroupId -eq $GroupId_Tier0) { 0 } elseif ($GroupId -eq $GroupId_Tier1) { 1 } elseif ($GroupId -eq $GroupId_Tier2) { 2 }
+
     try {
         $GroupObj = Get-MgBetaGroup -GroupId $GroupId -ExpandProperty 'Owners' -ErrorAction Stop
     }
@@ -499,27 +505,33 @@ ForEach (
     if (-Not $GroupObj) {
         Throw "GroupId $($GroupId) does not exist."
     }
+
     if (-Not $GroupObj.SecurityEnabled) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be security-enabled to be used for Cloud Administration."
     }
+
     if ($null -ne $GroupObj.OnPremisesSyncEnabled) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
     }
+
     if (
         $GroupObj.GroupType -and
             ($GroupObj.GroupType -contains 'Unified')
     ) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
     }
+
     if ($GroupObj.MailEnabled) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
     }
+
     if (
                 (-Not $GroupObj.IsManagementRestricted) -and
                 (-Not $GroupObj.IsAssignableToRole)
     ) {
         Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
     }
+
     if ($GroupObj.IsAssignableToRole) {
         if ($GroupObj.IsManagementRestricted) {
             Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider recreating the group without role enablement to avoid Privileged Role Administrator role assignment. Using Management Restricted Administrative Unit only should be the preferred protection for Cloud Administration."
@@ -537,6 +549,7 @@ ForEach (
             Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Missing Privileged Role Administrator permission to change membership of this group. Preferably, add this group to a Management Restricted Administrative Unit instead of assinging the missing role."
         }
     }
+
     if ($GroupObj.IsManagementRestricted) {
         if ($CloudAdminRestrictedAdminUnitId) {
             if (-Not (Get-MgBetaAdministrativeUnitMemberAsGroup -AdministrativeUnitId $CloudAdminRestrictedAdminUnitId -DirectoryObjectId $GroupObj.Id -ErrorAction SilentlyContinue)) {
@@ -566,6 +579,26 @@ ForEach (
             'Directory.Write.Restricted'
         ) 1> $null
     }
+
+    $GroupDescription = Get-Variable -ValueOnly -name "GroupDescription_Tier$ThisTier"
+    if (-Not $GroupObj.Description) {
+        if (-Not [string]::IsNullOrEmpty($GroupDescription)) {
+            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $ThisTier identification."
+            try {
+                Update-MgBetaGroup -GroupId $GroupObj.Id -Description $GroupDescription -ErrorAction Stop 1> $null
+            }
+            catch {
+                Throw $_
+            }
+        }
+    }
+    elseif (
+            (-Not [string]::IsNullOrEmpty($GroupDescription)) -and
+            ($GroupObj.Description -ne $GroupDescription)
+    ) {
+        Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $ThisTier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
+    }
+
     if ('Private' -ne $GroupObj.Visibility) {
         Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Correcting visibility to Private for Cloud Administration."
         try {
@@ -575,9 +608,10 @@ ForEach (
             Throw $_
         }
     }
+
     if ($GroupObj.Owners) {
         foreach ($owner in $GroupObj.Owners) {
-            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)"
+            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)."
             try {
                 Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $owner.Id -ErrorAction Stop 1> $null
             }
@@ -637,63 +671,48 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants -scriptParameterOnly $true 1> $null
 
     $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
-    $UpdatedUserOnly = $false
+    $AllowedGuestOrExternalUserTypes = @( (Get-Variable -ValueOnly -Name "AllowedGuestOrExternalUserTypes_Tier$Tier") -split ' ' | Select-Object -Unique )
+    $AllowMicrosoftAccount = Get-Variable -ValueOnly -Name "AllowMicrosoftAccount_Tier$Tier"
+    $AllowSameDomainForReferralUser = Get-Variable -ValueOnly -Name "AllowSameDomainForReferralUser_Tier$Tier"
     $AdminUnitId = if ($Tier -eq 0) { Get-Variable -ValueOnly -Name "AccountRestrictedAdminUnitId_Tier0" } else { Get-Variable -ValueOnly -Name "AccountAdminUnitId_Tier$Tier" }
-    $LicenseSkuPartNumber = Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier"
+    $LicenseSkuPartNumbers = @( (Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier") -split ' ' | Select-Object -Unique )
+    $AccountDomain = if ((Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier") -eq 'onmicrosoft.com') { $tenantDomain.Name } else { Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier" }
     $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
     $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
-    $AdminUnitObj = $null
-    $GroupObj = $null
-    $UserObj = $null
-    $TenantLicensed = $null
 
+    $AdminUnitObj = $null
     if (-Not [string]::IsNullOrEmpty($AdminUnitId)) {
         $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $AdminUnitId
     }
+
+    $GroupObj = $null
     if (-Not [string]::IsNullOrEmpty($GroupId)) {
         $GroupObj = Get-MgBetaGroup -GroupId $GroupId
     }
+
+    $refUserExObj = $null
+    $UserObj = $null
+    $TenantLicensed = $null
+    $UpdatedUserOnly = $false
     #endregion ---------------------------------------------------------------------
 
     #region Group Validation -------------------------------------------------------
-    if ($GroupObj) {
-        $GroupDescription = Get-Variable -ValueOnly -name "GroupDescription_Tier$Tier"
-        if (-Not $GroupObj.Description) {
-            Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $Tier identification"
-            try {
-                Update-MgBetaGroup -GroupId -Description $GroupDescription -ErrorAction Stop 1> $null
-            }
-            catch {
-                $script:returnError += .\Common_0000__Write-Error.ps1 @{
-                    Message          = $Error[0].Exception.Message
-                    ErrorId          = '500'
-                    Category         = $Error[0].CategoryInfo.Category
-                    TargetName       = $refUserObj.UserPrincipalName
-                    TargetObject     = $refUserObj.Id
-                    TargetType       = 'UserId'
-                    CategoryActivity = 'Account Provisioning'
-                    CategoryReason   = $Error[0].CategoryInfo.Reason
-                }
-                $persistentError = $true
-                return
-            }
-        }
-        elseif ($GroupObj.Description -ne $GroupDescription) {
+    if ($DedicatedAccount -eq $false) {
+        if (-Not $GroupObj) {
             $script:returnError += .\Common_0000__Write-Error.ps1 @{
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
-                Category         = 'InvalidData'
-                TargetName       = $refUserObj.UserPrincipalName
-                TargetObject     = $refUserObj.Id
+                Category         = 'MissingData'
+                TargetName       = $ReferralUserId
+                TargetObject     = $null
                 TargetType       = 'UserId'
-                CategoryActivity = 'Account Provisioning'
-                CategoryReason   = "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $Tier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
+                CategoryActivity = 'Cloud Administrator Creation'
+                CategoryReason   = "Static group for Tier $Tier must be configured in AV_CloudAdminTier${Tier}_GroupId when using ordinary user accounts."
             }
-            $persistentError = $true
             return
         }
 
-        if (($DedicatedAccount -eq $false) -and
+        if (
             ($GroupObj.GroupType -Contains 'DynamicMembership') -and
             ($GroupObj.MembershipRuleProcessingState -eq 'On')
         ) {
@@ -701,11 +720,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                 Message          = "${ReferralUserId}: Internal configuration error."
                 ErrorId          = '500'
                 Category         = 'InvalidData'
-                TargetName       = $refUserObj.UserPrincipalName
-                TargetObject     = $refUserObj.Id
+                TargetName       = $ReferralUserId
+                TargetObject     = $null
                 TargetType       = 'UserId'
                 CategoryActivity = 'Cloud Administrator Creation'
-                CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership."
+                CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership when using ordinary user accounts."
             }
             return
         }
@@ -763,7 +782,12 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     #region Referral User Validation -----------------------------------------------
     $userProperties = @(
         'Id'
+        'UserType'
         'CreatedDateTime'
+        'IsResourceAccount'
+        'CreationType'
+        'ExternalUserState'
+        'Identities'
         'UserPrincipalName'
         'Mail'
         'MailNickname'
@@ -775,7 +799,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         'EmployeeLeaveDateTime'
         'EmployeeOrgData'
         'EmployeeType'
-        'UserType'
         'AccountEnabled'
         'OnPremisesSamAccountName'
         'OnPremisesSyncEnabled'
@@ -805,20 +828,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     catch {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = $Error[0].Exception.Message
-            ErrorId          = '500'
-            Category         = $Error[0].CategoryInfo.Category
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = $Error[0].CategoryInfo.Reason
-        }
-        return
-    }
-
-    if ($null -eq $refUserObj) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
             Message           = "${ReferralUserId}: Referral User ID does not exist in directory."
             ErrorId           = '404'
             Category          = 'ObjectNotFound'
@@ -832,40 +841,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         return
     }
 
-    if (
-        ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
-        ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
-        ($refUserObj.UserPrincipalName -match '^.+#EXT#@.+\.onmicrosoft\.com$') -or # External Accounts
-        ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
-        ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
-    ) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
-            ErrorId          = '403'
-            Category         = 'PermissionDenied'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = 'Referral User ID is listed as not capable of having a Cloud Administrator account.'
-        }
-        return
-    }
-
-    if (($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$') {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID must not use a onmicrosoft.com subdomain."
-            ErrorId          = '403'
-            Category         = 'PermissionDenied'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = 'Referral User ID must not use a onmicrosoft.com subdomain.'
-        }
-        return
-    }
-
+    #region All Accounts
     if (-Not $refUserObj.AccountEnabled) {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
             Message          = "${ReferralUserId}: Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts."
@@ -880,19 +856,85 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         return
     }
 
-    if ($refUserObj.UserType -ne 'Member') {
+    if ($refUserObj.IsResourceAccount) {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID must be of type Member."
+            Message          = "${ReferralUserId}: Resource accounts can not have a Cloud Administrator account created."
             ErrorId          = '403'
-            Category         = 'InvalidType'
+            Category         = 'PermissionDenied'
             TargetName       = $refUserObj.UserPrincipalName
             TargetObject     = $refUserObj.Id
             TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = 'Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts.'
+            CategoryReason   = 'Referral User ID is a resource account.'
         }
         return
     }
+
+    $refUserTypeDetails = .\Common_0002__Get-MgUserTypeDetail.ps1 -UserObject $refUserObj
+
+    if ($refUserTypeDetails.IsEmailOTPAuthentication -ne $false) {
+        $script:returnError += .\Common_0000__Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must not use email one-time passcode authentication."
+            ErrorId          = '403'
+            Category         = 'PermissionDenied'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'UserId'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID has defined identity details that indicate email one-time passcode authentication.'
+        }
+        return
+    }
+
+    if ($refUserTypeDetails.IsFacebookAccount -ne $false) {
+        $script:returnError += .\Common_0000__Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must not be a facebook.com identity."
+            ErrorId          = '403'
+            Category         = 'PermissionDenied'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'UserId'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID has defined identity Issuer of facebook.com.'
+        }
+        return
+    }
+
+    if (
+        ($refUserTypeDetails.IsMicrosoftAccount -ne $false) -and
+        ($AllowMicrosoftAccount -ne $true)
+    ) {
+        $script:returnError += .\Common_0000__Write-Error.ps1 @{
+            Message          = "${ReferralUserId}: Referral User ID must not be a Microsoft Account."
+            ErrorId          = '403'
+            Category         = 'PermissionDenied'
+            TargetName       = $refUserObj.UserPrincipalName
+            TargetObject     = $refUserObj.Id
+            TargetType       = 'UserId'
+            CategoryActivity = 'ReferralUserId user validation'
+            CategoryReason   = 'Referral User ID has defined identity Issuer of MicrosoftAccount.'
+        }
+        return
+    }
+
+    # if (
+    #     ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
+    #     ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
+    #     ($refUserObj.UserPrincipalName -match '^(?:SVCC?_.+|SVC[A-Z0-9]+)@.+$') -or # Service Accounts
+    #     ($refUserObj.UserPrincipalName -match '^(?:Sync_.+|[A-Z]+SyncServiceAccount.*)@.+$')  # Entra Sync Accounts
+    # ) {
+    #     $script:returnError += .\Common_0000__Write-Error.ps1 @{
+    #         Message          = "${ReferralUserId}: This type of user name can not have a Cloud Administrator account created."
+    #         ErrorId          = '403'
+    #         Category         = 'PermissionDenied'
+    #         TargetName       = $refUserObj.UserPrincipalName
+    #         TargetObject     = $refUserObj.Id
+    #         TargetType       = 'UserId'
+    #         CategoryActivity = 'ReferralUserId user validation'
+    #         CategoryReason   = 'Referral User ID is listed as not capable of having a Cloud Administrator account.'
+    #     }
+    #     return
+    # }
 
     if ([string]::IsNullOrEmpty($refUserObj.DisplayName)) {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
@@ -904,37 +946,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             TargetType       = 'UserId'
             CategoryActivity = 'ReferralUserId user validation'
             CategoryReason   = 'Referral User ID must have DisplayName property set.'
-        }
-        return
-    }
-
-    if ($refUserObj.DisplayName -match '^[^\s]+@[^\s]+\.[^\s]+$') {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID display name must be an e-mail address."
-            ErrorId          = '403'
-            Category         = 'InvalidType'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = 'Referral User ID must have a DisplayName containing given name and last name.'
-        }
-        return
-    }
-
-    if (
-        (-Not $refUserObj.Manager) -or
-        (-Not $refUserObj.Manager.Id)
-    ) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID must have manager property set."
-            ErrorId          = '403'
-            Category         = 'ResourceUnavailable'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = 'Referral User ID must have manager property set.'
         }
         return
     }
@@ -972,49 +983,148 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         return
     }
+    #endregion
 
-    if ($true -eq $tenant.OnPremisesSyncEnabled -and ($true -ne $refUserObj.OnPremisesSyncEnabled)) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
-            ErrorId          = '403'
-            Category         = 'InvalidType'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID must be a hybrid identity synced from on-premises directory."
+    if ($refUserTypeDetails.IsInternal -eq $true) {
+
+        #region Internal Accounts
+        if (
+            ($DedicatedAccount -eq $true) -and
+            (($refUserObj.UserPrincipalName).Split('@')[1] -eq $AccountDomain) -and
+            ($AllowSameDomainForReferralUser -ne $true)
+        ) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Internal Referral User ID must not use domain $AccountDomain."
+                ErrorId          = '403'
+                Category         = 'PermissionDenied'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Internal Referral User ID must not use domain $AccountDomain which would be the same for the dedicated Cloud Administrator account."
+            }
+            return
         }
-        return
+
+        if (
+            ($refUserObj.UserPrincipalName).Split('@')[1] -match '^.+\.onmicrosoft\.com$'
+        ) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Internal Referral User ID must not use a onmicrosoft.com subdomain."
+                ErrorId          = '403'
+                Category         = 'PermissionDenied'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = 'Internal Referral User ID must not use a onmicrosoft.com subdomain.'
+            }
+            return
+        }
+
+        if (
+            ($true -eq $tenant.OnPremisesSyncEnabled) -and
+            ($true -ne $refUserObj.OnPremisesSyncEnabled)
+        ) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
+                ErrorId          = '403'
+                Category         = 'InvalidType'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Referral User ID must be a hybrid identity synced from on-premises directory."
+            }
+            return
+        }
+
+        if (
+            (-Not $refUserObj.Manager) -or
+            (-Not $refUserObj.Manager.Id)
+        ) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Referral User ID must have manager property set."
+                ErrorId          = '403'
+                Category         = 'ResourceUnavailable'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = 'Referral User ID must have manager property set.'
+            }
+            return
+        }
+
+        $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction SilentlyContinue
+
+        if ($null -eq $refUserExObj) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
+                ErrorId          = '403'
+                Category         = 'NotEnabled'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Referral User ID must have a mailbox."
+            }
+            return
+        }
+
+        if (('UserMailbox' -ne $refUserExObj.RecipientType) -or ('UserMailbox' -ne $refUserExObj.RecipientTypeDetails)) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox."
+                ErrorId          = '403'
+                Category         = 'InvalidType'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+            }
+            return
+        }
+        #endregion
+
     }
 
-    $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction SilentlyContinue
+    else {
 
-    if ($null -eq $refUserExObj) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
-            ErrorId          = '403'
-            Category         = 'NotEnabled'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Referral User ID must have a mailbox."
+        #region Guest or External Accounts
+        if (
+            ([string]::IsNullOrEmpty($refUserTypeDetails.GuestOrExternalUserType)) -or
+            ([string]::IsNullOrEmpty($AllowedGuestOrExternalUserTypes)) -or
+            ($refUserTypeDetails.GuestOrExternalUserType -notin $AllowedGuestOrExternalUserTypes)
+        ) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Referral User ID is a guest or external user that can not be used for Cloud Administration in Tier $Tier."
+                ErrorId          = '403'
+                Category         = 'PermissionDenied'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Referral User ID is of guest or external user type $($refUserTypeDetails.GuestOrExternalUserType)"
+            }
+            return
         }
-        return
-    }
 
-    if (('UserMailbox' -ne $refUserExObj.RecipientType) -or ('UserMailbox' -ne $refUserExObj.RecipientTypeDetails)) {
-        $script:returnError += .\Common_0000__Write-Error.ps1 @{
-            Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox."
-            ErrorId          = '403'
-            Category         = 'InvalidType'
-            TargetName       = $refUserObj.UserPrincipalName
-            TargetObject     = $refUserObj.Id
-            TargetType       = 'UserId'
-            CategoryActivity = 'ReferralUserId user validation'
-            CategoryReason   = "Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+        if ($DedicatedAccount -eq $true) {
+            $script:returnError += .\Common_0000__Write-Error.ps1 @{
+                Message          = "${ReferralUserId}: Guest or external Referral User ID cannot have dedicated account created for Cloud Administration in Tier $Tier."
+                ErrorId          = '403'
+                Category         = 'PermissionDenied'
+                TargetName       = $refUserObj.UserPrincipalName
+                TargetObject     = $refUserObj.Id
+                TargetType       = 'UserId'
+                CategoryActivity = 'ReferralUserId user validation'
+                CategoryReason   = "Cloud Administration in Tier $Tier requires a dedicated account, but a guest or external account must not be used as Referral User ID."
+            }
+            return
         }
-        return
+        #endregion
+
     }
     #endregion ---------------------------------------------------------------------
 
@@ -1118,8 +1228,6 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         (Get-Variable -ValueOnly -Name "UserPrincipalNameSuffix_Tier$Tier")
     }
     else { '' }
-
-    $AccountDomain = if ((Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier") -eq 'onmicrosoft.com') { $tenantDomain.Name } else { Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier" }
 
     if (-Not ($tenant.VerifiedDomains | Where-Object Name -eq $AccountDomain)) {
         $script:returnError += .\Common_0000__Write-Error.ps1 @{
@@ -1351,7 +1459,16 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     ForEach ($property in $userProperties) {
         if (
             ($null -eq $BodyParams.$property) -and
-            ($property -notin @('Id', 'Mail', 'UserType')) -and
+            ($property -notin @(
+                'Id'
+                'UserType'
+                'CreatedDateTime'
+                'IsResourceAccount'
+                'CreationType'
+                'ExternalUserState'
+                'Identities'
+                'Mail'
+            )) -and
             ($property -notmatch '^OnPremises')
         ) {
             # Empty or null values require special handling as of today
@@ -1525,7 +1642,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     else {
         #region License Availability Validation Before New Account Creation ------------
-        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ') | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in $LicenseSkuPartNumbers | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
             if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
                 $script:returnError += .\Common_0000__Write-Error.ps1 @{
@@ -1777,7 +1894,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     #region License Availability Validation For Pre-Existing Account ---------------
     if (-Not $TenantLicensed) {
-        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique) | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
+        $TenantLicensed = Get-MgSubscribedSku -All | Where-Object SkuPartNumber -in $LicenseSkuPartNumbers | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
         foreach ($Sku in $TenantLicensed) {
             if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
                 $script:returnError += .\Common_0000__Write-Error.ps1 @{
@@ -1812,7 +1929,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             ErrorAction    = 'Stop'
         }
 
-        foreach ($SkuPartNumber in @($LicenseSkuPartNumber -split ' ' | Select-Object -Unique)) {
+        foreach ($SkuPartNumber in $LicenseSkuPartNumbers) {
             if (-Not ($UserLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber)) {
                 Write-Verbose "Adding missing license $SkuPartNumber"
                 $Sku = $TenantLicensed | Where-Object SkuPartNumber -eq $SkuPartNumber
@@ -2107,6 +2224,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         }
         catch {
             if ($AdminUnitObj) {
+                $ExoUserPhoto = $true
                 Write-Verbose "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
             }
             else {
@@ -2213,6 +2331,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     if ([string]::IsNullOrEmpty($ReferralUserId[$_])) { return }
     if ([string]::IsNullOrEmpty($Tier[$_])) { return }
     [System.GC]::Collect()
+    Write-Verbose "Current script memory consumption: $([Math]::Round((Get-Process -Id $PID).WorkingSet64 / 1MB)) MByte"
     $params = @{
         ReferralUserId = $ReferralUserId[$_]
         Tier           = $Tier[$_]

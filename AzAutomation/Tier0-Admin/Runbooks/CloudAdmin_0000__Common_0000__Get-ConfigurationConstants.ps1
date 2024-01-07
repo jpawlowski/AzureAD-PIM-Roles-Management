@@ -114,10 +114,26 @@ $Constants = [array] @(
         defaultValue  = $true
     }
     @{
+        sourceName    = "AV_CloudAdminTier0_AllowedGuestOrExternalUserTypes"
+        mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier0'
+        defaultValue  = $null
+        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowMicrosoftAccount"
+        mapToVariable = 'AllowMicrosoftAccount_Tier0'
+        defaultValue  = $false
+    }
+    @{
         sourceName    = "AV_CloudAdminTier0_AccountDomain"
         mapToVariable = 'AccountDomain_Tier0'
         defaultValue  = 'onmicrosoft.com'
         Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowSameDomainForReferralUser"
+        mapToVariable = 'AllowSameDomainForReferralUser_Tier0'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier0_AccountTypeEmployeeTypePrefix"
@@ -279,10 +295,26 @@ $Constants = [array] @(
         defaultValue  = $false
     }
     @{
+        sourceName    = "AV_CloudAdminTier1_AllowedGuestOrExternalUserTypes"
+        mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier1'
+        defaultValue  = $null
+        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AllowMicrosoftAccount"
+        mapToVariable = 'AllowMicrosoftAccount_Tier1'
+        defaultValue  = $false
+    }
+    @{
         sourceName    = "AV_CloudAdminTier1_AccountDomain"
         mapToVariable = 'AccountDomain_Tier1'
         defaultValue  = 'onmicrosoft.com'
         Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AllowSameDomainForReferralUser"
+        mapToVariable = 'AllowSameDomainForReferralUser_Tier1'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier1_AccountTypeEmployeeTypePrefix"
@@ -444,10 +476,26 @@ $Constants = [array] @(
         defaultValue  = $false
     }
     @{
+        sourceName    = "AV_CloudAdminTier2_AllowedGuestOrExternalUserTypes"
+        mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier2'
+        defaultValue  = 'internalGuest b2bCollaborationGuest b2bCollaborationMember'
+        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowMicrosoftAccount"
+        mapToVariable = 'AllowMicrosoftAccount_Tier2'
+        defaultValue  = $false
+    }
+    @{
         sourceName    = "AV_CloudAdminTier2_AccountDomain"
         mapToVariable = 'AccountDomain_Tier2'
         defaultValue  = 'onmicrosoft.com'
         Regex         = '^(?=^.{1,253}$)(([a-z\d]([a-z\d-]{0,62}[a-z\d])*[\.]){1,3}[a-z]{1,61})$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowSameDomainForReferralUser"
+        mapToVariable = 'AllowSameDomainForReferralUser_Tier2'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier2_AccountTypeEmployeeTypePrefix"
