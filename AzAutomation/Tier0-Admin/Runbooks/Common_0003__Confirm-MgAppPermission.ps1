@@ -51,6 +51,7 @@ Param(
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
 $AppPermissions = .\Common_0002__Get-MgAppPermission.ps1
 
@@ -58,4 +59,5 @@ foreach ($Permission in ($Permissions | Select-Object -Unique)) {
 #TODO
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

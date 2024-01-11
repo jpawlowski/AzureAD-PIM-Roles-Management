@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0001__Connect-MgGraph.ps1,Common_0000__Import-Modules.ps1
+.REQUIREDSCRIPTS Common_0001__Connect-MgGraph.ps1,Common_0000__Import-Module.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -27,16 +27,25 @@ Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
-#region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common_0000__Import-Modules.ps1 -Modules @(
-    @{ Name = 'Microsoft.Graph.Identity.Governance'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
-) 1> $null
-#endregion ---------------------------------------------------------------------
+# Avoid using Microsoft.Graph.Identity.Governance module as it requires too much memory in Azure Automation
+$params = @{
+    OutputType  = 'PSObject'
+    Method      = 'GET'
+    Uri         = "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?`$filter=PrincipalId eq %27$($env:MG_PRINCIPAL_ID)%27&`$expand=roleDefinition"
+    ErrorAction = 'Stop'
+}
 
-$roleAssignments = Get-MgRoleManagementDirectoryRoleAssignment -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" -ExpandProperty roleDefinition
+try {
+    $return = (Invoke-MgGraphRequest @params).value
+}
+catch {
+    Throw $_
+}
 
-Write-Verbose "Received directory roles:`n$($roleAssignments | ConvertTo-Json)"
+Write-Verbose "Received directory roles:`n$($return | ConvertTo-Json -Depth 5 -WarningAction SilentlyContinue)"
 
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $roleAssignments
+return $return

@@ -79,12 +79,12 @@ Param (
     [Parameter(mandatory = $true)]
     [string]$Location,
 
-    [Parameter(mandatory = $true)]
-    [string]$CloudAdministrationRestrictedAdminUnit,
+    # [Parameter(mandatory = $true)]
+    # [string]$CloudAdministrationRestrictedAdminUnit,
 
-    [string]$CloudAdministratorsAdminUnit,
+    # [string]$CloudAdministratorsAdminUnit,
     [string]$Plan,
-    [Array]$Runbooks = (Join-Path (Get-Item $MyInvocation.MyCommand).Directory 'Runbooks')
+    [Array]$Runbooks = (Join-Path ((Get-Item $MyInvocation.MyCommand).Directory).Parent 'Runbooks')
 )
 
 if ("AzureAutomation/" -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -99,7 +99,6 @@ $MgScopes = @(
     'Directory.Read.All'
     'Directory.ReadWrite.All'
     'Directory.Write.Restricted'
-    'AppRoleAssignment.Read.All'
     'AppRoleAssignment.ReadWrite.All'
     'RoleManagement.Read.Directory'
     'RoleManagement.ReadWrite.Directory'
@@ -129,64 +128,64 @@ if ($MissingMgScopes) {
     Throw "Missing Microsoft Graph authorization scopes:`n`n$($MissingMgScopes -join "`n")"
 }
 
-$CloudAdminRestrictedAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministrationRestrictedAdminUnit)'"
+# $CloudAdminRestrictedAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministrationRestrictedAdminUnit)'"
 
-if (-Not $CloudAdminRestrictedAdminUnit) {
-    if ($PSCmdlet.ShouldProcess(
-            "Create Restricted Management Administrative Unit in Microsoft Entra",
-            "Do you confirm to create Restricted Management Administrative Unit ?",
-            'Create Restricted Management Administrative Unit in Microsoft Entra'
-        )) {
+# if (-Not $CloudAdminRestrictedAdminUnit) {
+#     if ($PSCmdlet.ShouldProcess(
+#             "Create Restricted Management Administrative Unit in Microsoft Entra",
+#             "Do you confirm to create Restricted Management Administrative Unit ?",
+#             'Create Restricted Management Administrative Unit in Microsoft Entra'
+#         )) {
 
-        $params = @{
-            DisplayName                  = $CloudAdministrationRestrictedAdminUnit
-            Visibility                   = 'HiddenMembership'
-            IsMemberManagementRestricted = $true
-        }
-        $CloudAdminRestrictedAdminUnit = New-MgBetaAdministrativeUnit @params
+#         $params = @{
+#             DisplayName                  = $CloudAdministrationRestrictedAdminUnit
+#             Visibility                   = 'HiddenMembership'
+#             IsMemberManagementRestricted = $true
+#         }
+#         $CloudAdminRestrictedAdminUnit = New-MgBetaAdministrativeUnit @params
 
-    }
-    elseif ($WhatIfPreference) {
-        Write-Verbose 'What If: Restricted Management Administrative Unit would have been created in Microsoft Entra.'
-    }
-    else {
-        Write-Verbose 'Creation of Restricted Management Administrative Unit in Microsoft Entra was denied.'
-    }
-}
+#     }
+#     elseif ($WhatIfPreference) {
+#         Write-Verbose 'What If: Restricted Management Administrative Unit would have been created in Microsoft Entra.'
+#     }
+#     else {
+#         Write-Verbose 'Creation of Restricted Management Administrative Unit in Microsoft Entra was denied.'
+#     }
+# }
 
-if (-Not $CloudAdminRestrictedAdminUnit.IsMemberManagementRestricted) {
-    Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' must be management restricted."
-}
+# if (-Not $CloudAdminRestrictedAdminUnit.IsMemberManagementRestricted) {
+#     Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' must be management restricted."
+# }
 
-if (-Not $CloudAdminRestrictedAdminUnit.Visibility -or ($CloudAdminRestrictedAdminUnit.Visibility -ne 'HiddenMembership')) {
-    Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' visibility must be HiddenMembership."
-}
+# if (-Not $CloudAdminRestrictedAdminUnit.Visibility -or ($CloudAdminRestrictedAdminUnit.Visibility -ne 'HiddenMembership')) {
+#     Throw "Admin Unit '$($CloudAdminRestrictedAdminUnit.DisplayName)' visibility must be HiddenMembership."
+# }
 
-$CloudAdminsAdminUnit = $null
-if ($CloudAdministratorsAdminUnit) {
-    $CloudAdminsAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministratorsAdminUnit)'"
+# $CloudAdminsAdminUnit = $null
+# if ($CloudAdministratorsAdminUnit) {
+#     $CloudAdminsAdminUnit = Get-MgBetaAdministrativeUnit -All -ConsistencyLevel eventual -Filter "DisplayName eq '$($CloudAdministratorsAdminUnit)'"
 
-    if (-Not $CloudAdminsAdminUnit) {
-        if ($PSCmdlet.ShouldProcess(
-                "Create Cloud Admin Accounts Administrative Unit in Microsoft Entra",
-                "Do you confirm to create Cloud Admin Accounts Administrative Unit ?",
-                'Create Cloud Admin Accounts Administrative Unit in Microsoft Entra'
-            )) {
+#     if (-Not $CloudAdminsAdminUnit) {
+#         if ($PSCmdlet.ShouldProcess(
+#                 "Create Cloud Admin Accounts Administrative Unit in Microsoft Entra",
+#                 "Do you confirm to create Cloud Admin Accounts Administrative Unit ?",
+#                 'Create Cloud Admin Accounts Administrative Unit in Microsoft Entra'
+#             )) {
 
-            $params = @{
-                DisplayName                  = $CloudAdministratorsAdminUnit
-            }
-            $CloudAdminsAdminUnit = New-MgBetaAdministrativeUnit @params
+#             $params = @{
+#                 DisplayName = $CloudAdministratorsAdminUnit
+#             }
+#             $CloudAdminsAdminUnit = New-MgBetaAdministrativeUnit @params
 
-        }
-        elseif ($WhatIfPreference) {
-            Write-Verbose 'What If: Cloud Admin Accounts Administrative Unit would have been created in Microsoft Entra.'
-        }
-        else {
-            Write-Verbose 'Creation of Cloud Admin Accounts Administrative Unit in Microsoft Entra was denied.'
-        }
-    }
-}
+#         }
+#         elseif ($WhatIfPreference) {
+#             Write-Verbose 'What If: Cloud Admin Accounts Administrative Unit would have been created in Microsoft Entra.'
+#         }
+#         else {
+#             Write-Verbose 'Creation of Cloud Admin Accounts Administrative Unit in Microsoft Entra was denied.'
+#         }
+#     }
+# }
 
 try {
     if (
@@ -227,10 +226,18 @@ if (-Not $automationAccount) {
             ResourceGroupName = $ResourceGroupName
             Name              = $Name
             Location          = $Location
+            ErrorAction       = 'Stop'
+            Plan              = 'Basic'
         }
         if ($Plan) { $Params.Plan = $Plan }
         if ($Verbose) { $Params.Verbose = $Verbose }
-        $automationAccount = New-AzAutomationAccount @Params
+        try {
+            $automationAccount = New-AzAutomationAccount @Params
+        }
+        catch {
+            Throw $_
+        }
+        Start-Sleep -Seconds 10
     }
     elseif ($WhatIfPreference) {
         Write-Verbose 'What If: A new Azure Automation account would have been created.'
@@ -242,7 +249,7 @@ if (-Not $automationAccount) {
 }
 
 if ($PSCmdlet.ShouldProcess(
-        "Set Automation Variables in $(..AutomationAccountName)",
+        "Set Automation Variables in $($automationAccount.AutomationAccountName)",
         "Do you confirm to set Automation Variables in $($automationAccount.AutomationAccountName) ?",
         'Set Automation Variables in Azure Automation Account'
     )) {
@@ -250,34 +257,6 @@ if ($PSCmdlet.ShouldProcess(
     $Variables = @(
         @{
             Name  = 'AV_CloudAdmin_RestrictedAdminUnitId'
-            Value = [String]''
-        }
-        @{
-            Name  = 'AV_CloudAdmin_AccountTypeExtensionAttribute'
-            Value = [String]'15'
-        }
-        @{
-            Name  = 'AV_CloudAdmin_AccountTypeEmployeeType'
-            Value = [boolean]$true
-        }
-        @{
-            Name  = 'AV_CloudAdmin_ReferenceExtensionAttribute'
-            Value = [String]'14'
-        }
-        @{
-            Name  = 'AV_CloudAdmin_ReferenceManager'
-            Value = [boolean]$false
-        }
-        @{
-            Name  = 'AV_CloudAdmin_Webhook'
-            Value = [String]''
-        }
-        @{
-            Name  = 'AV_CloudAdminTier0_LicenseSkuPartNumber'
-            Value = [String]'EXCHANGEDESKLESS'
-        }
-        @{
-            Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
             Value = [String]''
         }
         @{
@@ -292,17 +271,14 @@ if ($PSCmdlet.ShouldProcess(
             Name  = 'AV_CloudAdminTier2_GroupId'
             Value = [String]''
         }
+
         @{
-            Name  = 'AV_CloudAdminTier0_DedicatedAccount'
-            Value = [Boolean]$true
+            Name  = 'AV_CloudAdminTier0_AccountRestrictedAdminUnitId'
+            Value = [String]''
         }
         @{
-            Name  = 'AV_CloudAdminTier1_DedicatedAccount'
-            Value = [Boolean]$false
-        }
-        @{
-            Name  = 'AV_CloudAdminTier2_DedicatedAccount'
-            Value = [Boolean]$false
+            Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
+            Value = [String]''
         }
     )
 
@@ -348,14 +324,6 @@ if ($PSCmdlet.ShouldProcess(
     )) {
 
     $PSGalleryModules = @(
-        @{
-            Name    = 'PackageManagement'
-            Version = '1.4.8.1'
-        }
-        @{
-            Name    = 'PowerShellGet'
-            Version = '2.2.5'
-        }
         @{
             Name    = 'Microsoft.Graph.Authentication'
             Version = '2.0'
@@ -416,9 +384,18 @@ if ($PSCmdlet.ShouldProcess(
             Name    = 'Microsoft.Graph.Beta.Applications'
             Version = '2.0'
         }
+
+        @{
+            Name    = 'PackageManagement'
+            Version = '1.4.8.1'
+        }
+        @{
+            Name    = 'PowerShellGet'
+            Version = '2.2.5'
+        }
         @{
             Name    = 'ExchangeOnlineManagement'
-            Version = '3.0'
+            Version = '3.4'
         }
     )
 
@@ -435,16 +412,59 @@ if ($PSCmdlet.ShouldProcess(
             (
                 $Module.Version -and
                 ([System.Version]$AzPSModule.Version -lt [System.Version]$Module.Version) -and
-                $AzPSModule.ProvisioningState -ne 'Creating' -and
                 $AzPSModule.ProvisioningState -ne 'Succeeded'
             )
         ) {
             Write-Output "   Creating : $($Module.Name)"
-            $null = New-AzAutomationModule `
-                -ResourceGroupName $automationAccount.ResourceGroupName `
-                -AutomationAccountName $automationAccount.AutomationAccountName `
-                -Name $Module.Name `
-                -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.Name)"
+
+            if (
+                (-Not $AzPSModule) -or
+                ($AzPSModule.ProvisioningState -ne 'Creating')
+            ) {
+                try {
+                    $null = New-AzAutomationModule `
+                        -ResourceGroupName $automationAccount.ResourceGroupName `
+                        -AutomationAccountName $automationAccount.AutomationAccountName `
+                        -Name $Module.Name `
+                        -ContentLinkUri "https://www.powershellgallery.com/api/v2/package/$($Module.Name)" `
+                        -ErrorAction Stop
+                }
+                catch {
+                    Throw $_
+                }
+            }
+
+            # Wait for module installation
+            $DoLoop = $true
+            $RetryCount = 1
+            $MaxRetry = 300
+            $WaitSec = 3
+
+            do {
+                $Module = Get-AzAutomationModule `
+                    -ResourceGroupName $ResourceGroupName `
+                    -AutomationAccountName $automationAccount.AutomationAccountName `
+                    -Name $Module.Name
+
+                if ($Module.ProvisioningState -eq 'Succeeded') {
+                    $DoLoop = $false
+                }
+                if ($Module.ProvisioningState -eq 'Failed') {
+                    Write-Output "     FAILED : $($Module.Name)"
+                    $DoLoop = $false
+                    break
+                }
+                elseif ($RetryCount -ge $MaxRetry) {
+                    Write-Output "    TIMEOUT : $($Module.Name)"
+                    $DoLoop = $false
+                    break
+                }
+                else {
+                    $RetryCount += 1
+                    Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for PowerShell module installation ..." -Verbose
+                    Start-Sleep -Seconds $WaitSec
+                }
+            } While ($DoLoop)
         }
         else {
             Write-Output "   Succeeded: $($Module.Name)"
@@ -504,6 +524,7 @@ if ($PSCmdlet.ShouldProcess(
             Name                  = $File.BaseName
             Type                  = 'PowerShell'
             Path                  = $File
+            ErrorAction           = 'Stop'
         }
 
         if ($ExistingRunbook) {
@@ -516,7 +537,12 @@ if ($PSCmdlet.ShouldProcess(
             $Params.Publish = $true
         }
 
-        $null = Import-AzAutomationRunbook @Params
+        try {
+            $null = Import-AzAutomationRunbook @Params
+        }
+        catch {
+            Throw $_
+        }
         Start-Sleep -Seconds 5
     }
 }
@@ -533,10 +559,16 @@ if (-Not $automationAccount.Identity) {
             "Do you confirm to enable a system-assigned Managed Identity for $($automationAccount.AutomationAccountName) ?",
             'Enable System-Assigned Managed Identity for Azure Automation Account'
         )) {
-        $automationAccount = Set-AzAutomationAccount `
-            -ResourceGroupName $automationAccount.ResourceGroupName `
-            -Name $automationAccount.AutomationAccountName `
-            -AssignSystemIdentity
+        try {
+            $automationAccount = Set-AzAutomationAccount `
+                -ResourceGroupName $automationAccount.ResourceGroupName `
+                -Name $automationAccount.AutomationAccountName `
+                -AssignSystemIdentity `
+                -ErrorAction Stop
+        }
+        catch {
+            Throw $_
+        }
     }
     elseif ($WhatIfPreference) {
         Write-Verbose 'What If: System-Assigned Managed Identity would have been enabled.'

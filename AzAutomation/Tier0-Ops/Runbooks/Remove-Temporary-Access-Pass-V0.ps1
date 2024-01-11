@@ -188,6 +188,6 @@ if (-Not $return.Warnings) { $return.Remove('Warnings') } else { $return.Warning
 if (-Not $return.Errors) { $return.Remove('Errors') } else { $return.Errors | ForEach-Object { Write-Error $_.message } }
 if ($return.Data.Count -eq 0) { $return.Remove('Data') }
 
-if ($OutJson) { return $($return | ConvertTo-Json -Depth 4) }
+if ($OutJson) { return $($return | ConvertTo-Json -Depth 5 -WarningAction SilentlyContinue) }
 if ($OutText) { return $return.Data.TemporaryAccessPass.TemporaryAccessPass ? $return.Data.TemporaryAccessPass.TemporaryAccessPass : $null }
 return $return

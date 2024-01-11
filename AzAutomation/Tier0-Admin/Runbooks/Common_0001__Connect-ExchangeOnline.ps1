@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0000__Import-Modules.ps1
+.REQUIREDSCRIPTS Common_0000__Import-Module.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -28,15 +28,18 @@
 [CmdletBinding()]
 Param(
     [Parameter(mandatory = $true)]
-    [String]$Organization
+    [String]$Organization,
+
+    [Array]$CommandName
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common_0000__Import-Modules.ps1 -Modules @(
-    @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.0'; MaximumVersion = '3.65535' }
+.\Common_0000__Import-Module.ps1 -Modules @(
+    @{ Name = 'ExchangeOnlineManagement'; MinimumVersion = '3.4'; MaximumVersion = '3.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -80,18 +83,28 @@ if (
 if (-Not ($Connection)) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
         $params.ManagedIdentity = $true
+        $params.SkipLoadingCmdletHelp = $true
+        $params.SkipLoadingFormatData = $true
+    }
+
+    if ($CommandName) {
+        $params.CommandName = $CommandName
+    }
+    elseif ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
+        Write-Warning 'Loading all Exchange Online commands. For improved memory consumption, consider adding -CommandName parameter with only required commands to be loaded.'
     }
 
     try {
         $OrigVerbosePreference = $global:VerbosePreference
         $global:VerbosePreference = 'SilentlyContinue'
-        Write-Information 'Connecting to Exchange Online ...'
+        Write-Information 'Connecting to Exchange Online ...' -InformationAction Continue
         Connect-ExchangeOnline @params 1> $null
         $global:VerbosePreference = $OrigVerbosePreference
     }
     catch {
-        Throw "Failed to connect to Exchange Online"
+        Throw $_
     }
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

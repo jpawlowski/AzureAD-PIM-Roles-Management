@@ -29,9 +29,9 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+# Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
 
-$params = if ($Param) {
+$return = if ($Param) {
     if ($Param -is [String]) {
         @{ Message = $Param }
     }
@@ -43,7 +43,7 @@ else {
     @{}
 }
 
-Write-Error @params
+Write-Error @return
 
-Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $params
+# Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
+return $return

@@ -35,6 +35,7 @@ Param(
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
 #region [COMMON] FUNCTIONS -----------------------------------------------------
 function Get-RandomCharacter([Int32]$length, [string]$characters) {
@@ -74,23 +75,25 @@ $numberCharsNeeded = [Math]::Max($minNumber - $remainingChars, 0)
 $specialCharsNeeded = [Math]::Max($minSpecial - $remainingChars, 0)
 
 # Generate the password
-$password = ''
+$return = [System.Text.StringBuilder]''
 if ($lowerCharsNeeded -gt 0) {
-    $password += Get-RandomCharacter -length $lowerCharsNeeded -characters $lowerChars
+    $return.Append((Get-RandomCharacter -length $lowerCharsNeeded -characters $lowerChars))
 }
 if ($upperCharsNeeded -gt 0) {
-    $password += Get-RandomCharacter -length $upperCharsNeeded -characters $upperChars
+    $return.Append((Get-RandomCharacter -length $upperCharsNeeded -characters $upperChars))
 }
 if ($numberCharsNeeded -gt 0) {
-    $password += Get-RandomCharacter -length $numberCharsNeeded -characters $numberChars
+    $return.Append((Get-RandomCharacter -length $numberCharsNeeded -characters $numberChars))
 }
 if ($specialCharsNeeded -gt 0) {
-    $password += Get-RandomCharacter -length $specialCharsNeeded -characters $specialChars
+    $return.Append((Get-RandomCharacter -length $specialCharsNeeded -characters $specialChars))
 }
-$remainingChars = $length - $password.Length
+$remainingChars = $length - $return.Length
 if ($remainingChars -gt 0) {
-    $password += Get-RandomCharacter -length $remainingChars -characters ($lowerChars + $upperChars + $numberChars + $specialChars)
+    $return.Append((Get-RandomCharacter -length $remainingChars -characters ($lowerChars + $upperChars + $numberChars + $specialChars)))
 }
+$return = Get-ScrambleString $return.ToString()
 
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return Get-ScrambleString $password
+return $return

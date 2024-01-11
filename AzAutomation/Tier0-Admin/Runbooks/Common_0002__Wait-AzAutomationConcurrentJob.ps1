@@ -27,14 +27,9 @@ Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
-$return = $null
-
-if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
-
-    #region [COMMON] CONNECTIONS ---------------------------------------------------
-    .\Common_0001__Connect-AzAccount.ps1 1> $null
-    #endregion ---------------------------------------------------------------------
+if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName -and $env:AZURE_AUTOMATION_RUNBOOK_Name) {
 
     $DoLoop = $true
     $RetryCount = 1
@@ -50,13 +45,13 @@ if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountNa
         }
         $activeJobs = $jobs | Where-Object { $_.status -eq 'Running' -or $_.status -eq 'Queued' -or $_.status -eq 'New' -or $_.status -eq 'Activating' -or $_.status -eq 'Resuming' } | Sort-Object -Property CreationTime
 
-        $jobRanking = @()
+        $jobRanking = [System.Collections.ArrayList]@()
         $rank = 0
 
         foreach ($activeJob in $activeJobs) {
             $rank++
             $activeJob | Add-Member -MemberType NoteProperty -Name jobRanking -Value $rank -Force
-            $jobRanking += $activeJob
+            $jobRanking.Add($activeJob)
         }
 
         $currentJob = $activeJobs | Where-Object { $_.JobId -eq $PSPrivateMetadata.JobId }
@@ -77,10 +72,10 @@ if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountNa
     } While ($DoLoop)
 }
 else {
-    $return = $true
     Write-Verbose 'Not running in Azure Automation: Concurrency check NOT ACTIVE.'
+    $return = $true
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-
 return $return

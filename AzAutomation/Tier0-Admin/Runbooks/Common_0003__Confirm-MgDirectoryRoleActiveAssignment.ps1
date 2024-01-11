@@ -51,8 +51,9 @@ Param(
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
-$missingRoles = @()
+$missingRoles = [System.Collections.ArrayList]@()
 $RoleAssignments = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
 $GlobalAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq '62e90394-69f5-4237-9190-012177145e10' }
 $PrivRoleAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814' }
@@ -163,7 +164,7 @@ foreach (
             Write-Warning "Superseeded directory role by active Global Administrator: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
         }
         else {
-            $missingRoles += @{ DirectoryScopeId = $DirectoryScopeId; TemplateId = $TemplateId; DisplayName = $DisplayName }
+            $missingRoles.Add(@{ DirectoryScopeId = $DirectoryScopeId; TemplateId = $TemplateId; DisplayName = $DisplayName })
         }
     }
 }
@@ -172,5 +173,6 @@ if ($missingRoles.Count -gt 0) {
     Throw "Missing mandatory directory role permissions:`n$($missingRoles | ConvertTo-Json)"
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'RoleAssignments') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $RoleAssignments

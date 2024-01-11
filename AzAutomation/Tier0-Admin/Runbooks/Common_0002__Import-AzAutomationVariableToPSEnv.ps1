@@ -27,16 +27,38 @@ Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
-if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName) {
+if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
 
     #region [COMMON] CONNECTIONS ---------------------------------------------------
     .\Common_0001__Connect-AzAccount.ps1 1> $null
     #endregion ---------------------------------------------------------------------
 
-    $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName
+    try {
+        if ([string]::IsNullOrEmpty($env:AZURE_AUTOMATION_ResourceGroupName)) {
+            Throw 'Missing environment variable $env:AZURE_AUTOMATION_ResourceGroupName'
+        }
+        elseif ([string]::IsNullOrEmpty($env:AZURE_AUTOMATION_AccountName)) {
+            Throw 'Missing environment variable $env:AZURE_AUTOMATION_AccountName'
+        }
+        else {
+            $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName
+        }
+    }
+    catch {
+        Throw $_
+    }
 
     foreach ($AutomationVariable in $AutomationVariables) {
+        if ($AutomationVariable.GetType().Name -ne 'String') {
+            Write-Verbose "SKIPPING $($AutomationVariable.Name) because it is not a String but '$($AutomationVariable.GetType().Name)'"
+            continue
+        }
+        elseif ([string]::IsNullOrEmpty($AutomationVariable.Value)) {
+            Write-Verbose "SKIPPING $($AutomationVariable.Name) because it has NullOrEmpty value"
+            continue
+        }
         Write-Verbose "Setting `$env:$($AutomationVariable.Name)"
         [Environment]::SetEnvironmentVariable($AutomationVariable.Name, $AutomationVariable.Value)
     }
@@ -45,4 +67,5 @@ else {
     Write-Verbose 'Not running in Azure Automation. Script environment variables must be set manually before local run.'
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

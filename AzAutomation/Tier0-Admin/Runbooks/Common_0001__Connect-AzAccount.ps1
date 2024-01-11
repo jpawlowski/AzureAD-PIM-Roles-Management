@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
-.REQUIREDSCRIPTS Common_0000__Import-Modules.ps1
+.REQUIREDSCRIPTS Common_0000__Import-Module.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -45,21 +45,20 @@ Param(
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common_0000__Import-Modules.ps1 -Modules @(
+.\Common_0000__Import-Module.ps1 -Modules @(
     @{ Name = 'Az.Accounts'; MinimumVersion = '2.8'; MaximumVersion = '2.65535' }
-    @{ Name = 'Az.Automation'; MinimumVersion = '1.7'; MaximumVersion = '1.65535' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
-$Context = $null
-
-$params = @{
-    Scope = 'Process'
-}
-
 if (-Not (Get-AzContext)) {
+    $Context = $null
+    $params = @{
+        Scope = 'Process'
+    }
+
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
         Write-Verbose 'Using system-assigned Managed Service Identity'
         $params.Identity = $true
@@ -69,36 +68,67 @@ if (-Not (Get-AzContext)) {
     }
 
     try {
-        Write-Information 'Connecting to Microsoft Azure ...'
+        Write-Information 'Connecting to Microsoft Azure ...' -InformationAction Continue
         if ($Tenant) { $params.Tenant = $Tenant }
         if ($Subscription) { $params.Subscription = $Subscription }
         $Context = (Connect-AzAccount @params).context
+
+        $Context = Set-AzContext -SubscriptionName $Context.Subscription -DefaultProfile $Context
+
+        if ($params.Identity -eq $true) {
+            Write-Verbose 'Running in Azure Automation - Generating connection environment variables'
+
+            if ($env:MG_PRINCIPAL_DISPLAYNAME) {
+                #region [COMMON] ENVIRONMENT ---------------------------------------------------
+                .\Common_0000__Import-Module.ps1 -Modules @(
+                    @{ Name = 'Az.Automation'; MinimumVersion = '1.7'; MaximumVersion = '1.65535' }
+                ) 1> $null
+                #endregion ---------------------------------------------------------------------
+
+                $AzAutomationAccount = Get-AzAutomationAccount -DefaultProfile $Context -ErrorAction Stop | Where-Object { $_.AutomationAccountName -eq $env:MG_PRINCIPAL_DISPLAYNAME }
+                if ($AzAutomationAccount) {
+                    Write-Verbose 'Retreived Automation Account details'
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_SubscriptionId', $AzAutomationAccount.SubscriptionId)
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_ResourceGroupName', $AzAutomationAccount.ResourceGroupName)
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_AccountName', $AzAutomationAccount.AutomationAccountName)
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_PrincipalId', $AzAutomationAccount.Identity.PrincipalId)
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_TenantId', $AzAutomationAccount.Identity.TenantId)
+                    [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_Type', $AzAutomationAccount.Identity.Type)
+
+                    if ($PSPrivateMetadata.JobId) {
+
+                        $AzAutomationJob = Get-AzAutomationJob -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Id $PSPrivateMetadata.JobId -ErrorAction Stop
+                        if ($AzAutomationJob) {
+                            Write-Verbose 'Retreived Automation Job details'
+                            [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_Name', $AzAutomationJob.RunbookName)
+                            [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_CreationTime', $AzAutomationJob.CreationTime.ToUniversalTime())
+                            [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_StartTime', $AzAutomationJob.StartTime.ToUniversalTime())
+
+                            $AzAutomationRunbook = Get-AzAutomationRunbook -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Name $AzAutomationJob.RunbookName -ErrorAction Stop
+                            if ($AzAutomationRunbook) {
+                                Write-Verbose 'Retreived Automation Runbook details'
+                                [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_CreationTime', $AzAutomationRunbook.CreationTime.ToUniversalTime())
+                                [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_LastModifiedTime', $AzAutomationRunbook.LastModifiedTime.ToUniversalTime())
+                            }
+                        }
+                    }
+                }
+                else {
+                    Throw "Unable to find own Automation Account details for '$env:MG_PRINCIPAL_DISPLAYNAME'"
+                }
+            }
+            else {
+                Throw 'Missing environment variable $env:MG_PRINCIPAL_DISPLAYNAME. Please run Common_0001__Connect-MgGraph.ps1 first.'
+            }
+        }
+        else {
+            Write-Verbose 'Not running in Azure Automation - no connection environment variables set.'
+        }
     }
     catch {
-        Throw "Failed to connect to Microsoft Azure";
-    }
-
-    $Context = Set-AzContext -SubscriptionName $Context.Subscription -DefaultProfile $Context
-
-    if ($params.Identity) {
-        $AzAutomationAccount = Get-AzAutomationAccount -DefaultProfile $Context -ErrorAction Stop | Where-Object AutomationAccountName -eq $env:MG_PRINCIPAL_DISPLAYNAME
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_SubscriptionId', $AzAutomationAccount.SubscriptionId)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_ResourceGroupName', $AzAutomationAccount.ResourceGroupName)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_AccountName', $AzAutomationAccount.AutomationAccountName)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_PrincipalId', $AzAutomationAccount.Identity.PrincipalId)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_TenantId', $AzAutomationAccount.Identity.TenantId)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_IDENTITY_Type', $AzAutomationAccount.Identity.Type)
-
-        $AzAutomationJob = Get-AzAutomationJob -DefaultProfile $Context -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -Id $PSPrivateMetadata.JobId -ErrorAction Stop
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_Name', $AzAutomationJob.RunbookName)
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_CreationTime', $AzAutomationJob.CreationTime.ToUniversalTime())
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_StartTime', $AzAutomationJob.StartTime.ToUniversalTime())
-
-        $AzAutomationRunbook = Get-AzAutomationRunbook -DefaultProfile $Context -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -Name $env:AZURE_AUTOMATION_RUNBOOK_Name -ErrorAction Stop
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_CreationTime', $AzAutomationRunbook.CreationTime.ToUniversalTime())
-        [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_LastModifiedTime', $AzAutomationRunbook.LastModifiedTime.ToUniversalTime())
+        Throw $_
     }
 }
 
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $Context
