@@ -34,17 +34,17 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 #region [COMMON] FUNCTIONS -----------------------------------------------------
 function Get-RandomCharacter([Int32]$length, [string]$characters) {
     if ($length -lt 1) { return '' }
     if (Get-Command Get-SecureRandom -ErrorAction SilentlyContinue) {
-        $random = 1..$length | ForEach-Object { Get-SecureRandom -Maximum $characters.Length }
+        $random = 1..$length | & { process { Get-SecureRandom -Maximum $characters.Length } }
     }
     else {
-        $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.Length }
+        $random = 1..$length | & { process { Get-Random -Maximum $characters.Length } }
     }
     $private:ofs = ''
     return [string]$characters[$random]
@@ -75,25 +75,25 @@ $numberCharsNeeded = [Math]::Max($minNumber - $remainingChars, 0)
 $specialCharsNeeded = [Math]::Max($minSpecial - $remainingChars, 0)
 
 # Generate the password
-$return = [System.Text.StringBuilder]''
+$return = [System.Text.StringBuilder]::new()
 if ($lowerCharsNeeded -gt 0) {
-    $return.Append((Get-RandomCharacter -length $lowerCharsNeeded -characters $lowerChars))
+    $null = $return.Append((Get-RandomCharacter -length $lowerCharsNeeded -characters $lowerChars))
 }
 if ($upperCharsNeeded -gt 0) {
-    $return.Append((Get-RandomCharacter -length $upperCharsNeeded -characters $upperChars))
+    $null = $return.Append((Get-RandomCharacter -length $upperCharsNeeded -characters $upperChars))
 }
 if ($numberCharsNeeded -gt 0) {
-    $return.Append((Get-RandomCharacter -length $numberCharsNeeded -characters $numberChars))
+    $null = $return.Append((Get-RandomCharacter -length $numberCharsNeeded -characters $numberChars))
 }
 if ($specialCharsNeeded -gt 0) {
-    $return.Append((Get-RandomCharacter -length $specialCharsNeeded -characters $specialChars))
+    $null = $return.Append((Get-RandomCharacter -length $specialCharsNeeded -characters $specialChars))
 }
 $remainingChars = $length - $return.Length
 if ($remainingChars -gt 0) {
-    $return.Append((Get-RandomCharacter -length $remainingChars -characters ($lowerChars + $upperChars + $numberChars + $specialChars)))
+    $null = $return.Append((Get-RandomCharacter -length $remainingChars -characters ($lowerChars + $upperChars + $numberChars + $specialChars)))
 }
 $return = Get-ScrambleString $return.ToString()
 
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

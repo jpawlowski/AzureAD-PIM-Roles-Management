@@ -26,56 +26,75 @@
 Param()
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
-if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName -and $env:AZURE_AUTOMATION_RUNBOOK_Name) {
+if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
 
-    $DoLoop = $true
-    $RetryCount = 1
-    $MaxRetry = 120
-    $WaitSec = 30
+    #region [COMMON] CONNECTIONS ---------------------------------------------------
+    .\Common_0001__Connect-AzAccount.ps1 1> $null
+    #endregion ---------------------------------------------------------------------
 
-    do {
-        try {
-            $jobs = Get-AzAutomationJob -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -RunbookName $env:AZURE_AUTOMATION_RUNBOOK_Name -ErrorAction Stop
-        }
-        catch {
-            Throw $_
-        }
-        $activeJobs = $jobs | Where-Object { $_.status -eq 'Running' -or $_.status -eq 'Queued' -or $_.status -eq 'New' -or $_.status -eq 'Activating' -or $_.status -eq 'Resuming' } | Sort-Object -Property CreationTime
+    if ([string]::IsNullOrEmpty($env:AZURE_AUTOMATION_ResourceGroupName)) {
+        Throw 'Missing environment variable $env:AZURE_AUTOMATION_ResourceGroupName.'
+    }
+    if ([string]::IsNullOrEmpty($env:AZURE_AUTOMATION_AccountName)) {
+        Throw 'Missing environment variable $env:AZURE_AUTOMATION_AccountName.'
+    }
+    if ([string]::IsNullOrEmpty($env:AZURE_AUTOMATION_RUNBOOK_Name)) {
+        Throw 'Missing environment variable $env:AZURE_AUTOMATION_RUNBOOK_Name.'
+    }
 
-        $jobRanking = [System.Collections.ArrayList]@()
-        $rank = 0
+    if ($env:AZURE_AUTOMATION_ResourceGroupName -and $env:AZURE_AUTOMATION_AccountName -and $env:AZURE_AUTOMATION_RUNBOOK_Name) {
 
-        foreach ($activeJob in $activeJobs) {
-            $rank++
-            $activeJob | Add-Member -MemberType NoteProperty -Name jobRanking -Value $rank -Force
-            $jobRanking.Add($activeJob)
-        }
+        $DoLoop = $true
+        $RetryCount = 1
+        $MaxRetry = 120
+        $WaitSec = 30
 
-        $currentJob = $activeJobs | Where-Object { $_.JobId -eq $PSPrivateMetadata.JobId }
+        do {
+            try {
+                $jobs = Get-AzAutomationJob -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -RunbookName $env:AZURE_AUTOMATION_RUNBOOK_Name -ErrorAction Stop
+            }
+            catch {
+                Throw $_
+            }
+            $activeJobs = $jobs | Where-Object { $_.status -eq 'Running' -or $_.status -eq 'Queued' -or $_.status -eq 'New' -or $_.status -eq 'Activating' -or $_.status -eq 'Resuming' } | Sort-Object -Property CreationTime
+            Clear-Variable -Name jobs
 
-        If ($currentJob.jobRanking -eq 1) {
-            $DoLoop = $false
-            $return = $true
-        }
-        elseif ($RetryCount -ge $MaxRetry) {
-            $DoLoop = $false
-            $return = $false
-        }
-        else {
-            $RetryCount += 1
-            Write-Verbose "$(Get-Date -Format yyyy-MM-dd-hh-mm-ss.ffff) Waiting for concurrent jobs: I am at rank $($currentJob.jobRanking) ..." -Verbose
-            Start-Sleep -Seconds $WaitSec
-        }
-    } While ($DoLoop)
+            $jobRanking = [System.Collections.ArrayList]::new()
+            $rank = 0
+
+            foreach ($activeJob in $activeJobs) {
+                $rank++
+                $activeJob | Add-Member -MemberType NoteProperty -Name jobRanking -Value $rank -Force
+                $null = $jobRanking.Add($activeJob)
+            }
+
+            $currentJob = $activeJobs | Where-Object { $_.JobId -eq $PSPrivateMetadata.JobId }
+            Clear-Variable -Name activeJobs
+
+            If ($currentJob.jobRanking -eq 1) {
+                $DoLoop = $false
+                $return = $true
+            }
+            elseif ($RetryCount -ge $MaxRetry) {
+                $DoLoop = $false
+                $return = $false
+            }
+            else {
+                $RetryCount += 1
+                Write-Verbose "$(Get-Date -Format yyyy-MM-dd-hh-mm-ss.ffff) Waiting for concurrent jobs: I am at rank $($currentJob.jobRanking) ..." -Verbose
+                Start-Sleep -Seconds $WaitSec
+            }
+        } While ($DoLoop)
+    }
 }
 else {
     Write-Verbose 'Not running in Azure Automation: Concurrency check NOT ACTIVE.'
     $return = $true
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

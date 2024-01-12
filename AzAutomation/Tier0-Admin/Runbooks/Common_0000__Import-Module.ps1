@@ -55,10 +55,10 @@ $VerbosePreference = $OrigVerbosePreference
 $global:VerbosePreference = $OrigGlobalVerbosePreference
 
 if ($Initialized) {
-    Write-Debug "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+    Write-Debug "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
 }
 else {
-    Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+    Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
 }
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
@@ -79,9 +79,9 @@ $VerbosePreference = 'SilentlyContinue'
 $global:VerbosePreference = 'SilentlyContinue'
 
 $LoadedModules = (Get-Module | & { process { $_.Name } })
-$Missing = [System.Collections.ArrayList]@()
+$Missing = [System.Collections.ArrayList]::new()
 
-$Modules | Where-Object { ($null -ne $_.Name) -and ($LoadedModules -notContains $_.Name) } | & {
+$Modules | Where-Object { (-Not [string]::IsNullOrEmpty($_.Name)) -and ($LoadedModules -notContains $_.Name) } | & {
     process {
         $Module = $_
         Write-Debug "Importing module $($Module.Name)"
@@ -101,16 +101,16 @@ $Modules | Where-Object { ($null -ne $_.Name) -and ($LoadedModules -notContains 
             $Module.Remove('WarningAction')
             $Module.Remove('ErrorAction')
             $Module.ErrorDetails = $_
-            $script:Missing.Add($Module)
+            $null = $script:Missing.Add($Module)
         }
     }
 }
 
+$global:VerbosePreference = $OrigGlobalVerbosePreference
+
 If ($Missing.Count -gt 0) {
     Throw "Modules could not be loaded: $( $(ForEach ($item in $Missing | Sort-Object -Property Name) { ($item.Keys | Sort-Object @{Expression={$_ -eq "Name" -or $_ -eq "RequiredVersion"}; Descending=$true} | ForEach-Object { "${_}: $($item[$_])" }) -join '; ' }) -join ' | ' )"
 }
-
-$global:VerbosePreference = $OrigGlobalVerbosePreference
 
 Remove-Variable -Name Initialized, OrigVerbosePreference, Missing, LoadedModules, Modules, Module -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false
 

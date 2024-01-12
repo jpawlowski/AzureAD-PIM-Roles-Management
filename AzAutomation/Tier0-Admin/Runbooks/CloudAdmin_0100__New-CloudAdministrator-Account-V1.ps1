@@ -214,7 +214,7 @@
 #>
 
 #region TODO:
-#- remove MgBeta and see if it can be replaced by Invoke-MgGraph, especially for Identity.(Beta).Governace ...
+#- concurrent job testing
 #- convert ReferralUserId to #EXT# format for domains that are not validated in the tenant
 #- regex check for UPN which is currently commented out
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
@@ -226,17 +226,16 @@
 
 [CmdletBinding()]
 Param (
-    [Parameter(Position = 0, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [Array]$ReferralUserId,
 
-    [Parameter(Position = 1, mandatory = $true)]
+    [Parameter(mandatory = $true)]
     [Array]$Tier,
 
-    [Parameter(Position = 2)]
     [Array]$UserPhotoUrl,
-
     [Boolean]$OutJson,
     [Boolean]$OutText,
+    [Boolean]$OutObject,
     [Hashtable]$JobReference
 )
 
@@ -275,7 +274,7 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
-.\Common_0002__Import-AzAutomationVariableToPSEnv.ps1 1> $null
+.\Common_0002__Import-AzAutomationVariableToPSEnv.ps1 1> $null      # Implicitly connects to Azure Cloud
 $Constants = .\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1
 .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
@@ -493,10 +492,10 @@ $persistentError = $false
 $Iteration = 0
 
 # To improve memory consumption, return arrays are kept separate until the end of this script
-$returnOutput = [System.Collections.ArrayList]@()
-$returnInformation = [System.Collections.ArrayList]@()
-$returnWarning = [System.Collections.ArrayList]@()
-$returnError = [System.Collections.ArrayList]@()
+$returnOutput = [System.Collections.ArrayList]::new()
+$returnInformation = [System.Collections.ArrayList]::new()
+$returnWarning = [System.Collections.ArrayList]::new()
+$returnError = [System.Collections.ArrayList]::new()
 $return = @{
     Job = .\Common_0003__Get-AzAutomationJobInfo.ps1
 }
@@ -614,7 +613,7 @@ if (
             Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $ThisTier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
         }
 
-        if ('Private' -ne $GroupObj.Visibility) {
+        if ($GroupObj.Visibility -ne 'Private') {
             Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Correcting visibility to Private for Cloud Administration."
             try {
                 Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' -ErrorAction Stop 1> $null
@@ -624,11 +623,11 @@ if (
             }
         }
 
-        if ($GroupObj.Owners) {
-            ForEach ($owner in $GroupObj.Owners) {
-                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($owner.Id)."
+        $GroupObj.Owners | & {
+            process {
+                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($_.Id)."
                 try {
-                    Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $owner.Id -ErrorAction Stop 1> $null
+                    Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $_.Id -ErrorAction Stop 1> $null
                 }
                 catch {
                     Throw $_
@@ -640,7 +639,7 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] OPEN CONNECTIONS: Exchange Online -----------------------------
-.\Common_0003__Confirm-MgAppPermission.ps1 -Permissions @(
+.\Common_0003__Confirm-MgAppPermission.ps1 -Permissions @( #TODO child runbook doesnt actually work
     @{
         DisplayName = 'Office 365 Exchange Online'
         AppId       = '00000002-0000-0ff1-ce00-000000000000'
@@ -660,12 +659,12 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region Process Referral User --------------------------------------------------
-function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
+function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUrl) {
     Write-Verbose "-----STARTLOOP $ReferralUserId, Tier $Tier ---"
 
     #region [COMMON] LOOP HANDLING -------------------------------------------------
     # Only process items if there was no error during script initialization before
-    if (($Iteration -eq 0) -and ($returnError.Count -gt 0)) { $persistentError = $true }
+    if (($Iteration -eq 0) -and ($returnError.Count -gt 0)) { $script:persistentError = $true }
     if ($persistentError) {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: Skipped processing."
@@ -749,9 +748,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     #region [COMMON] PARAMETER VALIDATION ------------------------------------------
     $regex = '^[^\s]+@[^\s]+\.[^\s]+$|^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
-    if ($ReferralUserId -notmatch $regex) {
+    if ($LocalUserId -notmatch $regex) {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                    Message           = "${ReferralUserId}: ReferralUserId is invalid"
+                    Message           = "${ReferralUserId}: LocalUserId is invalid ($LocalUserId)"
                     ErrorId           = '400'
                     Category          = 'SyntaxError'
                     TargetName        = $ReferralUserId
@@ -759,7 +758,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                     TargetType        = 'UserId'
                     RecommendedAction = 'Provide either User Principal Name, or Object ID (UUID).'
                     CategoryActivity  = 'ReferralUserId parameter validation'
-                    CategoryReason    = "Parameter ReferralUserId does not match $regex"
+                    CategoryReason    = "Parameter LocalUserId was converted from ReferralUserId and does not match $regex"
                 }))
         return
     }
@@ -834,7 +833,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     )
 
     $params = @{
-        UserId         = $ReferralUserId
+        UserId         = $LocalUserId
         Property       = $userProperties
         ExpandProperty = $userExpandPropeties
         ErrorAction    = 'Stop'
@@ -933,6 +932,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         return
     }
 
+    #TODO check
     # if (
     #     ($refUserObj.UserPrincipalName -match '^A[0-9][A-Z][-_].+@.+$') -or # Tiered admin accounts, e.g. A0C_*, A1L-*, etc.
     #     ($refUserObj.UserPrincipalName -match '^ADM[CL]?[-_].+@.+$') -or # Non-Tiered admin accounts, e.g. ADM_, ADMC-* etc.
@@ -1088,9 +1088,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                     }))
             return
         }
-        finally {
-            Write-Verbose "Found existing mailbox for $($refUserObj.Id) ($($refUserObj.Id)) with PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
-        }
+        Write-Verbose "Found existing mailbox for $($refUserObj.Id) ($($refUserObj.Id)) with PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
 
         if (('UserMailbox' -ne $refUserExObj.RecipientType) -or ('UserMailbox' -ne $refUserExObj.RecipientTypeDetails)) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1215,9 +1213,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
             UserPhotoUrl = $null
         }
 
-        ForEach ($property in $userProperties) {
-            if ($null -eq $data.$property) {
-                $data.$property = $refUserObj.$property
+        $userProperties | & {
+            process {
+                if ($null -eq $data.$_) {
+                    $data.$_ = $refUserObj.$_
+                }
             }
         }
 
@@ -1411,7 +1411,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                     CategoryActivity = 'Cloud Administrator Creation'
                     CategoryReason   = "Either EmployeeType or extensionAttribute method must be configured to store account type."
                 }))
-        $persistentError = $true
+        $script:persistentError = $true
         return
     }
 
@@ -1431,7 +1431,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                         CategoryActivity = 'Cloud Administrator Creation'
                         CategoryReason   = "Reference extension attribute '$extAttrRef' must not be used by other IT services."
                     }))
-            $persistentError = $true
+            $script:persistentError = $true
             return
         }
 
@@ -1453,7 +1453,7 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
                     CategoryActivity = 'Cloud Administrator Creation'
                     CategoryReason   = "Either EmployeeType or extensionAttribute method must be configured to store account type."
                 }))
-        $persistentError = $true
+        $script:persistentError = $true
         return
     }
 
@@ -1476,29 +1476,32 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         )
     }
 
-    ForEach ($property in $userProperties) {
-        if (
-            ($null -eq $BodyParams.$property) -and
-            ($property -notin @(
-                'Id'
-                'UserType'
-                'CreatedDateTime'
-                'IsResourceAccount'
-                'CreationType'
-                'ExternalUserState'
-                'Identities'
-                'Mail'
-            )) -and
-            ($property -notmatch '^OnPremises')
-        ) {
-            # Empty or null values require special handling as of today
-            if ([string]::IsNullOrEmpty($refUserObj.$property)) {
-                Write-Verbose "Clearing property $property"
-                $BodyParamsNull.$property = $null
-            }
-            else {
-                Write-Verbose "Copying property $property"
-                $BodyParams.$property = $refUserObj.$property
+    $userProperties | & {
+        process {
+            if (
+                ($null -eq $BodyParams.$_) -and
+                ($_ -notin @(
+                    'Id'
+                    'UserType'
+                    'CreatedDateTime'
+                    'IsResourceAccount'
+                    'CreationType'
+                    'ExternalUserState'
+                    'Identities'
+                    'Mail'
+                )) -and
+                ($_ -notmatch '^OnPremises')
+            ) {
+                # Empty or null values require special handling because
+                # MS Graph module momentarily does not handle them properly
+                if ([string]::IsNullOrEmpty($refUserObj.$_)) {
+                    Write-Verbose "Clearing property $_"
+                    $BodyParamsNull.$_ = $null
+                }
+                else {
+                    Write-Verbose "Copying property $_"
+                    $BodyParams.$_ = $refUserObj.$_
+                }
             }
         }
     }
@@ -1520,29 +1523,31 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         OutputType = 'PSObject'
         Method     = 'GET'
         Headers    = @{ ConsistencyLevel = 'eventual' }
-        Uri        = "https://graph.microsoft.com/beta/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')"
+        Uri        = "https://graph.microsoft.com/v1.0/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')"
     }
     $deletedUserList = Invoke-MgGraphRequest @params
 
-    if ($deletedUserList.'@odata.count' -gt 0) {
-        ForEach ($deletedUserObj in $deletedUserList.Value) {
-            $script:returnInformation.Add(( .\Common_0000__Write-Information.ps1 @{
-                        Message          = "${ReferralUserId}: Soft-deleted admin account $($deletedUserObj.UserPrincipalName) ($($deletedUserObj.Id)) was permanently deleted before re-creation."
-                        Category         = 'ResourceExists'
-                        TargetName       = $refUserObj.UserPrincipalName
-                        TargetObject     = $refUserObj.Id
-                        TargetType       = 'UserId'
-                        CategoryActivity = 'Account Provisioning'
-                        CategoryReason   = "An existing admin account was deleted before."
-                        Tags             = 'UserId', 'Account Provisioning'
-                    }))
+    if ($deletedUserList) {
+        $deletedUserList.Value | & {
+            process {
+                $script:returnInformation.Add(( .\Common_0000__Write-Information.ps1 @{
+                            Message          = "${ReferralUserId}: Soft-deleted admin account $($_.UserPrincipalName) ($($_.Id)) was permanently deleted before re-creation."
+                            Category         = 'ResourceExists'
+                            TargetName       = $refUserObj.UserPrincipalName
+                            TargetObject     = $refUserObj.Id
+                            TargetType       = 'UserId'
+                            CategoryActivity = 'Account Provisioning'
+                            CategoryReason   = "An existing admin account was deleted before."
+                            Tags             = 'UserId', 'Account Provisioning'
+                        }))
 
-            $params = @{
-                OutputType = 'PSObject'
-                Method     = 'DELETE'
-                Uri        = "https://graph.microsoft.com/beta/directory/deletedItems/$($deletedUserObj.Id)"
+                $params = @{
+                    OutputType = 'PSObject'
+                    Method     = 'DELETE'
+                    Uri        = "https://graph.microsoft.com/v1.0/directory/deletedItems/$($_.Id)"
+                }
+                Invoke-MgGraphRequest @params 1> $null
             }
-            Invoke-MgGraphRequest @params 1> $null
         }
     }
     #endregion ---------------------------------------------------------------------
@@ -1662,24 +1667,26 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     }
     else {
         #region License Availability Validation Before New Account Creation ------------
-        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
-        ForEach ($Sku in $TenantLicensed) {
-            if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
-                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                            Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
-                            ErrorId           = '503'
-                            Category          = 'LimitsExceeded'
-                            TargetName        = $refUserObj.UserPrincipalName
-                            TargetObject      = $refUserObj.Id
-                            TargetType        = 'UserId'
-                            RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
-                            CategoryActivity  = 'License Availability Validation'
-                            CategoryReason    = "License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
-                        }))
-                $persistentError = $true
-            }
-            else {
-                Write-Verbose "License SkuPartNumber $($Sku.SkuPartNumber) has at least 1 free license available to continue"
+        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
+            process {
+                if ($_.ConsumedUnits -ge $_.Enabled) {
+                    $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                                Message           = "${ReferralUserId}: License SkuPartNumber $($_.SkuPartNumber) has run out of free licenses."
+                                ErrorId           = '503'
+                                Category          = 'LimitsExceeded'
+                                TargetName        = $refUserObj.UserPrincipalName
+                                TargetObject      = $refUserObj.Id
+                                TargetType        = 'UserId'
+                                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                                CategoryActivity  = 'License Availability Validation'
+                                CategoryReason    = "License SkuPartNumber $($_.SkuPartNumber) has run out of free licenses."
+                            }))
+                    $script:persistentError = $true
+                }
+                else {
+                    Write-Verbose "License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
+                    $_
+                }
             }
         }
         if ($persistentError) { return }
@@ -1914,24 +1921,26 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
 
     #region License Availability Validation For Pre-Existing Account ---------------
     if (-Not $TenantLicensed) {
-        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits
-        ForEach ($Sku in $TenantLicensed) {
-            if ($Sku.ConsumedUnits -ge $Sku.Enabled) {
-                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                            Message           = "${ReferralUserId}: License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
-                            ErrorId           = '503'
-                            Category          = 'LimitsExceeded'
-                            TargetName        = $refUserObj.UserPrincipalName
-                            TargetObject      = $refUserObj.Id
-                            TargetType        = 'UserId'
-                            RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
-                            CategoryActivity  = 'License Availability Validation'
-                            CategoryReason    = "License SkuPartNumber $($Sku.SkuPartNumber) has run out of free licenses."
-                        }))
-                $persistentError = $true
-            }
-            else {
-                Write-Verbose "License SkuPartNumber $($Sku.SkuPartNumber) has at least 1 free license available to continue"
+        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
+            process {
+                if ($_.ConsumedUnits -ge $_.Enabled) {
+                    $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                                Message           = "${ReferralUserId}: License SkuPartNumber $($_.SkuPartNumber) has run out of free licenses."
+                                ErrorId           = '503'
+                                Category          = 'LimitsExceeded'
+                                TargetName        = $refUserObj.UserPrincipalName
+                                TargetObject      = $refUserObj.Id
+                                TargetType        = 'UserId'
+                                RecommendedAction = 'Purchase additional licenses to create new Cloud Administrator accounts.'
+                                CategoryActivity  = 'License Availability Validation'
+                                CategoryReason    = "License SkuPartNumber $($_.SkuPartNumber) has run out of free licenses."
+                            }))
+                    $script:persistentError = $true
+                }
+                else {
+                    Write-Verbose "License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
+                    $_
+                }
             }
         }
         if ($persistentError) { return }
@@ -1944,22 +1953,25 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         $UserLicensed = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
         $params = @{
             UserId         = $UserObj.Id
-            AddLicenses    = [System.Collections.ArrayList]@()
-            RemoveLicenses = [System.Collections.ArrayList]@()
+            AddLicenses    = [System.Collections.ArrayList]::new()
+            RemoveLicenses = [System.Collections.ArrayList]::new()
             ErrorAction    = 'Stop'
         }
 
-        ForEach ($SkuPartNumber in $LicenseSkuPartNumbers) {
-            if (-Not ($UserLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber })) {
-                Write-Verbose "Adding missing license $SkuPartNumber"
-                $Sku = $TenantLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber }
-                $license = @{
-                    SkuId = $Sku.SkuId
+        $LicenseSkuPartNumbers | & {
+            process {
+                $SkuPartNumber = $_
+                if (-Not ($UserLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber })) {
+                    Write-Verbose "Adding missing license $SkuPartNumber"
+                    $Sku = $TenantLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber }
+                    $license = @{
+                        SkuId = $Sku.SkuId
+                    }
+                    if ($SkuPartNumber -eq $SkuPartNumberWithExchangeServicePlan) {
+                        $license.DisabledPlans = $Sku.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
+                    }
+                    $params.AddLicenses += $license
                 }
-                if ($SkuPartNumber -eq $SkuPartNumberWithExchangeServicePlan) {
-                    $license.DisabledPlans = $Sku.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -NotMatch 'EXCHANGE') } | Select-Object -ExpandProperty ServicePlanId
-                }
-                $params.AddLicenses += $license
             }
         }
 
@@ -2194,105 +2206,105 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     else { $null }
 
     $PhotoUrl = $null
-    $response = $null
-    ForEach (
-        $url in @(
-            if ($PhotoUrlUser) { $PhotoUrlUser }
-            if ($SquareLogoRelativeUrl) {
-                ForEach ($Cdn in $tenantBranding.CdnList) {
-                    "https://$Cdn/$SquareLogoRelativeUrl"
-                }
-            }
-        )
-    ) {
-        $params = @{
-            UseBasicParsing = $true
-            Method          = 'GET'
-            Uri             = $url
-            TimeoutSec      = 10
-            ErrorAction     = 'Stop'
+    @(
+        if ($PhotoUrlUser) { $PhotoUrlUser }
+        if ($SquareLogoRelativeUrl) {
+            $tenantBranding.CdnList | & { process { "https://$_/$SquareLogoRelativeUrl" } }
         }
+    ) | & {
+        process {
+            if ($script:PhotoUrl) { return }
 
-        try {
-            $response = Invoke-WebRequest @params
-
-            if ($response.StatusCode -eq 200) {
-                if ($response.Headers.'Content-Type' -notmatch '^image/') {
-                    Write-Error "Photo from URL '$($Url)' must have Content-Type 'image/*'."
-                }
-                else {
-                    Write-Verbose "Successfully retrieved User Photo from $url"
-                    $PhotoUrl = $url
-                    break
-                }
-            }
-        }
-        catch {
-            Write-Warning "Failed to retrieve User Photo from $url"
-        }
-    }
-    if ($response) {
-        $ExoUserPhoto = $false
-        Write-Verbose 'Uploading User Photo to Microsoft Graph'
-        $params = @{
-            InFile      = 'nonExistat.lat'
-            UserId      = $UserObj.Id
-            Data        = ([System.IO.MemoryStream]::new($response.Content))
-            ErrorAction = 'Stop'
-        }
-        try {
-            Set-MgBetaUserPhotoContent @params 1> $null
-        }
-        catch {
-            if ($AdminUnitObj) {
-                $ExoUserPhoto = $true
-                Write-Verbose "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
-            }
-            else {
-                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                            Message          = $Error[0].Exception.Message
-                            ErrorId          = '500'
-                            Category         = $Error[0].CategoryInfo.Category
-                            TargetName       = $refUserObj.UserPrincipalName
-                            TargetObject     = $refUserObj.Id
-                            TargetType       = 'UserId'
-                            CategoryActivity = 'Account Provisioning: Update User Photo (Microsoft Graph PowerShell)'
-                            CategoryReason   = $Error[0].CategoryInfo.Reason
-                        }))
-            }
-        }
-
-        # This is a workaround that is announced to stop working in April 2024 due to Deprecation of Exchange Online PowerShell UserPhoto cmdlets: https://go.microsoft.com/fwlink/p/?linkid=2249705
-        if ($ExoUserPhoto) {
-            Write-Verbose 'Uploading User Photo to Exchange Online'
             $params = @{
-                Identity    = $userExObj.Identity
-                PictureData = $response.Content
-                Confirm     = $false
+                UseBasicParsing = $true
+                Method          = 'GET'
+                Uri             = $_
+                TimeoutSec      = 10
+                ErrorAction     = 'Stop'
+            }
+
+            try {
+                $return = Invoke-WebRequest @params
+                if ($return.StatusCode -eq 200) {
+                    if ($return.Headers.'Content-Type' -notmatch '^image/') {
+                        Write-Error "Photo from URL $($params.Uri) must have Content-Type 'image/*'."
+                    }
+                    else {
+                        Write-Verbose "Successfully retrieved User Photo from $($params.Uri)"
+                        $script:PhotoUrl = $params.Uri
+                        $return
+                    }
+                }
+            }
+            catch {
+                Write-Warning "Failed to retrieve User Photo from $($params.Uri)"
+            }
+        }
+    } | & {
+        process {
+            $ExoUserPhoto = $false
+
+            Write-Verbose 'Uploading User Photo to Microsoft Graph'
+            $params = @{
+                InFile      = 'nonExistat.lat'
+                UserId      = $UserObj.Id
+                Data        = ([System.IO.MemoryStream]::new($_.Content))
                 ErrorAction = 'Stop'
             }
             try {
-                Set-UserPhoto @params 1> $null
+                Set-MgBetaUserPhotoContent @params 1> $null
             }
             catch {
-                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                            Message          = $Error[0].Exception.Message
-                            ErrorId          = '500'
-                            Category         = $Error[0].CategoryInfo.Category
-                            TargetName       = $refUserObj.UserPrincipalName
-                            TargetObject     = $refUserObj.Id
-                            TargetType       = 'UserId'
-                            CategoryActivity = 'Account Provisioning: Update User Photo (Exchange Online PowerShell)'
-                            CategoryReason   = $Error[0].CategoryInfo.Reason
-                        }))
+                if ($AdminUnitObj) {
+                    $ExoUserPhoto = $true
+                    if ($Iteration -eq 1) {
+                        Write-Warning "Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
+                    }
+                }
+                else {
+                    $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                                Message          = $Error[0].Exception.Message
+                                ErrorId          = '500'
+                                Category         = $Error[0].CategoryInfo.Category
+                                TargetName       = $refUserObj.UserPrincipalName
+                                TargetObject     = $refUserObj.Id
+                                TargetType       = 'UserId'
+                                CategoryActivity = 'Account Provisioning: Update User Photo (Microsoft Graph PowerShell)'
+                                CategoryReason   = $Error[0].CategoryInfo.Reason
+                            }))
+                }
             }
-            finally {
-                Write-Warning "User $($UserObj.UserPrincipalName) ($($UserObj.Id)): User Photo update used Exchange Online cmdlet Set-UserPhoto that is announced to stop working in April 2024 due to deprecation of Exchange Online PowerShell UserPhoto cmdlets, see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
+
+            # This is a workaround that is announced to stop working in April 2024 due to Deprecation of Exchange Online PowerShell UserPhoto cmdlets: https://go.microsoft.com/fwlink/p/?linkid=2249705
+            if ($ExoUserPhoto) {
+                Write-Verbose 'Uploading User Photo to Exchange Online'
+                $params = @{
+                    Identity      = $userExObj.Identity
+                    PictureData   = $_.Content
+                    Confirm       = $false
+                    ErrorAction   = 'Stop'
+                    WarningAction = 'SilentlyContinue'
+                }
+                try {
+                    Set-UserPhoto @params 1> $null
+                }
+                catch {
+                    $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                                Message          = $Error[0].Exception.Message
+                                ErrorId          = '500'
+                                Category         = $Error[0].CategoryInfo.Category
+                                TargetName       = $refUserObj.UserPrincipalName
+                                TargetObject     = $refUserObj.Id
+                                TargetType       = 'UserId'
+                                CategoryActivity = 'Account Provisioning: Update User Photo (Exchange Online PowerShell)'
+                                CategoryReason   = $Error[0].CategoryInfo.Reason
+                            }))
+                }
+                if ($Iteration -eq 1) {
+                    Write-Warning "User Photo update used Exchange Online cmdlet Set-UserPhoto that is announced to stop working in April 2024 due to deprecation of Exchange Online PowerShell UserPhoto cmdlets, see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
+                }
             }
         }
-    }
-    else {
-        Write-Error "Failed to retrieve User Photo from all URLs"
     }
     #endregion ---------------------------------------------------------------------
 
@@ -2318,9 +2330,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         DeliverToMailboxandForward = $userExMbObj.DeliverToMailboxandForward
     }
 
-    ForEach ($property in $userProperties) {
-        if ($null -eq $data.$property) {
-            $data.$property = $UserObj.$property
+    $userProperties | & {
+        process {
+            if ($null -eq $data.$_) {
+                $data.$_ = $UserObj.$_
+            }
         }
     }
 
@@ -2348,6 +2362,9 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
     return $data
 }
 
+$LocalUserId = @( .\Common_0002__Convert-UserIdToLocalUserId.ps1 -UserId $ReferralUserId -VerifiedDomains $tenant.VerifiedDomains )
+if ($LocalUserId.Count -ne $ReferralUserId.Count) { Throw 'ReferralUserId count must not be different after LocalUserId conversion.' }
+
 0..$($ReferralUserId.Count) | & {
     process {
         if ([string]::IsNullOrEmpty($ReferralUserId[$_])) { return }
@@ -2357,10 +2374,11 @@ function ProcessReferralUser ($ReferralUserId, $Tier, $UserPhotoUrl) {
         [GC]::WaitForPendingFinalizers()
         $params = @{
             ReferralUserId = $ReferralUserId[$_]
+            LocalUserId    = $LocalUserId[$_]
             Tier           = $Tier[$_]
             UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl) -or [string]::IsNullOrEmpty($UserPhotoUrl[$_])) { $null } else { $UserPhotoUrl[$_] }
         }
-        $returnOutput.Add((ProcessReferralUser @params))
+        $null = $returnOutput.Add((ProcessReferralUser @params))
     }
 }
 #endregion ---------------------------------------------------------------------
@@ -2375,10 +2393,18 @@ $return.Job.EndTime = (Get-Date).ToUniversalTime()
 $return.Job.Runtime = $return.Job.EndTime - $return.Job.StartTime
 $return.Job.Waittime = $return.Job.CreationTime - $return.Job.StartTime
 
-if ($Webhook) { .\Common_0000__Submit-Webhook.ps1 -Uri $Webhook -Body $return 1> $null }
-$InformationPreference = $origInformationPreference
-if (($true -eq $OutText) -or ($PSBoundParameters.Keys -contains 'OutJson') -and ($false -eq $OutJson)) { return }
-if ($OutJson) { .\Common_0000__Write-JsonOutput.ps1 $return; return }
+Write-Verbose "Total Waittime: $([math]::Floor($return.Job.Waittime.TotalSeconds)) sec ($([math]::Round($return.Job.Waittime.TotalMinutes, 1)) min)"
+Write-Verbose "Total Runtime: $([math]::Floor($return.Job.Runtime.TotalSeconds)) sec ($([math]::Round($return.Job.Runtime.TotalMinutes, 1)) min)"
 
-return $return
+if ($Webhook) { .\Common_0000__Submit-Webhook.ps1 -Uri $Webhook -Body $return 1> $null }
+
+if (
+    ($OutText -eq $true) -or
+    (($PSBoundParameters.Keys -contains 'OutJson') -and ($OutJson -eq $false)) -or
+    (($PSBoundParameters.Keys -contains 'OutObject') -and ($OutObject -eq $false))
+) { return }
+
+if ($OutJson) { .\Common_0000__Write-JsonOutput.ps1 $return; return }
+if ($OutObject -eq $true) { return $return }
+if ($VerbosePreference -ne 'Continue') { Write-Output "Success = $($return.Success)" }
 #endregion ---------------------------------------------------------------------

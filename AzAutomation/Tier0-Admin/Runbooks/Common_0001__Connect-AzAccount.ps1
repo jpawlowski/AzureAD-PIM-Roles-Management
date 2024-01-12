@@ -44,8 +44,8 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Module.ps1 -Modules @(
@@ -87,7 +87,7 @@ if (-Not (Get-AzContext)) {
 
                 $AzAutomationAccount = Get-AzAutomationAccount -DefaultProfile $Context -ErrorAction Stop | Where-Object { $_.AutomationAccountName -eq $env:MG_PRINCIPAL_DISPLAYNAME }
                 if ($AzAutomationAccount) {
-                    Write-Verbose 'Retreived Automation Account details'
+                    Write-Verbose 'Retrievedd Automation Account details'
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_SubscriptionId', $AzAutomationAccount.SubscriptionId)
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_ResourceGroupName', $AzAutomationAccount.ResourceGroupName)
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_AccountName', $AzAutomationAccount.AutomationAccountName)
@@ -99,18 +99,27 @@ if (-Not (Get-AzContext)) {
 
                         $AzAutomationJob = Get-AzAutomationJob -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Id $PSPrivateMetadata.JobId -ErrorAction Stop
                         if ($AzAutomationJob) {
-                            Write-Verbose 'Retreived Automation Job details'
+                            Write-Verbose 'Retrievedd Automation Job details'
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_Name', $AzAutomationJob.RunbookName)
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_CreationTime', $AzAutomationJob.CreationTime.ToUniversalTime())
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_StartTime', $AzAutomationJob.StartTime.ToUniversalTime())
 
                             $AzAutomationRunbook = Get-AzAutomationRunbook -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Name $AzAutomationJob.RunbookName -ErrorAction Stop
                             if ($AzAutomationRunbook) {
-                                Write-Verbose 'Retreived Automation Runbook details'
+                                Write-Verbose 'Retrievedd Automation Runbook details'
                                 [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_CreationTime', $AzAutomationRunbook.CreationTime.ToUniversalTime())
                                 [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_LastModifiedTime', $AzAutomationRunbook.LastModifiedTime.ToUniversalTime())
                             }
+                            else {
+                                Throw "Unable to find own Automation Runbook details for runbook name $($AzAutomationJob.RunbookName)"
+                            }
                         }
+                        else {
+                            Throw "Unable to find own Automation Job details for job Id $($PSPrivateMetadata.JobId)"
+                        }
+                    }
+                    else {
+                        Throw 'Missing global variable $PSPrivateMetadata.JobId'
                     }
                 }
                 else {
@@ -130,5 +139,5 @@ if (-Not (Get-AzContext)) {
     }
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

@@ -39,8 +39,8 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0000__Import-Module.ps1 -Modules @(
@@ -51,15 +51,15 @@ $StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
 
 #region FUNCTIONS --------------------------------------------------------------
 function Get-MgMissingScope ([Array]$Scopes) {
-    $MissingScopes = [System.Collections.ArrayList]@()
+    $MissingScopes = [System.Collections.ArrayList]::new()
 
     foreach ($Scope in $Scopes) {
         if ($WhatIfPreference -and ($Scope -like '*Write*')) {
             Write-Verbose "What If: Removed $Scope from required Microsoft Graph scopes"
-            $Scopes.Remove($Scope)
+            $null = $script:Scopes.Remove($Scope)
         }
         elseif ($Scope -notin @((Get-MgContext).Scopes)) {
-            $MissingScopes.Add($Scope)
+            $null = $MissingScopes.Add($Scope)
         }
     }
     return $MissingScopes
@@ -171,5 +171,5 @@ catch {
     Throw $_
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

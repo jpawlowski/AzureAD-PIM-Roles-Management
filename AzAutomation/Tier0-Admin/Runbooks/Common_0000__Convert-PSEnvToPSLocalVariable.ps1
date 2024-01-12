@@ -32,81 +32,83 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
-foreach ($Item in $Variable) {
-    # Script parameters be of type array/collection and be processed during a loop,
-    # and therefore updated multiple times
-    if (
-        (($scriptParameterOnly -eq $true) -and ($null -eq $Item.respectScriptParameter)) -or
-        (($scriptParameterOnly -eq $false) -and ($null -ne $Item.respectScriptParameter))
-    ) { continue }
+$Variable | & {
+    process {
+        # Script parameters be of type array/collection and be processed during a loop,
+        # and therefore updated multiple times
+        if (
+            (($scriptParameterOnly -eq $true) -and ($null -eq $_.respectScriptParameter)) -or
+            (($scriptParameterOnly -eq $false) -and ($null -ne $_.respectScriptParameter))
+        ) { return }
 
-    if ($null -eq $Item.mapToVariable) {
-        Write-Warning "[$($Item.sourceName) --> `$script:???] Missing mapToVariable property in configuration."
-        continue
-    }
+        if ($null -eq $_.mapToVariable) {
+            Write-Warning "[$($_.sourceName) --> `$script:???] Missing mapToVariable property in configuration."
+            return
+        }
 
-    $params = @{
-        Name  = $Item.mapToVariable
-        Scope = 1
-        Force = $true
-    }
+        $params = @{
+            Name  = $_.mapToVariable
+            Scope = 2
+            Force = $true
+        }
 
-    if (-Not $Item.respectScriptParameter) { $params.Option = 'Constant' }
+        if (-Not $_.respectScriptParameter) { $params.Option = 'Constant' }
 
-    if (
-        ($Item.respectScriptParameter) -and
-        ($null -ne $(Get-Variable -Name $Item.respectScriptParameter -Scope $params.Scope -ValueOnly -ErrorAction SilentlyContinue))
-    ) {
-        $params.Value = Get-Variable -Name $Item.respectScriptParameter -Scope $params.Scope -ValueOnly
-        Write-Verbose "[$($Item.sourceName) --> `$script:$($params.Name)] Using value from script parameter $($Item.respectScriptParameter)"
-    }
-    elseif ([Environment]::GetEnvironmentVariable($Item.sourceName)) {
-        $params.Value = (Get-ChildItem -Path "env:$($Item.sourceName)").Value
-        Write-Verbose "[$($Item.sourceName) --> `$script:$($params.Name)] Using value from `$env:$($Item.sourceName)"
-    }
-    elseif ($Item.ContainsKey('defaultValue')) {
-        $params.Value = $Item.defaultValue
-        Write-Verbose "[$($Item.sourceName) --> `$script:$($params.Name)] `$env:$($Item.sourceName) not found, using built-in default value"
-    }
-    else {
-        Write-Error "[$($Item.sourceName) --> `$script:$($params.Name)] Missing default value in configuration."
-        continue
-    }
-
-    if (
-        (-Not $Item.Regex) -and
-        (($params.Value -ne $false) -and ($params.Value -ne $true))
-    ) {
-        if ($Item.ContainsKey('defaultValue')) {
-            $params.Value = $Item.defaultValue
-            Write-Warning "[$($Item.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, using built-in default value"
+        if (
+            ($_.respectScriptParameter) -and
+            ($null -ne $(Get-Variable -Name $_.respectScriptParameter -Scope $params.Scope -ValueOnly -ErrorAction SilentlyContinue))
+        ) {
+            $params.Value = Get-Variable -Name $_.respectScriptParameter -Scope $params.Scope -ValueOnly
+            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] Using value from script parameter $($_.respectScriptParameter)"
+        }
+        elseif ([Environment]::GetEnvironmentVariable($_.sourceName)) {
+            $params.Value = (Get-ChildItem -Path "env:$($_.sourceName)").Value
+            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] Using value from `$env:$($_.sourceName)"
+        }
+        elseif ($_.ContainsKey('defaultValue')) {
+            $params.Value = $_.defaultValue
+            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] `$env:$($_.sourceName) not found, using built-in default value"
         }
         else {
-            Write-Error "[$($Item.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, and no default value was found in configuration."
-            continue
+            Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Missing default value in configuration."
+            return
         }
-    }
 
-    if (
-        $Item.Regex -and
-        (-Not [String]::IsNullOrEmpty($params.Value)) -and
-        ($params.Value -notmatch $Item.Regex)
-    ) {
-        $params.Value = $null
-        if ($Item.ContainsKey('defaultValue')) {
-            $params.Value = $Item.defaultValue
-            Write-Warning "[$($Item.sourceName) --> `$script:$($params.Name)] Value does not match '$($Item.Regex)', using built-in default value"
+        if (
+            (-Not $_.Regex) -and
+            (($params.Value -ne $false) -and ($params.Value -ne $true))
+        ) {
+            if ($_.ContainsKey('defaultValue')) {
+                $params.Value = $_.defaultValue
+                Write-Warning "[$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, using built-in default value"
+            }
+            else {
+                Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, and no default value was found in configuration."
+                return
+            }
         }
-        else {
-            Write-Error "[$($Item.sourceName) --> `$script:$($params.Name)] Value does not match '$($Item.Regex)', and no default value was found in configuration."
-            continue
+
+        if (
+            $_.Regex -and
+            (-Not [String]::IsNullOrEmpty($params.Value)) -and
+            ($params.Value -notmatch $_.Regex)
+        ) {
+            $params.Value = $null
+            if ($_.ContainsKey('defaultValue')) {
+                $params.Value = $_.defaultValue
+                Write-Warning "[$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', using built-in default value"
+            }
+            else {
+                Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', and no default value was found in configuration."
+                return
+            }
         }
+        New-Variable @params
     }
-    New-Variable @params
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

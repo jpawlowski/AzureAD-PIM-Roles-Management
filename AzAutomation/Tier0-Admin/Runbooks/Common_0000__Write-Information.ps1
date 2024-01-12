@@ -29,7 +29,7 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-# Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+# Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
 
 $params = if ($Param) {
     if ($Param -is [String]) {
@@ -48,9 +48,11 @@ if (-Not $params.MessageData -and $params.Message) {
     $params.Remove('Message')
 }
 $iparams = @{}
-foreach ($key in $params.Keys) {
-    if ($key -notin 'MessageData', 'Tags') { continue }
-    $iparams.$key = $params.$key
+$params.Keys | & {
+    process {
+        if ($_ -notin 'MessageData', 'Tags') { return }
+        $iparams.$_ = $params.$_
+    }
 }
 $params.Message = $params.MessageData
 $params.Remove('MessageData')

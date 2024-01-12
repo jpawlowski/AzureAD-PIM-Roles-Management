@@ -50,13 +50,13 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
-$missingRoles = [System.Collections.ArrayList]@()
-$RoleAssignments = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
-$GlobalAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq '62e90394-69f5-4237-9190-012177145e10' }
-$PrivRoleAdmin = $RoleAssignments | Where-Object { $_.RoleDefinition.TemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814' }
+$missingRoles = [System.Collections.ArrayList]::new()
+$return = .\Common_0002__Get-MgDirectoryRoleActiveAssignment.ps1
+$GlobalAdmin = $return | Where-Object { $_.RoleDefinition.TemplateId -eq '62e90394-69f5-4237-9190-012177145e10' }
+$PrivRoleAdmin = $return | Where-Object { $_.RoleDefinition.TemplateId -eq 'e8611ab8-c189-46e8-94e1-60213ab1f814' }
 
 if ($GlobalAdmin) {
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
@@ -139,11 +139,11 @@ foreach (
     $TemplateId = if ($Item -is [String]) { if ($Item -match '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') { $Item } else { $null } } else { $Item.TemplateId }
     $DisplayName = if ($Item -is [String]) { if ($Item -notmatch '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$') { $Item } else { $null } } else { $Item.DisplayName }
     $Optional = if ($Item -is [String]) { $false } else { $Item.Optional }
-    $AssignedRole = $RoleAssignments | Where-Object { ($_.DirectoryScopeId -eq $DirectoryScopeId) -and (($_.RoleDefinition.TemplateId -eq $TemplateId) -or ($_.RoleDefinition.DisplayName -eq $DisplayName)) }
+    $AssignedRole = $return | Where-Object { ($_.DirectoryScopeId -eq $DirectoryScopeId) -and (($_.RoleDefinition.TemplateId -eq $TemplateId) -or ($_.RoleDefinition.DisplayName -eq $DisplayName)) }
     $superseededRole = $false
     if (-Not $AssignedRole -and $DirectoryScopeId -ne '/') {
         $superseededRole = $true
-        $AssignedRole = $RoleAssignments | Where-Object { ($_.DirectoryScopeId -eq '/') -and (($_.RoleDefinition.TemplateId -eq $TemplateId) -or ($_.RoleDefinition.DisplayName -eq $DisplayName)) }
+        $AssignedRole = $return | Where-Object { ($_.DirectoryScopeId -eq '/') -and (($_.RoleDefinition.TemplateId -eq $TemplateId) -or ($_.RoleDefinition.DisplayName -eq $DisplayName)) }
     }
     if ($AssignedRole) {
         if ($superseededRole) {
@@ -164,7 +164,7 @@ foreach (
             Write-Warning "Superseeded directory role by active Global Administrator: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
         }
         else {
-            $missingRoles.Add(@{ DirectoryScopeId = $DirectoryScopeId; TemplateId = $TemplateId; DisplayName = $DisplayName })
+            $null = $missingRoles.Add(@{ DirectoryScopeId = $DirectoryScopeId; TemplateId = $TemplateId; DisplayName = $DisplayName })
         }
     }
 }
@@ -173,6 +173,6 @@ if ($missingRoles.Count -gt 0) {
     Throw "Missing mandatory directory role permissions:`n$($missingRoles | ConvertTo-Json)"
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'RoleAssignments') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
-return $RoleAssignments
+return $return

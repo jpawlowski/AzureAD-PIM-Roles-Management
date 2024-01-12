@@ -28,8 +28,8 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 try {
     if ((Get-Module).Name -match 'Microsoft.Graph.Beta') {
@@ -41,7 +41,7 @@ try {
         ) 1> $null
         #endregion ---------------------------------------------------------------------
 
-        $return = [System.Collections.ArrayList]@()
+        $return = [System.Collections.ArrayList]::new()
 
         if ((Get-MgContext).AuthType -eq 'Delegated') {
             $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment `
@@ -71,9 +71,9 @@ try {
         }
 
         if ($null -eq $App) {
-            $Apps = [System.Collections.ArrayList]@()
+            $Apps = [System.Collections.ArrayList]::new()
             foreach ($Item in $AppRoleAssignments) {
-                $Apps.Add($Item.ResourceId)
+                $null = $Apps.Add($Item.ResourceId)
             }
         }
         else {
@@ -112,10 +112,10 @@ try {
                 continue
             }
 
-            $AppRoles = [System.Collections.ArrayList]@()
+            $AppRoles = [System.Collections.ArrayList]::new()
             if ($AppRoleAssignments) {
                 foreach ($appRoleId in ($AppRoleAssignments | Where-Object ResourceId -eq $AppResource.Id | Select-Object -ExpandProperty AppRoleId -Unique)) {
-                    $AppRoles.Add(($AppResource.AppRoles | Where-Object Id -eq $appRoleId | Select-Object -ExpandProperty Value))
+                    $null = $AppRoles.Add(($AppResource.AppRoles | Where-Object Id -eq $appRoleId | Select-Object -ExpandProperty Value))
                 }
             }
 
@@ -129,15 +129,15 @@ try {
                         }
                         $Permission.Scope.Trim() -split ' ' | ForEach-Object {
                             if (-Not $Oauth2PermissionScopes.$PrincipalTypeName) {
-                                $Oauth2PermissionScopes.$PrincipalTypeName = [System.Collections.ArrayList]@()
+                                $Oauth2PermissionScopes.$PrincipalTypeName = [System.Collections.ArrayList]::new()
                             }
-                            ($Oauth2PermissionScopes.$PrincipalTypeName).Add($_)
+                            $null = ($Oauth2PermissionScopes.$PrincipalTypeName).Add($_)
                         }
                     }
                 }
             }
 
-            $return.Add(
+            $null = $return.Add(
                 @{
                     AppId                  = $AppResource.AppId
                     DisplayName            = $AppResource.DisplayName
@@ -155,7 +155,7 @@ try {
         ) 1> $null
         #endregion ---------------------------------------------------------------------
 
-        $return = [System.Collections.ArrayList]@()
+        $return = [System.Collections.ArrayList]::new()
 
         if ((Get-MgContext).AuthType -eq 'Delegated') {
             $AppRoleAssignments = Get-MgUserAppRoleAssignment `
@@ -185,9 +185,9 @@ try {
         }
 
         if ($null -eq $App) {
-            $Apps = [System.Collections.ArrayList]@()
+            $Apps = [System.Collections.ArrayList]::new()
             foreach ($Item in $AppRoleAssignments) {
-                $Apps.Add($Item.ResourceId)
+                $null = $Apps.Add($Item.ResourceId)
             }
         }
         else {
@@ -226,10 +226,10 @@ try {
                 continue
             }
 
-            $AppRoles = [System.Collections.ArrayList]@()
+            $AppRoles = [System.Collections.ArrayList]::new()
             if ($AppRoleAssignments) {
                 foreach ($appRoleId in ($AppRoleAssignments | Where-Object ResourceId -eq $AppResource.Id | Select-Object -ExpandProperty AppRoleId -Unique)) {
-                    $AppRoles.Add(($AppResource.AppRoles | Where-Object Id -eq $appRoleId | Select-Object -ExpandProperty Value))
+                    $null = $AppRoles.Add(($AppResource.AppRoles | Where-Object Id -eq $appRoleId | Select-Object -ExpandProperty Value))
                 }
             }
 
@@ -243,15 +243,15 @@ try {
                         }
                         $Permission.Scope.Trim() -split ' ' | ForEach-Object {
                             if (-Not $Oauth2PermissionScopes.$PrincipalTypeName) {
-                                $Oauth2PermissionScopes.$PrincipalTypeName = [System.Collections.ArrayList]@()
+                                $Oauth2PermissionScopes.$PrincipalTypeName = [System.Collections.ArrayList]::new()
                             }
-                            ($Oauth2PermissionScopes.$PrincipalTypeName).Add($_)
+                            $null = ($Oauth2PermissionScopes.$PrincipalTypeName).Add($_)
                         }
                     }
                 }
             }
 
-            $return.Add(
+            $null = $return.Add(
                 @{
                     AppId                  = $AppResource.AppId
                     DisplayName            = $AppResource.DisplayName
@@ -266,6 +266,6 @@ catch {
     Throw $_
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

@@ -23,11 +23,13 @@
 #>
 
 [CmdletBinding()]
-Param()
+Param(
+    [Array]$Variable
+)
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
-$StartupVariables = (Get-Variable | ForEach-Object { $_.Name })
+Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
+$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
 
@@ -50,22 +52,25 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         Throw $_
     }
 
-    foreach ($AutomationVariable in $AutomationVariables) {
-        if ($AutomationVariable.GetType().Name -ne 'String') {
-            Write-Verbose "SKIPPING $($AutomationVariable.Name) because it is not a String but '$($AutomationVariable.GetType().Name)'"
-            continue
+    $AutomationVariables | & {
+        process {
+            if (($null -ne $script:Variable) -and ($_.Name -notin $script:Variable)) { return }
+            if ($_.Value.GetType().Name -ne 'String') {
+                Write-Verbose "SKIPPING $($_.Name) because it is not a String but '$($_.GetType().Name)'"
+                return
+            }
+            elseif ([string]::IsNullOrEmpty($_.Value)) {
+                Write-Verbose "SKIPPING $($_.Name) because it has NullOrEmpty value"
+                return
+            }
+            Write-Verbose "Setting `$env:$($_.Name)"
+            [Environment]::SetEnvironmentVariable($_.Name, $_.Value)
         }
-        elseif ([string]::IsNullOrEmpty($AutomationVariable.Value)) {
-            Write-Verbose "SKIPPING $($AutomationVariable.Name) because it has NullOrEmpty value"
-            continue
-        }
-        Write-Verbose "Setting `$env:$($AutomationVariable.Name)"
-        [Environment]::SetEnvironmentVariable($AutomationVariable.Name, $AutomationVariable.Value)
     }
 }
 else {
     Write-Verbose 'Not running in Azure Automation. Script environment variables must be set manually before local run.'
 }
 
-Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | ForEach-Object { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false }
+Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"

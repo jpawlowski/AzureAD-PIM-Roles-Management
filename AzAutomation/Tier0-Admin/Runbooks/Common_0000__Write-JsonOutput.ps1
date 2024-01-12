@@ -31,12 +31,12 @@ Param(
 )
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
-# Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name + ': ' + $_.Value } }) -join ', ') ---"
+# Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
 
 $params = if ($ConvertToParam) { $ConvertToParam.Clone() } else { @{} }
 if ($null -eq $params.Compress) {
     $params.Compress = $true
-    if ('Continue' -eq $VerbosePreference) { $params.Compress = $false }
+    if ($VerbosePreference -eq 'Continue') { $params.Compress = $false }
 }
 if ($null -eq $params.Depth) { $params.Depth = 100 }
 

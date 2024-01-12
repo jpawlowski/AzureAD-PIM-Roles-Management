@@ -337,7 +337,7 @@ function Update-Entra-CA-Policies {
                 $BodyParameter.Remove('Description')    # As long as description property for CA policies is read-only in Microsoft Graph backend, we can't send it :-(
 
                 # Resolve excludeGroups
-                $excludeGroups = [System.Collections.ArrayList]@()
+                $excludeGroups = [System.Collections.ArrayList]::new()
                 if ($null -ne $BodyParameter.conditions.users.excludeGroups) {
                     [System.Collections.ArrayList]$excludeGroups = $BodyParameter.conditions.users.excludeGroups
                 }
