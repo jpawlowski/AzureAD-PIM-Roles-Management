@@ -30,6 +30,127 @@
 
     That way, flexible configuration can be provided with easy control as part of the Azure Automation Account.
     Also, script runtime parameters can be reduced to the absolute minimum to improve security.
+
+.NOTES
+    CUSTOM CONFIGURATION SETTINGS
+    =============================
+
+    Variables for custom configuration settings, either from $env:<VariableName>,
+    or Azure Automation Account Variables, whose will automatically be published in $env.
+
+    ********************************************************************************************************
+    * Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2. *
+    * For example: AV_CloudAdminTier0_GroupId, AV_CloudAdminTier1_GroupId, AV_CloudAdminTier2_GroupId      *
+    ********************************************************************************************************
+
+    AV_CloudAdmin_RestrictedAdminUnitId - [String] - Default Value: $null
+        ...
+
+    AV_CloudAdmin_AccountTypeExtensionAttribute - [Integer] - Default Value: 15
+        Save user account type information in this extension attribute. Content from the referral user will be copied and the Cloud Administrator
+        information is added either as prefix or suffix (see AV_CloudAdminTier<Tier>_ExtensionAttribute* settings below).
+
+    AV_CloudAdmin_AccountTypeEmployeeType - [Boolean] - Default Value: $true
+        ...
+
+    AV_CloudAdmin_ReferenceExtensionAttribute - [Integer] - Default Value: 14
+        ...
+
+    AV_CloudAdmin_ReferenceManager - [Boolean] - Default Value: $false
+        ...
+
+    AV_CloudAdmin_Webhook - [String] - Default Value: $null
+        Send return data in JSON format as POST to this webhook URL.
+
+    AV_CloudAdminTier0_AccountRestrictedAdminUnitId
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountAdminUnitId
+        Tier 1 and 2 only, see AV_CloudAdminTier0_AccountRestrictedAdminUnitId for Tier 0.
+
+    AV_CloudAdminTier<Tier>_UserPhotoUrl - [String] - Default Value: <empty>
+        Default value for script parameter UserPhotoUrl. If no parameter was provided, this value will be used instead.
+        If no value was provided at all, the tenant's square logo will be used.
+
+    AV_CloudAdminTier<Tier>_LicenseSkuPartNumber - [String] - Default Value: EXCHANGEDESKLESS
+        License assigned to the dedicated admin user account. The license SKU part number must contain an Exchange Online service plan to generate a mailbox
+        for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
+        Multiple licenses may be assigned using a whitespace delimiter.
+        For the license containing the Exchange Online service plan, only that service plan is enabled for the user, any other service plan within that license will be disabled.
+        If GroupId is also provided, group-based licensing is implied and Exchange Online service plan activation will only be monitored before continuing.
+
+    AV_CloudAdminTier<Tier>_GroupId - [String] - Default Value: <empty>
+        Entra Group Object ID where the user shall be added. If the group is dynamic, group membership update will only be monitored before continuing.
+
+    AV_CloudAdminTier<Tier>_GroupDescription - [String] - Default Value: Tier <Tier> Cloud Administrators
+        ...
+
+    AV_CloudAdminTier<Tier>_DedicatedAccount - [Boolean] - Default Value: $true for Tier 0, $false for Tier 1 and 2
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountDomain - [String] - Default Value: onmicrosoft.com
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypePrefix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypePrefixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypeSuffix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypeSuffixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributePrefix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributePrefixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributeSuffix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributeSuffixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserDisplayNamePrefix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserDisplayNamePrefixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserDisplayNameSuffix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserDisplayNameSuffixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_GivenNamePrefix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_GivenNamePrefixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_GivenNameSuffix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_GivenNameSuffixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserPrincipalNamePrefix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserPrincipalNamePrefixSeparator - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserPrincipalNameSuffix - [String] - Default Value: 
+        ...
+
+    AV_CloudAdminTier<Tier>_UserPrincipalNameSuffixSeparator - [String] - Default Value: 
+        ...
+
 #>
 
 [OutputType([array])]

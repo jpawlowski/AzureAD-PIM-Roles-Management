@@ -16,28 +16,31 @@
 
 <#
 .SYNOPSIS
-    Create or update a dedicated cloud native account for administrative purposes in Tier 0, 1, or 2
+    Activate or update a user account for Cloud Administration in in Tier 0, 1, or 2
 
 .DESCRIPTION
-    Create a dedicated cloud native account for administrative purposes that can perform privileged tasks in Tier 0.
+    For Tier 0 access, a dedicated cloud native account for is created and its lifecycle is bound to the referring account.
     For Tier 1 and Tier 2, the creation of a dedicated user account is optional depending on your custom configuration, so that only a precondition check is performed before the user is added to the respective security group.
+    Also, external or guest accounts may be activated for Cloud Administration in Tier 1 or Tier 2.
 
-    For dedicated admin accounts, User Principal Name and mail address will use the initial .onmicrosoft.com domain of the respective Entra ID tenant.
-    The admin account will be referred to the main user account from ReferralUserId by using the manager property as well as using the same Employee information (if set).
-    To identify as a Cloud Administrator account, the EmployeeType property will be used so that it can be used as an alternative to the UPN naming convention.
-    Also, an extension attribute is used to reflect the account type. If the same extension attribute is also used for the referring account, it is copied and a prefix/suffix is added to represent the respective Tier level.
-    Permanent e-mail forwarding to the referring user ID will be configured to receive notifications, e.g. from Entra Privileged Identity Management.
+    For dedicated admin accounts, User Principal Name and mail address use the initial .onmicrosoft.com domain of the respective Entra ID tenant, but may also be configured to use a custom domain.
+    Other attributes are mostly copied from the referring user ID. The admin account holds a reference by using extensionAttribute14 conisting the object ID.
+    To identify as a Cloud Administrator account, extensionAttribute15 reflects the respective Tier level so that it can be used for dynamic membership rules in administrative units and security groups.
+    Permanent email forwarding to the referring user ID is configured to receive notifications, e.g. from Entra Privileged Identity Management so that admins are aware of expiring directory role assignments.
+
+    For dedicated admin accounts that exist already, they will be updated with information from the referring user account.
 
     NOTE: This script uses the Microsoft Graph Beta API as it requires support for Restricted Management Administrative Units which is not available in the stable API.
 
 .PARAMETER ReferralUserId
     User account identifier of the existing main user account. May be an Entra Identity Object ID or User Principal Name (UPN).
+    External or guest accounts are converted to their local User Principal Name automatically.
 
 .PARAMETER Tier
-    The Tier level where the Cloud Administrator account shall be created.
+    The Tier level where access should be granted.
 
 .PARAMETER UserPhotoUrl
-    URL of an image that shall be set as default photo for the user. Must use HTTPS protocol, end with .jpg/.jpeg/.png/?*, and use image/* as Content-Type in HTTP return header.
+    URL of an image that shall be set as default photo for the user. Must use HTTPS protocol, end with .jpg/.jpeg/.png/?*, and server must return image/* as Content-Type in HTTP header.
     If environment variable $env:AV_CloudAdminTier<Tier>_UserPhotoUrl is set, it will be used as a fallback option.
     In case no photo URL was provided at all, Entra square logo from organizational tenant branding will be used.
     The recommended size of the photo is 648x648 px.
@@ -45,165 +48,99 @@
 .PARAMETER JobReference
     This information may be added for back reference in other IT systems. It will simply be added to the Job data.
 
+.PARAMETER OutObject
+    Output the result as object, e.g. when working with PowerShell pipelining.
+
 .PARAMETER OutputJson
     Output the result in JSON format.
     This is useful when output data needs to be processed in other IT systems after the job was completed.
 
-.PARAMETER OutputText
+.PARAMETER OutText
     Output the generated User Principal Name only.
 
+.OUTPUTS
+    Output may be requested by using one of the parameters -OutObject, -OutputJson, or -OutText.
+    Otherwise, a Success text output is generated, indicating if all referring user IDs where activated for Cloud Administration.
+
 .NOTES
-    CONDITIONS TO CREATE A CLOUD ADMINISTRATOR ACCOUNT
-    ==================================================
+    CONDITIONS TO ENABLE A USER FOR CLOUD ADMINISTRATION
+    ====================================================
 
-    Following conditions must be met to create a Cloud Administrator account:
+    Depending on the requested Tier level, a dedicated Cloud Administrator account may be created, or the requesting account is enabled directly.
+    For example, Tier 0 access always requires a dedicated Cloud Administrator account, while for Tier 1 access, the user account is activated directly.
 
-         1. A free license with Exchange Online plan must be available.
-         2. Referral user ID must exist.
-         3. Referral user ID must be an ordinary user account.
-         4. Referral user ID must not use a onmicrosoft.com subdomain.
-         5. Referral user ID must be enabled.
-         6. Referral user ID must be of directory type Member.
-         7. Referral user ID must have a manager.
-         8. If Referral user ID has EmployeeHireDate, the date and time must be reached.
-         9. If Referral user ID has EmployeeLeaveDateTime, the current date and time must be at least 45 days before.
-        10. If tenant has on-premises directory sync enabled, referral user ID must be a hybrid user account.
-        11. Referral user ID must have a mailbox of type UserMailbox.
+    External or guest users may also be used for Cloud Administration, depending on the required Tier access.
+    For example, Tier 0 and Tier 1 access is prohibited while Tier 2 access may be enabled.
+
+    Depending if a referring user ID is internal or external, different preconditions are validated:
+
+        Overall tenant readiness:
+            1. Microsoft Graph permissions of the logged in user / application ID / managed identity.
+            2. Entra directory permissions of the logged in user / application ID / managed identity.
+            3. Exchange Online permissions of the logged in user / application ID / managed identity.
+            4. Exchange Online subscription MUST exist.
+            5. Administrative Unit settings must be secure:
+                - For Cloud Administration security groups and Tier 0 admin accounts, Restricted Management MUST be enabled and visibility set to HiddenMembership. This may be optional for Tier 1 and Tier 2 admin units.
+                - Must NOT use dynamic membership for Cloud Administration groups.
+                - SHOULD use dynamic membership for Tier 0, Tier 1, and Tier 2 admin accounts.
+            6. Security groups for Tier level access must be secure:
+                - Must NOT be synced from on-premises (and never have been)
+                - Must NOT be a Unified Group
+                - Must NOT be email enabled
+                - Protected by a Management Restricted Administrative Unit (preferred)
+                - OR by having role assignment capablitity enabled (requires permanent Privileged Role Administrator assignment)
+                - Must NOT use dynamic membership for Tier 0, MAY use for Tier 1 and Tier 2 (not recommended). When no dedicated admin accounts are used, the group MUST be static.
+                - SHOULD use a specific description to avoid addressing the wrong group
+                - Must NOT have any grou owners assigned (otherwise, they will be removed immediately)
+
+        All referring user IDs:
+            1. Must exist.
+            2. Must be enabled.
+            3. Must NOT be a resource account.
+            4. Must NOT use email OTP authentication.
+            5. Must NOT be a facebook.com identity.
+            6. Must NOT be a personal Microsoft Account.
+            7. Must have a display name.
+
+        Internal referring user IDs:
+            1. When set, EmployeeHireDate must be in the past.
+            2. When set, EmployeeLeaveDateTime must be more than 45 days in the future.
+            3. Must NOT use the same domain as a dedicated admin account (only when dedicated account is created).
+            4. Must NOT use onmicrosoft.com domain.
+            6. Must be a hybrid user if tenant has on-premises directory sync enabled.
+            5. Must have a manager.
+            7. Must have a mailbox of type UserMailbox.
+            8. Free license with Exchange Online plan must be available (only when dedicated account is created).
+
+        External referring user IDs:
+            1. Must NOT be a personal Microsoft Account.
 
     In case an existing Cloud Administrator account was found for referral user ID, it must be a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
     If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
     The user part of the Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
 
 
+    DIFFERENTIATE BETWEEN INTERNAL AND EXTERNAL USER ACCOUNTS
+    =========================================================
+
+    bla bla bla bla bla bla bla bla bla bla bla bla
+
+
     CUSTOM CONFIGURATION SETTINGS
     =============================
 
-    Variables for custom configuration settings, either from $env:<VariableName>,
-    or Azure Automation Account Variables, whose will automatically be published in $env.
-
-    ********************************************************************************************************
-    * Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2. *
-    * For example: AV_CloudAdminTier0_GroupId, AV_CloudAdminTier1_GroupId, AV_CloudAdminTier2_GroupId      *
-    ********************************************************************************************************
-
-    AV_CloudAdmin_RestrictedAdminUnitId - [String] - Default Value: $null
-        ...
-
-    AV_CloudAdmin_AccountTypeExtensionAttribute - [Integer] - Default Value: 15
-        Save user account type information in this extension attribute. Content from the referral user will be copied and the Cloud Administrator
-        information is added either as prefix or suffix (see AV_CloudAdminTier<Tier>_ExtensionAttribute* settings below).
-
-    AV_CloudAdmin_AccountTypeEmployeeType - [Boolean] - Default Value: $true
-        ...
-
-    AV_CloudAdmin_ReferenceExtensionAttribute - [Integer] - Default Value: 14
-        ...
-
-    AV_CloudAdmin_ReferenceManager - [Boolean] - Default Value: $false
-        ...
-
-    AV_CloudAdmin_Webhook - [String] - Default Value: $null
-        Send return data in JSON format as POST to this webhook URL.
-
-    AV_CloudAdminTier0_AccountRestrictedAdminUnitId
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountAdminUnitId
-        Tier 1 and 2 only, see AV_CloudAdminTier0_AccountRestrictedAdminUnitId for Tier 0.
-
-    AV_CloudAdminTier<Tier>_UserPhotoUrl - [String] - Default Value: <empty>
-        Default value for script parameter UserPhotoUrl. If no parameter was provided, this value will be used instead.
-        If no value was provided at all, the tenant's square logo will be used.
-
-    AV_CloudAdminTier<Tier>_LicenseSkuPartNumber - [String] - Default Value: EXCHANGEDESKLESS
-        License assigned to the dedicated admin user account. The license SKU part number must contain an Exchange Online service plan to generate a mailbox
-        for the user (see https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
-        Multiple licenses may be assigned using a whitespace delimiter.
-        For the license containing the Exchange Online service plan, only that service plan is enabled for the user, any other service plan within that license will be disabled.
-        If GroupId is also provided, group-based licensing is implied and Exchange Online service plan activation will only be monitored before continuing.
-
-    AV_CloudAdminTier<Tier>_GroupId - [String] - Default Value: <empty>
-        Entra Group Object ID where the user shall be added. If the group is dynamic, group membership update will only be monitored before continuing.
-
-    AV_CloudAdminTier<Tier>_GroupDescription - [String] - Default Value: Tier <Tier> Cloud Administrators
-        ...
-
-    AV_CloudAdminTier<Tier>_DedicatedAccount - [Boolean] - Default Value: $true for Tier 0, $false for Tier 1 and 2
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountDomain - [String] - Default Value: onmicrosoft.com
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypePrefix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypePrefixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypeSuffix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeEmployeeTypeSuffixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributePrefix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributePrefixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributeSuffix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_AccountTypeExtensionAttributeSuffixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserDisplayNamePrefix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserDisplayNamePrefixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserDisplayNameSuffix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserDisplayNameSuffixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_GivenNamePrefix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_GivenNamePrefixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_GivenNameSuffix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_GivenNameSuffixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserPrincipalNamePrefix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserPrincipalNamePrefixSeparator - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserPrincipalNameSuffix - [String] - Default Value: 
-        ...
-
-    AV_CloudAdminTier<Tier>_UserPrincipalNameSuffixSeparator - [String] - Default Value: 
-        ...
+    Configuration settings can be obtained from CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1.
 
 .EXAMPLE
-    New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0
+    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0
 
 .EXAMPLE
-    New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0 -UserPhotoUrl https://example.com/assets/Tier0-Admins.png
+    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0 -UserPhotoUrl https://example.com/assets/Tier0-Admins.png
 
     Provide a different URL for the photo to be uploaded to the new Cloud Administrator account.
 
 .EXAMPLE
-    $csv = Get-Content list.csv | ConvertFrom-Csv; New-CloudAdministrator-Account-V1.ps1 -ReferralUserId $csv.ReferralUserId -Tier $csv.Tier -UserPhotoUrl $csv.UserPhotoUrl
+    $csv = Get-Content list.csv | ConvertFrom-Csv; CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId $csv.ReferralUserId -Tier $csv.Tier -UserPhotoUrl $csv.UserPhotoUrl
 
     BATCH PROCESSING
     ================
@@ -211,11 +148,17 @@
     Azure Automation has limited support for regular PowerShell pipelining as it does not process inline execution of child runbooks within Begin/End blocks.
     Therefore, classic PowerShell pipelining does NOT work. Instead, an array can be used to provide the required input data.
     The advantage is that the script will run more efficient as some tasks only need to be performed once per batch instead of each individual account.
+
+    The CSV must have the following format:
+
+    ReferralUserId,Tier,UserPhotoUrl,
+    user1@contoso.com,0,,
+    user2@contoso.com,0,https://www.example.com/photo.jpg,
 #>
 
 #region TODO:
+#- License availablity check only when a dedicated account is created
 #- concurrent job testing
-#- convert ReferralUserId to #EXT# format for domains that are not validated in the tenant
 #- regex check for UPN which is currently commented out
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
 #- Install PowerShell modules that are mentioned as "requires" but do not update existing ones, just to support the initial run of the script
@@ -491,7 +434,6 @@ $tenantBranding = Get-MgBetaOrganizationBranding -OrganizationId $tenant.Id
 $persistentError = $false
 $Iteration = 0
 
-# To improve memory consumption, return arrays are kept separate until the end of this script
 $returnOutput = [System.Collections.ArrayList]::new()
 $returnInformation = [System.Collections.ArrayList]::new()
 $returnWarning = [System.Collections.ArrayList]::new()
