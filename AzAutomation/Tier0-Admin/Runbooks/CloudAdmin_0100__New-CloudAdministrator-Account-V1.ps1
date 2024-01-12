@@ -4,7 +4,7 @@
 .AUTHOR Julian Pawlowski
 .COMPANYNAME Workoho GmbH
 .COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
-.TAGS TieringModel Identity CloudAdministrator Security Azure Automation AzureAutomation
+.TAGS TieringModel CloudAdministrator Identity Microsoft365 Security Azure Automation AzureAutomation
 .LICENSEURI
 .PROJECTURI
 .ICONURI
@@ -74,13 +74,13 @@
 
     Depending if a referring user ID is internal or external, different preconditions are validated:
 
-        Overall tenant readiness:
+        Overall readiness:
             1. Microsoft Graph permissions of the logged in user / application ID / managed identity.
             2. Entra directory permissions of the logged in user / application ID / managed identity.
             3. Exchange Online permissions of the logged in user / application ID / managed identity.
-            4. Exchange Online subscription MUST exist.
+            4. Exchange Online subscription MUST exist in the tenant.
             5. Administrative Unit settings must be secure:
-                - For Cloud Administration security groups and Tier 0 admin accounts, Restricted Management MUST be enabled and visibility set to HiddenMembership. This may be optional for Tier 1 and Tier 2 admin units.
+                - Admin units for Cloud Administration security groups and Tier 0 admin accounts MUST have Restricted Management enabled and visibility set to HiddenMembership. This may be optional for Tier 1 and Tier 2 admin units.
                 - Must NOT use dynamic membership for Cloud Administration groups.
                 - SHOULD use dynamic membership for Tier 0, Tier 1, and Tier 2 admin accounts.
             6. Security groups for Tier level access must be secure:
@@ -91,7 +91,7 @@
                 - OR by having role assignment capablitity enabled (requires permanent Privileged Role Administrator assignment)
                 - Must NOT use dynamic membership for Tier 0, MAY use for Tier 1 and Tier 2 (not recommended). When no dedicated admin accounts are used, the group MUST be static.
                 - SHOULD use a specific description to avoid addressing the wrong group
-                - Must NOT have any grou owners assigned (otherwise, they will be removed immediately)
+                - Must NOT have any group owners assigned (otherwise, they will be removed immediately)
 
         All referring user IDs:
             1. Must exist.
@@ -157,7 +157,7 @@
 #>
 
 #region TODO:
-#- License availablity check only when a dedicated account is created
+#- Check that admin unit contains only groups/users as per intention
 #- concurrent job testing
 #- regex check for UPN which is currently commented out
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
