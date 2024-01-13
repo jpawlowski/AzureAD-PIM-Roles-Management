@@ -30,49 +30,88 @@ Param(
 
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 Write-Verbose "---START of $((Get-Item $PSCommandPath).Name), $((Test-ScriptFileInfo $PSCommandPath | Select-Object -Property Version, Guid | & { process{$_.PSObject.Properties | & { process{$_.Name + ': ' + $_.Value} }} }) -join ', ') ---"
-$StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
+# $StartupVariables = (Get-Variable | & { process { $_.Name } })      # Remember existing variables so we can cleanup ours at the end of the script
 
 $return = @{
     IsInternal               = $null
     IsEmailOTPAuthentication = $null
     IsFacebookAccount        = $null
+    IsGoogleAccount          = $null
     IsMicrosoftAccount       = $null
+    IsExternalEntraAccount   = $null
+    IsFederated              = $null
     GuestOrExternalUserType  = $null
 }
 
-if ($null -ne $UserObject.Identities) {
+if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
+    Write-Verbose 'Evaluating identities'
     if (
         (($UserObject.Identities).Issuer -contains 'mail') -or
-        (($UserObject.Identities).Identities.SignInType -contains 'emailAddress') -or
-        (($UserObject.Identities).Identities.SignInType -contains 'userName')
+        (($UserObject.Identities).SignInType -contains 'emailAddress')
     ) {
+        Write-Verbose '- IsEmailOTPAuthentication'
         $return.IsEmailOTPAuthentication = $true
-        $return.IsFacebookAccount = $false
-        $return.IsMicrosoftAccount = $false
-    }
-    elseif (($UserObject.Identities).Issuer -contains 'facebook.com') {
-        $return.IsEmailOTPAuthentication = $false
-        $return.IsFacebookAccount = $true
-        $return.IsMicrosoftAccount = $false
-    }
-    elseif (($UserObject.Identities).Issuer -contains 'MicrosoftAccount') {
-        $return.IsEmailOTPAuthentication = $false
-        $return.IsFacebookAccount = $false
-        $return.IsMicrosoftAccount = $true
     }
     else {
         $return.IsEmailOTPAuthentication = $false
+    }
+
+    if (($UserObject.Identities).Issuer -contains 'facebook.com') {
+        Write-Verbose '- IsFacebookAccount'
+        $return.IsFacebookAccount = $true
+    }
+    else {
         $return.IsFacebookAccount = $false
+    }
+
+    if (($UserObject.Identities).Issuer -contains 'google.com') {
+        Write-Verbose '- IsGoogleAccount'
+        $return.IsGoogleAccount = $true
+    }
+    else {
+        $return.IsGoogleAccount = $false
+    }
+
+    if (($UserObject.Identities).Issuer -contains 'MicrosoftAccount') {
+        Write-Verbose '- IsMicrosoftAccount'
+        $return.IsMicrosoftAccount = $true
+    }
+    else {
         $return.IsMicrosoftAccount = $false
+    }
+
+    if (($UserObject.Identities).Issuer -contains 'ExternalAzureAD') {
+        Write-Verbose '- ExternalAzureAD'
+        $return.IsExternalEntraAccount = $true
+    }
+    else {
+        $return.IsExternalEntraAccount = $false
+    }
+
+    if (
+        ($UserObject.Identities).SignInType -contains 'federated'
+    ) {
+        Write-Verbose '- IsFederated'
+        $return.IsFederated = $true
+    }
+    else {
+        $return.IsFederated = $false
     }
 }
 
 if (
-    ($null -ne $UserObject.UserType) -and
-    ($null -ne $UserObject.UserPrincipalName)
+    (-Not [string]::IsNullOrEmpty($UserObject.UserType)) -and
+    (-Not [string]::IsNullOrEmpty($UserObject.UserPrincipalName))
 ) {
-    if ($UserObject.UserType -eq 'External') {
-        $return.GuestOrExternalUserType = 'otherExternalUser'
+    Write-Verbose 'Evaluating UserType'
+
+    if ($UserObject.UserType -eq 'Member') {
+        if ($UserObject.UserPrincipalName -notmatch '^.+#EXT#@.+\.onmicrosoft\.com$') {
+            $return.GuestOrExternalUserType = 'None'
+        }
+        else {
+            $return.GuestOrExternalUserType = 'b2bCollaborationMember'
+        }
     }
     elseif ($UserObject.UserType -eq 'Guest') {
         if ($UserObject.UserPrincipalName -notmatch '^.+#EXT#@.+\.onmicrosoft\.com$') {
@@ -82,31 +121,40 @@ if (
             $return.GuestOrExternalUserType = 'b2bCollaborationGuest'
         }
     }
-    elseif (
-        ($UserObject.UserType -eq 'Member') -and
-        ($UserObject.UserPrincipalName -match '^.+#EXT#@.+\.onmicrosoft\.com$')
-    ) {
-        $return.GuestOrExternalUserType = 'b2bCollaborationMember'
-    }
     else {
-        $return.GuestOrExternalUserType = 'None'
+        $return.GuestOrExternalUserType = 'otherExternalUser'
     }
+    Write-Verbose "- $($return.GuestOrExternalUserType)"
 }
 
 if (
-    ($return.GuestOrExternalUserType -eq 'None') -and
     ($return.IsEmailOTPAuthentication -eq $false) -and
     ($return.IsFacebookAccount -eq $false) -and
-    ($return.IsMicrosoftAccount -eq $false)
+    ($return.IsGoogleAccount -eq $false) -and
+    ($return.IsMicrosoftAccount -eq $false) -and
+    ($return.IsExternalEntraAccount -eq $false) -and
+    ($return.IsFederated -eq $false) -and
+    ($return.GuestOrExternalUserType -eq 'None')
 ) {
+    Write-Verbose "Internal state: True"
     $return.IsInternal = $true
 }
-else {
+elseif (
+    ($null -ne $return.IsEmailOTPAuthentication) -and
+    ($null -ne $return.IsFacebookAccount) -and
+    ($null -ne $return.IsGoogleAccount) -and
+    ($null -ne $return.IsMicrosoftAccount) -and
+    ($null -ne $return.IsExternalEntraAccount) -and
+    ($null -ne $return.IsFederated) -and
+    ($null -ne $return.GuestOrExternalUserType)
+) {
+    Write-Verbose "Internal state: False"
     $return.IsInternal = $false
 }
+else {
+    Write-Warning "Internal state: UNKNOWN"
+}
 
-Write-Verbose "Determined User Type Details: $($return | ConvertTo-Json -Depth 5 -WarningAction SilentlyContinue)"
-
-Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
+# Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

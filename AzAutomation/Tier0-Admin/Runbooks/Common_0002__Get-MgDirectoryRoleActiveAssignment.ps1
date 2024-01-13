@@ -44,8 +44,6 @@ catch {
     Throw $_
 }
 
-Write-Verbose "Received directory roles:`n$($return | ConvertTo-Json -Depth 5 -WarningAction SilentlyContinue)"
-
 Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox
 Write-Verbose "-----END of $((Get-Item $PSCommandPath).Name) ---"
 return $return

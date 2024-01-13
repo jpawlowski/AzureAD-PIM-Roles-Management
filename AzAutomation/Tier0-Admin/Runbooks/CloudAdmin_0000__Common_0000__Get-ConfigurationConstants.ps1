@@ -238,11 +238,31 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier0_AllowedGuestOrExternalUserTypes"
         mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier0'
         defaultValue  = $null
-        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+        Regex         = '(?:internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowFacebookAccount"
+        mapToVariable = 'AllowFacebookAccount_Tier0'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowGoogleAccount"
+        mapToVariable = 'AllowGoogleAccount_Tier0'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier0_AllowMicrosoftAccount"
         mapToVariable = 'AllowMicrosoftAccount_Tier0'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowExternalEntraAccount"
+        mapToVariable = 'AllowExternalEntraAccount_Tier0'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowFederatedAccount"
+        mapToVariable = 'AllowFederatedAccount_Tier0'
         defaultValue  = $false
     }
     @{
@@ -419,11 +439,31 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier1_AllowedGuestOrExternalUserTypes"
         mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier1'
         defaultValue  = $null
-        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+        Regex         = '(?:internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AllowFacebookAccount"
+        mapToVariable = 'AllowFacebookAccount_Tier1'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AllowGoogleAccount"
+        mapToVariable = 'AllowGoogleAccount_Tier1'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier1_AllowMicrosoftAccount"
         mapToVariable = 'AllowMicrosoftAccount_Tier1'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowExternalEntraAccount"
+        mapToVariable = 'AllowExternalEntraAccount_Tier1'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowFederatedAccount"
+        mapToVariable = 'AllowFederatedAccount_Tier1'
         defaultValue  = $false
     }
     @{
@@ -600,11 +640,31 @@ $Constants = [array] @(
         sourceName    = "AV_CloudAdminTier2_AllowedGuestOrExternalUserTypes"
         mapToVariable = 'AllowedGuestOrExternalUserTypes_Tier2'
         defaultValue  = 'internalGuest b2bCollaborationGuest b2bCollaborationMember'
-        Regex         = '(?:None|internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+        Regex         = '(?:internalGuest|b2bCollaborationGuest|b2bCollaborationMember|otherExternalUser)(\s|$)+'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowFacebookAccount"
+        mapToVariable = 'AllowFacebookAccount_Tier2'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowGoogleAccount"
+        mapToVariable = 'AllowGoogleAccount_Tier2'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier2_AllowMicrosoftAccount"
         mapToVariable = 'AllowMicrosoftAccount_Tier2'
+        defaultValue  = $false
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowExternalEntraAccount"
+        mapToVariable = 'AllowExternalEntraAccount_Tier2'
+        defaultValue  = $true
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowFederatedAccount"
+        mapToVariable = 'AllowFederatedAccount_Tier2'
         defaultValue  = $false
     }
     @{

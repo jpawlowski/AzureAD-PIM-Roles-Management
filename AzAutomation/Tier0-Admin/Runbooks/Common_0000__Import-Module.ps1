@@ -84,6 +84,8 @@ $Missing = [System.Collections.ArrayList]::new()
 $Modules | Where-Object { (-Not [string]::IsNullOrEmpty($_.Name)) -and ($LoadedModules -notContains $_.Name) } | & {
     process {
         $Module = $_
+        $Optional = $_.Optional
+        if ($null -ne $Module.Optional) { $Module.Remove('Optional') }
         Write-Debug "Importing module $($Module.Name)"
         $Module.Debug = $false
         $Module.Verbose = $false
@@ -101,7 +103,13 @@ $Modules | Where-Object { (-Not [string]::IsNullOrEmpty($_.Name)) -and ($LoadedM
             $Module.Remove('WarningAction')
             $Module.Remove('ErrorAction')
             $Module.ErrorDetails = $_
-            $null = $script:Missing.Add($Module)
+
+            if ($Optional -eq $true) {
+                Write-Warning "Optional module could not be loaded: $(Module.Name)"
+            }
+            else {
+                $null = $script:Missing.Add($Module)
+            }
         }
     }
 }

@@ -645,6 +645,7 @@ if ($automationAccount.Identity.PrincipalId) {
             # Microsoft Graph
             '00000003-0000-0000-c000-000000000000' = @{
                 AppRoles = @(
+                    'AuditLog.Read.All'
                     'Directory.Read.All'
                     'Directory.Write.Restricted'
                     'Group.Read.All'

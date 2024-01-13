@@ -75,55 +75,83 @@
     Depending if a referring user ID is internal or external, different preconditions are validated:
 
         Overall readiness:
-            1. Microsoft Graph permissions of the logged in user / application ID / managed identity.
-            2. Entra directory permissions of the logged in user / application ID / managed identity.
-            3. Exchange Online permissions of the logged in user / application ID / managed identity.
-            4. Exchange Online subscription MUST exist in the tenant.
-            5. Administrative Unit settings must be secure:
+             1. Tenant MUST be of type AAD / B2B (not B2C).
+             2. Microsoft Graph permissions of the logged in user / application ID / managed identity.
+             3. Entra directory permissions of the logged in user / application ID / managed identity.
+             4. Exchange Online permissions of the logged in user / application ID / managed identity.
+             5. Exchange Online subscription MUST exist in the tenant.
+             6. Administrative Unit settings must be secure:
                 - Admin units for Cloud Administration security groups and Tier 0 admin accounts MUST have Restricted Management enabled and visibility set to HiddenMembership. This may be optional for Tier 1 and Tier 2 admin units.
-                - Must NOT use dynamic membership for Cloud Administration groups.
+                - MUST NOT use dynamic membership for Cloud Administration groups.
                 - SHOULD use dynamic membership for Tier 0, Tier 1, and Tier 2 admin accounts.
-            6. Security groups for Tier level access must be secure:
-                - Must NOT be synced from on-premises (and never have been)
-                - Must NOT be a Unified Group
-                - Must NOT be email enabled
-                - Protected by a Management Restricted Administrative Unit (preferred)
+                - MUST NOT include devices and MUST only include either groups OR users.
+             7. Security groups for Tier level access must be secure:
+                - MUST NOT be synchronized from on-premises (and must never have been before)
+                - MUST NOT be a Unified Group
+                - MUST NOT be email enabled
+                - MUST be protected by a Management Restricted Administrative Unit (preferred)
                 - OR by having role assignment capablitity enabled (requires permanent Privileged Role Administrator assignment)
-                - Must NOT use dynamic membership for Tier 0, MAY use for Tier 1 and Tier 2 (not recommended). When no dedicated admin accounts are used, the group MUST be static.
-                - SHOULD use a specific description to avoid addressing the wrong group
-                - Must NOT have any group owners assigned (otherwise, they will be removed immediately)
+                - MUST NOT use dynamic membership for Tier 0, MAY use for Tier 1 and Tier 2 (not recommended). When no dedicated admin accounts are used, the group MUST be static.
+                - SHOULD use a specified description to avoid addressing the wrong group
+                - MUST NOT have any group owners assigned (otherwise, they will be removed immediately)
 
         All referring user IDs:
-            1. Must exist.
-            2. Must be enabled.
-            3. Must NOT be a resource account.
-            4. Must NOT use email OTP authentication.
-            5. Must NOT be a facebook.com identity.
-            6. Must NOT be a personal Microsoft Account.
-            7. Must have a display name.
+             1. MUST exist.
+             2. MUST be enabled.
+             3. MUST NOT be a resource account.
+             4. MUST have a display name.
+             5. When set, EmployeeHireDate MUST be in the past.
+             6. When set, EmployeeLeaveDateTime MUST be more than 45 days in the future.
+             7. Free license with Exchange Online plan MUST be available (only when dedicated account is created).
 
         Internal referring user IDs:
-            1. When set, EmployeeHireDate must be in the past.
-            2. When set, EmployeeLeaveDateTime must be more than 45 days in the future.
-            3. Must NOT use the same domain as a dedicated admin account (only when dedicated account is created).
-            4. Must NOT use onmicrosoft.com domain.
-            6. Must be a hybrid user if tenant has on-premises directory sync enabled.
-            5. Must have a manager.
-            7. Must have a mailbox of type UserMailbox.
-            8. Free license with Exchange Online plan must be available (only when dedicated account is created).
+             1. MUST NOT use the same domain as a dedicated admin account (only when dedicated account is created).
+             2. MUST NOT use any onmicrosoft.com domain.
+             3. MUST be a hybrid user if tenant has on-premises directory synchronization enabled.
+             4. MUST have a manager reference.
+             5. MUST have a mailbox of type UserMailbox or RemoteUserMailbox if UPN domain WAS enabled for email.
+             6. Mail property's domain name MUST have a valid MX record in DNS if UPN domain WAS NOT enabled for email.
+             7. MUST have signed in within the last 14 days at least once.
 
         External referring user IDs:
-            1. Must NOT be a personal Microsoft Account.
+             1. Must NOT use email OTP authentication.
+             2. Must NOT be a Facebook identity.
+             3. Must NOT be a Google identity.
+             4. Must NOT be a personal Microsoft account.
+             5. MAY be an external Microsoft Entra account (default setting: Tier 2 only).
+             6. Must NOT be a federated identity.
+             7. Mail property's domain name MUST have a valid MX record in DNS.
+             8. MUST have a valid user type (default setting: Tier 2 only, may be internalGuest / b2bCollaborationGuest / b2bCollaborationMember)
+             9. MUST have redeemed any guest invitation.
+            10. MUST have signed in within the last 30 days at least once.
+            11. MUST NOT be used when dedicated account is required.
 
-    In case an existing Cloud Administrator account was found for referral user ID, it must be a cloud native account to be updated. Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
-    If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account. A soft-deleted mailbox will be permanently deleted in that case as well.
-    The user part of the Cloud Administrator account must be mutually exclusive to the tenant. A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
+    If a dedicated Cloud Administrator account is required for the respective Tier, the following conditions are checked:
+
+             1. In case an existing Cloud Administrator account was found for referral user ID, it must be a cloud native account to be updated.
+                Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
+             2. If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account.
+             3. The user part of the Cloud Administrator account must be mutually exclusive to the tenant.
+                A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
 
 
     DIFFERENTIATE BETWEEN INTERNAL AND EXTERNAL USER ACCOUNTS
     =========================================================
 
-    bla bla bla bla bla bla bla bla bla bla bla bla
+    The type of external user is determined based on the definition of guestOrExternalUserTypes defined here:
+    https://learn.microsoft.com/en-us/graph/api/resources/conditionalaccessguestsorexternalusers?view=graph-rest-beta#properties
+
+    That means, a user account is only considered internal if these prerequisites are met:
+
+        1. Must NOT use email OTP authentication.
+        2. Must NOT be a Facebook identity.
+        3. Must NOT be a Google identity.
+        4. Must NOT be a personal Microsoft account.
+        5. Must NOT be an external Microsoft Entra identity.
+        6. Must NOT be a federated identity.
+        7. Must NOT have any value for GuestOrExternalUserType (value MUST be 'None').
+
+    In all other cases, the user account is considered external.
 
 
     CUSTOM CONFIGURATION SETTINGS
@@ -158,6 +186,7 @@
 
 #region TODO:
 #- Check that admin unit contains only groups/users as per intention
+#- Let requester decide to always create a dedicated account if desired
 #- concurrent job testing
 #- regex check for UPN which is currently commented out
 #- find existing account not only by UPN but also extensionAttribute and manager and EmployeeType
@@ -202,11 +231,11 @@ if (
     @{ Name = 'Microsoft.Graph.Beta.Users.Actions'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
     @{ Name = 'Microsoft.Graph.Beta.Applications'; MinimumVersion = '2.0'; MaximumVersion = '2.65535' }
 ) 1> $null
-
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] OPEN CONNECTIONS: Microsoft Graph -----------------------------
 .\Common_0001__Connect-MgGraph.ps1 -Scopes @(
+    'AuditLog.Read.All'
     'User.ReadWrite.All'
     'Directory.Read.All'
     'Group.ReadWrite.All'
@@ -444,6 +473,21 @@ $return = @{
 if ($JobReference) { $return.Job.Reference = $JobReference }
 #endregion ---------------------------------------------------------------------
 
+#region Tenant Validation ------------------------------------------------------
+if (
+    ($null -ne $tenant.tenantType) -and
+    ($tenant.tenantType -ne 'AAD')
+) {
+    Throw "Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.tenantType)."
+}
+elseif (
+    ($null -ne $tenant.AdditionalProperties.tenantType) -and
+    ($tenant.AdditionalProperties.tenantType -ne 'AAD')
+) {
+    Throw "Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.AdditionalProperties.tenantType)."
+}
+#endregion ---------------------------------------------------------------------
+
 #region Group Validation -------------------------------------------------------
 if (
     (@($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) }).Count -ne
@@ -629,7 +673,11 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
     $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
     $AllowedGuestOrExternalUserTypes = @( (Get-Variable -ValueOnly -Name "AllowedGuestOrExternalUserTypes_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
+    $AllowFacebookAccount = Get-Variable -ValueOnly -Name "AllowFacebookAccount_Tier$Tier"
+    $AllowGoogleAccount = Get-Variable -ValueOnly -Name "AllowGoogleAccount_Tier$Tier"
     $AllowMicrosoftAccount = Get-Variable -ValueOnly -Name "AllowMicrosoftAccount_Tier$Tier"
+    $AllowExternalEntraAccount = Get-Variable -ValueOnly -Name "AllowExternalEntraAccount_Tier$Tier"
+    $AllowFederatedAccount = Get-Variable -ValueOnly -Name "AllowFederatedAccount_Tier$Tier"
     $AllowSameDomainForReferralUser = Get-Variable -ValueOnly -Name "AllowSameDomainForReferralUser_Tier$Tier"
     $AdminUnitId = if ($Tier -eq 0) { Get-Variable -ValueOnly -Name "AccountRestrictedAdminUnitId_Tier0" } else { Get-Variable -ValueOnly -Name "AccountAdminUnitId_Tier$Tier" }
     $LicenseSkuPartNumbers = @( (Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
@@ -782,6 +830,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     try {
         $refUserObj = Get-MgBetaUser @params
+        $refUserObj.SignInActivity = (Get-MgBetaUser -UserId $refUserObj.Id -Property SignInActivity -ErrorAction Stop).SignInActivity
     }
     catch {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -799,7 +848,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
 
     #region All Accounts
-    if (-Not $refUserObj.AccountEnabled) {
+    if ($refUserObj.AccountEnabled -ne $true) {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
                     Message          = "${ReferralUserId}: Referral User ID is disabled. A Cloud Administrator account can only be set up for active accounts."
                     ErrorId          = '403'
@@ -823,53 +872,6 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                     TargetType       = 'UserId'
                     CategoryActivity = 'ReferralUserId user validation'
                     CategoryReason   = 'Referral User ID is a resource account.'
-                }))
-        return
-    }
-
-    $refUserTypeDetails = .\Common_0002__Get-MgUserTypeDetail.ps1 -UserObject $refUserObj
-
-    if ($refUserTypeDetails.IsEmailOTPAuthentication -ne $false) {
-        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                    Message          = "${ReferralUserId}: Referral User ID must not use email one-time passcode authentication."
-                    ErrorId          = '403'
-                    Category         = 'PermissionDenied'
-                    TargetName       = $refUserObj.UserPrincipalName
-                    TargetObject     = $refUserObj.Id
-                    TargetType       = 'UserId'
-                    CategoryActivity = 'ReferralUserId user validation'
-                    CategoryReason   = 'Referral User ID has defined identity details that indicate email one-time passcode authentication.'
-                }))
-        return
-    }
-
-    if ($refUserTypeDetails.IsFacebookAccount -ne $false) {
-        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                    Message          = "${ReferralUserId}: Referral User ID must not be a facebook.com identity."
-                    ErrorId          = '403'
-                    Category         = 'PermissionDenied'
-                    TargetName       = $refUserObj.UserPrincipalName
-                    TargetObject     = $refUserObj.Id
-                    TargetType       = 'UserId'
-                    CategoryActivity = 'ReferralUserId user validation'
-                    CategoryReason   = 'Referral User ID has defined identity Issuer of facebook.com.'
-                }))
-        return
-    }
-
-    if (
-        ($refUserTypeDetails.IsMicrosoftAccount -ne $false) -and
-        ($AllowMicrosoftAccount -ne $true)
-    ) {
-        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                    Message          = "${ReferralUserId}: Referral User ID must not be a Microsoft Account."
-                    ErrorId          = '403'
-                    Category         = 'PermissionDenied'
-                    TargetName       = $refUserObj.UserPrincipalName
-                    TargetObject     = $refUserObj.Id
-                    TargetType       = 'UserId'
-                    CategoryActivity = 'ReferralUserId user validation'
-                    CategoryReason   = 'Referral User ID has defined identity Issuer of MicrosoftAccount.'
                 }))
         return
     }
@@ -943,9 +945,26 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     #endregion
 
+    $refUserTypeDetails = .\Common_0002__Get-MgUserTypeDetail.ps1 -UserObject $refUserObj
+    if ($null -eq $refUserTypeDetails.IsInternal) {
+        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                    Message          = "${ReferralUserId}: Referral User ID internal/external state could not be determined."
+                    ErrorId          = '403'
+                    Category         = 'OperationStopped'
+                    TargetName       = $refUserObj.UserPrincipalName
+                    TargetObject     = $refUserObj.Id
+                    TargetType       = 'UserId'
+                    CategoryActivity = 'ReferralUserId user validation'
+                    CategoryReason   = "Referral User ID internal/external state could not be determined."
+                }))
+        return
+    }
+
     if ($refUserTypeDetails.IsInternal -eq $true) {
 
         #region Internal Accounts
+        Write-Verbose "${ReferralUserId} is classified as internal user"
+
         if (
             ($DedicatedAccount -eq $true) -and
             (($refUserObj.UserPrincipalName).Split('@')[1] -eq $AccountDomain) -and
@@ -958,7 +977,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId internal user validation'
                         CategoryReason   = "Internal Referral User ID must not use domain $AccountDomain which would be the same for the dedicated Cloud Administrator account."
                     }))
             return
@@ -974,15 +993,15 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId internal user validation'
                         CategoryReason   = 'Internal Referral User ID must not use a onmicrosoft.com subdomain.'
                     }))
             return
         }
 
         if (
-            ($true -eq $tenant.OnPremisesSyncEnabled) -and
-            ($true -ne $refUserObj.OnPremisesSyncEnabled)
+            ($tenant.OnPremisesSyncEnabled -eq $true) -and
+            ($refUserObj.OnPremisesSyncEnabled -ne $true)
         ) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
                         Message          = "${ReferralUserId}: Referral User ID must be a hybrid identity synced from on-premises directory."
@@ -991,7 +1010,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId internal user validation'
                         CategoryReason   = "Referral User ID must be a hybrid identity synced from on-premises directory."
                     }))
             return
@@ -1008,40 +1027,113 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId internal user validation'
                         CategoryReason   = 'Referral User ID must have manager property set.'
                     }))
             return
         }
 
-        try {
-            $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction Stop
-        }
-        catch {
-            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                        Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
-                        ErrorId          = '403'
-                        Category         = 'NotEnabled'
-                        TargetName       = $refUserObj.UserPrincipalName
-                        TargetObject     = $refUserObj.Id
-                        TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
-                        CategoryReason   = "Referral User ID must have a mailbox."
-                    }))
-            return
-        }
-        Write-Verbose "Found existing mailbox for $($refUserObj.Id) ($($refUserObj.Id)) with PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
+        if (
+            ($tenant.VerifiedDomains | Where-Object { $_.Name -eq $(($refUserObj.UserPrincipalName).Split('@')[1]) }).Capabilities.Split(', ') -contains 'Email'
+        ) {
+            try {
+                $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction Stop
+            }
+            catch {
+                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                            Message          = "${ReferralUserId}: Referral User ID must have a mailbox."
+                            ErrorId          = '403'
+                            Category         = 'NotEnabled'
+                            TargetName       = $refUserObj.UserPrincipalName
+                            TargetObject     = $refUserObj.Id
+                            TargetType       = 'UserId'
+                            CategoryActivity = 'ReferralUserId internal user validation'
+                            CategoryReason   = "Referral User ID must have a mailbox."
+                        }))
+                return
+            }
 
-        if (('UserMailbox' -ne $refUserExObj.RecipientType) -or ('UserMailbox' -ne $refUserExObj.RecipientTypeDetails)) {
+            Write-Verbose "Found internal mailbox for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserExObj.Mail) and PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
+
+            if (
+                ($refUserExObj.RecipientType -notmatch '^(?:Remote)?UserMailbox$') -or
+                ($refUserExObj.RecipientTypeDetails -notmatch '^(?:Remote)?UserMailbox$')
+            ) {
+                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                            Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox or RemoteUserMailbox."
+                            ErrorId          = '403'
+                            Category         = 'InvalidType'
+                            TargetName       = $refUserObj.UserPrincipalName
+                            TargetObject     = $refUserObj.Id
+                            TargetType       = 'UserId'
+                            CategoryActivity = 'ReferralUserId internal user validation'
+                            CategoryReason   = "Cloud Administrator accounts can not be created for user mailbox type of $($refUserExObj.RecipientTypeDetails)"
+                        }))
+                return
+            }
+        }
+        else {
+            $validateRefUserDomainMX = $false
+            $refUserDomainMX = $null
+
+            if (Get-Module -ListAvailable -Name DnsClient) {
+                $validateRefUserDomainMX = $true
+
+                .\Common_0000__Import-Module.ps1 -Modules @(
+                    @{ Name = 'DnsClient'; Cmdlet = 'Resolve-DnsName'; Function = 'Resolve-DnsName' }
+                ) 1> $null
+
+                $refUserDomainMX = Resolve-DnsName (($refUserObj.Mail).Split('@')[1]) -Type MX -ErrorAction SilentlyContinue
+            }
+            elseif (Get-Module -ListAvailable -Name DnsClient-PS) {
+                $validateRefUserDomainMX = $true
+
+                .\Common_0000__Import-Module.ps1 -Modules @(
+                    @{ Name = 'DnsClient-PS'; Cmdlet = 'Resolve-DnsName'; Function = 'Resolve-Dns' }
+                ) 1> $null
+
+                $refUserDomainMX = (Resolve-Dns -Query (($refUserObj.Mail).Split('@')[1]) -QueryType MX -Timeout (New-Timespan -Sec 30) -ContinueOnDnsError:$false -ContinueOnEmptyResponse:$false -ErrorAction SilentlyContinue).Answers
+            }
+            else {
+                Write-Warning 'Missing PowerShell module DnsClient-PS to validate MX record.'
+            }
+
+            if ($validateRefUserDomainMX -and -not $refUserDomainMX) {
+                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                            Message          = "${ReferralUserId}: Referral User ID must be able to receive emails."
+                            ErrorId          = '403'
+                            Category         = 'PermissionDenied'
+                            TargetName       = $refUserObj.UserPrincipalName
+                            TargetObject     = $refUserObj.Id
+                            TargetType       = 'UserId'
+                            CategoryActivity = 'ReferralUserId internal user validation'
+                            CategoryReason   = "Referral User ID domain MX record could not be found in DNS."
+                        }))
+                return
+            }
+
+            Write-Verbose "Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
+        }
+
+        if (
+            -Not ($refUserObj.SignInActivity) -or
+            -Not ($refUserObj.SignInActivity.LastSignInDateTime) -or
+            -Not ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime) -or
+            (
+                ($refUserObj.SignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-14)) -and
+                ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-14))
+            )
+        ) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                        Message          = "${ReferralUserId}: Referral User ID mailbox must be of type UserMailbox."
-                        ErrorId          = '403'
-                        Category         = 'InvalidType'
-                        TargetName       = $refUserObj.UserPrincipalName
-                        TargetObject     = $refUserObj.Id
-                        TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
-                        CategoryReason   = "Cloud Administrator accounts can not be created for user mailbox types of $($refUserExObj.RecipientTypeDetails)"
+                        Message           = "${ReferralUserId}: Referral User ID must be in active use within the last 14 days."
+                        ErrorId           = '403'
+                        Category          = 'PermissionDenied'
+                        TargetName        = $refUserObj.UserPrincipalName
+                        TargetObject      = $refUserObj.Id
+                        TargetType        = 'UserId'
+                        RecommendedAction = 'Make sure the user as logged in within the last 14 days at least once.'
+                        CategoryActivity  = 'ReferralUserId internal user validation'
+                        CategoryReason    = "Referral User ID must be in active use within the last 14 days."
                     }))
             return
         }
@@ -1052,6 +1144,152 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     else {
 
         #region Guest or External Accounts
+        Write-Verbose "${ReferralUserId} is classified as external user"
+
+        if ($refUserTypeDetails.IsEmailOTPAuthentication -ne $false) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not use email one-time passcode authentication."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity details that indicate email one-time passcode authentication.'
+                    }))
+            return
+        }
+
+        if (
+            ($refUserTypeDetails.IsFacebookAccount -ne $false) -and
+            ($AllowFacebookAccount -ne $true)
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not be a facebook.com identity."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity Issuer of facebook.com.'
+                    }))
+            return
+        }
+
+        if (
+            ($refUserTypeDetails.IsGoogleAccount -ne $false) -and
+            ($AllowGoogleAccount -ne $true)
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not be a google.com identity."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity Issuer of google.com.'
+                    }))
+            return
+        }
+
+        if (
+            ($refUserTypeDetails.IsMicrosoftAccount -ne $false) -and
+            ($AllowMicrosoftAccount -ne $true)
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not be a personal Microsoft account."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity Issuer of MicrosoftAccount.'
+                    }))
+            return
+        }
+
+        if (
+            ($refUserTypeDetails.IsExternalEntraAccount -ne $false) -and
+            ($AllowExternalEntraAccount -ne $true)
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not be an external Microsoft Entra identity."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity Issuer of ExternalAzureAD.'
+                    }))
+            return
+        }
+
+        if (
+            ($refUserTypeDetails.IsFederated -ne $false) -and
+            ($AllowFederatedAccount -ne $true) -and
+            ($refUserTypeDetails.IsFacebookAccount -ne $true) -and
+            ($refUserTypeDetails.IsGoogleAccount -ne $true) -and
+            ($refUserTypeDetails.IsMicrosoftAccount -ne $true) -and
+            ($refUserTypeDetails.IsExternalEntraAccount -ne $true)
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must not be a federated identity."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = 'Referral User ID has defined identity SignInType of federated, and issuer is not facebook.com, google.com, MicrosoftAccount, or ExternalAzureAD.'
+                    }))
+            return
+        }
+
+        $validateRefUserDomainMX = $false
+        $refUserDomainMX = $null
+
+        if (Get-Module -ListAvailable -Name DnsClient) {
+            $validateRefUserDomainMX = $true
+
+            .\Common_0000__Import-Module.ps1 -Modules @(
+                @{ Name = 'DnsClient'; Cmdlet = 'Resolve-DnsName'; Function = 'Resolve-DnsName' }
+            ) 1> $null
+
+            $refUserDomainMX = Resolve-DnsName (($refUserObj.Mail).Split('@')[1]) -Type MX -ErrorAction SilentlyContinue
+        }
+        elseif (Get-Module -ListAvailable -Name DnsClient-PS) {
+            $validateRefUserDomainMX = $true
+
+            .\Common_0000__Import-Module.ps1 -Modules @(
+                @{ Name = 'DnsClient-PS'; Cmdlet = 'Resolve-DnsName'; Function = 'Resolve-Dns' }
+            ) 1> $null
+
+            $refUserDomainMX = (Resolve-Dns -Query (($refUserObj.Mail).Split('@')[1]) -QueryType MX -Timeout (New-Timespan -Sec 30) -ContinueOnDnsError:$false -ContinueOnEmptyResponse:$false -ErrorAction SilentlyContinue).Answers
+        }
+        else {
+            Write-Warning 'Missing PowerShell module DnsClient-PS to validate MX record.'
+        }
+
+        if ($validateRefUserDomainMX -and -not $refUserDomainMX) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID must be able to receive emails."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = "Referral User ID domain MX record could not be found in DNS."
+                    }))
+            return
+        }
+
+        Write-Verbose "Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
+
         if (
             ([string]::IsNullOrEmpty($refUserTypeDetails.GuestOrExternalUserType)) -or
             ([string]::IsNullOrEmpty($AllowedGuestOrExternalUserTypes)) -or
@@ -1064,13 +1302,54 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId external user validation'
                         CategoryReason   = "Referral User ID is of guest or external user type $($refUserTypeDetails.GuestOrExternalUserType)"
                     }))
             return
         }
 
+        if (
+            (-Not [string]::IsNullOrEmpty($refUserObj.ExternalUserState)) -and
+            ($refUserObj.ExternalUserState -ne 'Accepted')
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Referral User ID is a guest or external user and must have accepted its invitation to be activated for Cloud Administration."
+                        ErrorId          = '403'
+                        Category         = 'PermissionDenied'
+                        TargetName       = $refUserObj.UserPrincipalName
+                        TargetObject     = $refUserObj.Id
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'ReferralUserId external user validation'
+                        CategoryReason   = "Referral User ID has ExternalUserState of '$($refUserObj.ExternalUserState)'"
+                    }))
+            return
+        }
+
+        if (
+            -Not ($refUserObj.SignInActivity) -or
+            -Not ($refUserObj.SignInActivity.LastSignInDateTime) -or
+            -Not ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime) -or
+            (
+                ($refUserObj.SignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-30)) -and
+                ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-30))
+            )
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message           = "${ReferralUserId}: Referral User ID must be in active use within the last 30 days."
+                        ErrorId           = '403'
+                        Category          = 'PermissionDenied'
+                        TargetName        = $refUserObj.UserPrincipalName
+                        TargetObject      = $refUserObj.Id
+                        TargetType        = 'UserId'
+                        RecommendedAction = 'Make sure the external user as logged in to the resource tenant within the last 30 days at least once.'
+                        CategoryActivity  = 'ReferralUserId external user validation'
+                        CategoryReason    = "Referral User ID must be in active use within the last 30 days."
+                    }))
+            return
+        }
+
         if ($DedicatedAccount -eq $true) {
+            #TODO let guest users in Tier2 own dedicated accounts
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
                         Message          = "${ReferralUserId}: Guest or external Referral User ID cannot have dedicated account created for Cloud Administration in Tier $Tier."
                         ErrorId          = '403'
@@ -1078,7 +1357,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                         TargetName       = $refUserObj.UserPrincipalName
                         TargetObject     = $refUserObj.Id
                         TargetType       = 'UserId'
-                        CategoryActivity = 'ReferralUserId user validation'
+                        CategoryActivity = 'ReferralUserId external user validation'
                         CategoryReason   = "Cloud Administration in Tier $Tier requires a dedicated account, but a guest or external account must not be used as Referral User ID."
                     }))
             return
@@ -1426,6 +1705,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                     'Id'
                     'UserType'
                     'CreatedDateTime'
+                    'SignInActivity'
                     'IsResourceAccount'
                     'CreationType'
                     'ExternalUserState'
