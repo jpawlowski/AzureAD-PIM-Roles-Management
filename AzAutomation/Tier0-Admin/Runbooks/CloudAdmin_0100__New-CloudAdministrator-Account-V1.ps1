@@ -9,7 +9,7 @@
 .PROJECTURI
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES Microsoft.Graph,Microsoft.Graph.Beta,Az
-.REQUIREDSCRIPTS CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1,Common_0000__Convert-PSEnvToPSLocalVariable.ps1,Common_0000__Get-RandomPassword.ps1,Common_0000__Import-Module.ps1,Common_0000__Submit-Webhook.ps1,Common_0000__Write-Error.ps1,Common_0000__Write-Information.ps1,Common_0000__Write-JsonOutput.ps1,Common_0000__Write-Warning.ps1,Common_0001__Connect-ExchangeOnline.ps1,Common_0001__Connect-MgGraph.ps1,Common_0002__Import-AzAutomationVariableToPSEnv.ps1,Common_0002__Wait-AzAutomationConcurrentJob.ps1,Common_0003__Confirm-MgAppPermission.ps1,Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1
+.REQUIREDSCRIPTS CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1,Common_0000__Convert-PSEnvToPSScriptVariable.ps1,Common_0000__Get-RandomPassword.ps1,Common_0000__Import-Module.ps1,Common_0000__Submit-Webhook.ps1,Common_0000__Write-Error.ps1,Common_0000__Write-Information.ps1,Common_0000__Write-JsonOutput.ps1,Common_0000__Write-Warning.ps1,Common_0001__Connect-ExchangeOnline.ps1,Common_0001__Connect-MgGraph.ps1,Common_0002__Import-AzAutomationVariableToPSEnv.ps1,Common_0002__Wait-AzAutomationConcurrentJob.ps1,Common_0003__Confirm-MgAppPermission.ps1,Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1
 .EXTERNALSCRIPTDEPENDENCIES
 .RELEASENOTES
 #>
@@ -20,8 +20,12 @@
 
 .DESCRIPTION
     For Tier 0 access, a dedicated cloud native account for is created and its lifecycle is bound to the referring account.
-    For Tier 1 and Tier 2, the creation of a dedicated user account is optional depending on your custom configuration, so that only a precondition check is performed before the user is added to the respective security group.
+    For Tier 1 and Tier 2, the creation of a dedicated user account may be optionally requested (may be reconfigured).
+    If no dedicated user account is created, only a precondition check is performed before the user is added to the respective security group.
     Also, external or guest accounts may be activated for Cloud Administration in Tier 1 or Tier 2.
+
+    Optionally, external or guest accounts may be used as referral user ID for dedicated Cloud Administration accounts if activated in the configuration.
+    However, it is strongly recommended to make sure that a proper lifecycle process is in place for external and guest accounts.
 
     For dedicated admin accounts, User Principal Name and mail address use the initial .onmicrosoft.com domain of the respective Entra ID tenant, but may also be configured to use a custom domain.
     Other attributes are mostly copied from the referring user ID. The admin account holds a reference by using extensionAttribute14 conisting the object ID.
@@ -44,6 +48,10 @@
     If environment variable $env:AV_CloudAdminTier<Tier>_UserPhotoUrl is set, it will be used as a fallback option.
     In case no photo URL was provided at all, Entra square logo from organizational tenant branding will be used.
     The recommended size of the photo is 648x648 px.
+
+.PARAMETER RequestDedicatedAccount
+    For some Tier levels, a dedicated Cloud Administrator account may be optionally requested.
+    In case a referral user ID shall explicitly receive a dedicated account, this parameter may be set to 'true'.
 
 .PARAMETER JobReference
     This information may be added for back reference in other IT systems. It will simply be added to the Job data.
@@ -76,23 +84,27 @@
 
         Overall readiness:
              1. Tenant MUST be of type AAD / B2B (not B2C).
-             2. Microsoft Graph permissions of the logged in user / application ID / managed identity.
-             3. Entra directory permissions of the logged in user / application ID / managed identity.
-             4. Exchange Online permissions of the logged in user / application ID / managed identity.
+             2. Microsoft Graph permissions of the logged in user / application ID / managed identity running the script.
+             3. Entra directory permissions of the logged in user / application ID / managed identity running the script.
+             4. Exchange Online permissions of the logged in user / application ID / managed identity running the script.
              5. Exchange Online subscription MUST exist in the tenant.
              6. Administrative Unit settings must be secure:
                 - Admin units for Cloud Administration security groups and Tier 0 admin accounts MUST have Restricted Management enabled and visibility set to HiddenMembership. This may be optional for Tier 1 and Tier 2 admin units.
                 - MUST NOT use dynamic membership for Cloud Administration groups.
                 - SHOULD use dynamic membership for Tier 0, Tier 1, and Tier 2 admin accounts.
                 - MUST NOT include devices and MUST only include either groups OR users.
-             7. Security groups for Tier level access must be secure:
+             7. Security groups for group-based licensing must be secure:
+                - MUST NOT be synchronized from on-premises (and must never have been before)
+                - MUST NOT be a Unified Group
+                - MUST NOT be email enabled
+                - ...
+             8. Security groups for Tier level access must be secure:
                 - MUST NOT be synchronized from on-premises (and must never have been before)
                 - MUST NOT be a Unified Group
                 - MUST NOT be email enabled
                 - MUST be protected by a Management Restricted Administrative Unit (preferred)
                 - OR by having role assignment capablitity enabled (requires permanent Privileged Role Administrator assignment)
                 - MUST NOT use dynamic membership for Tier 0, MAY use for Tier 1 and Tier 2 (not recommended). When no dedicated admin accounts are used, the group MUST be static.
-                - SHOULD use a specified description to avoid addressing the wrong group
                 - MUST NOT have any group owners assigned (otherwise, they will be removed immediately)
 
         All referring user IDs:
@@ -130,16 +142,16 @@
 
              1. In case an existing Cloud Administrator account was found for referral user ID, it must be a cloud native account to be updated.
                 Otherwise an error is returned and manual cleanup of the on-premises synced account is required to resolve the conflict.
-             2. If an existing Cloud administrator account was soft-deleted before, it will be permanently deleted before re-creating the account.
-             3. The user part of the Cloud Administrator account must be mutually exclusive to the tenant.
-                A warning will be generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
+             2. If an existing Cloud administrator account was soft-deleted before, it is permanently deleted before re-creating the account.
+             3. The user part of the Cloud Administrator account MUST be mutually exclusive to the tenant.
+                A warning is generated if there is other accounts using either a similar User Principal Name or same Display Name, Mail, Mail Nickname, or ProxyAddress.
 
 
     DIFFERENTIATE BETWEEN INTERNAL AND EXTERNAL USER ACCOUNTS
     =========================================================
 
     The type of external user is determined based on the definition of guestOrExternalUserTypes defined here:
-    https://learn.microsoft.com/en-us/graph/api/resources/conditionalaccessguestsorexternalusers?view=graph-rest-beta#properties
+    https://learn.microsoft.com/en-us/graph/api/resources/conditionalaccessguestsorexternalusers?view=graph-rest-1.0#properties
 
     That means, a user account is only considered internal if these prerequisites are met:
 
@@ -160,15 +172,20 @@
     Configuration settings can be obtained from CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1.
 
 .EXAMPLE
-    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0
+    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId user1@contoso.com -Tier 0
 
 .EXAMPLE
-    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId first.last@example.com -Tier 0 -UserPhotoUrl https://example.com/assets/Tier0-Admins.png
+    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId user2@contoso.com -Tier 0 -UserPhotoUrl https://example.com/assets/Tier0-Admins.png
 
     Provide a different URL for the photo to be uploaded to the new Cloud Administrator account.
 
 .EXAMPLE
-    $csv = Get-Content list.csv | ConvertFrom-Csv; CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId $csv.ReferralUserId -Tier $csv.Tier -UserPhotoUrl $csv.UserPhotoUrl
+    CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId user3@contoso.com -Tier 1 -RequestDedicatedAccount true
+
+    Explicitly request to create a dedicated account for Cloud Administration in Tier 1 instead of assigning permissions to the referral user ID.
+
+.EXAMPLE
+    $csv = Get-Content list.csv | ConvertFrom-Csv; CloudAdmin_0100__New-CloudAdministrator-Account-V1.ps1 -ReferralUserId $csv.ReferralUserId -Tier $csv.Tier -UserPhotoUrl $csv.UserPhotoUrl -RequestDedicatedAccount $csv.RequestDedicatedAccount
 
     BATCH PROCESSING
     ================
@@ -179,12 +196,16 @@
 
     The CSV must have the following format:
 
-    ReferralUserId,Tier,UserPhotoUrl,
-    user1@contoso.com,0,,
-    user2@contoso.com,0,https://www.example.com/photo.jpg,
+    ReferralUserId,Tier,UserPhotoUrl,RequestDedicatedAccount,
+    user1@contoso.com,0,,,
+    user2@contoso.com,0,https://example.com/assets/Tier0-Admins.png,,
+    user3@contoso.com,1,,true,
 #>
 
 #region TODO:
+#- error when regular user account is requested and tiering group is dynamic
+#- as soon as regular users with different licsing model join the security group, they shall not receive license
+#- created user account must be assigned to an admin unit, ideally management protected (same as for groups)
 #- Check that admin unit contains only groups/users as per intention
 #- Let requester decide to always create a dedicated account if desired
 #- concurrent job testing
@@ -205,6 +226,7 @@ Param (
     [Array]$Tier,
 
     [Array]$UserPhotoUrl,
+    [Array]$RequestDedicatedAccount,
     [Boolean]$OutJson,
     [Boolean]$OutText,
     [Boolean]$OutObject,
@@ -216,10 +238,11 @@ if (
     ($ReferralUserId.Count -gt 1) -and
     (
         ($ReferralUserId.Count -ne $Tier.Count) -or
-        ($ReferralUserId.Count -ne $UserPhotoUrl.Count)
+        ($ReferralUserId.Count -ne $UserPhotoUrl.Count) -or
+        ($ReferralUserId.Count -ne $RequestDedicatedAccount.Count)
     )
 ) {
-    Throw 'ReferralUserId, Tier, and UserPhotoUrl must contain the same number of items for batch processing.'
+    Throw 'ReferralUserId, Tier, UserPhotoUrl, and RequestDedicatedAccount must contain the same number of items for batch processing.'
 }
 #endregion ---------------------------------------------------------------------
 
@@ -235,12 +258,17 @@ if (
 
 #region [COMMON] OPEN CONNECTIONS: Microsoft Graph -----------------------------
 .\Common_0001__Connect-MgGraph.ps1 -Scopes @(
+    # Read-only permissions
     'AuditLog.Read.All'
-    'User.ReadWrite.All'
     'Directory.Read.All'
-    'Group.ReadWrite.All'
     'Organization.Read.All'
     'OnPremDirectorySynchronization.Read.All'
+
+    # Write permissions
+    'Group.ReadWrite.All'
+    'User.ReadWrite.All'
+
+    # Other permissions
     'Mail.Send'
 ) 1> $null
 #endregion ---------------------------------------------------------------------
@@ -248,7 +276,7 @@ if (
 #region [COMMON] ENVIRONMENT ---------------------------------------------------
 .\Common_0002__Import-AzAutomationVariableToPSEnv.ps1 1> $null      # Implicitly connects to Azure Cloud
 $Constants = .\CloudAdmin_0000__Common_0000__Get-ConfigurationConstants.ps1
-.\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants 1> $null
+.\Common_0000__Convert-PSEnvToPSScriptVariable.ps1 -Variable $Constants 1> $null
 #endregion ---------------------------------------------------------------------
 
 #region [COMMON] CONCURRENT JOBS -----------------------------------------------
@@ -270,7 +298,7 @@ $AdminUnitIsMemberManagementRestricted = $false
 @($CloudAdminRestrictedAdminUnitId; $AccountRestrictedAdminUnitId_Tier0; $AccountAdminUnitId_Tier1; $AccountAdminUnitId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique | & {
     process {
         try {
-            $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $_ -ErrorAction Stop
+            $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $_ -ErrorAction Stop -Verbose:$false
         }
         catch {
             Throw $_
@@ -287,10 +315,10 @@ $AdminUnitIsMemberManagementRestricted = $false
             )
         ) {
             if (-Not $AdminUnitObj.IsMemberManagementRestricted) {
-                Throw "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must have restricted management enabled to be used for Cloud Administration."
+                Throw "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must have Restricted Management enabled to be used for Cloud Administration."
             }
             if ($AdminUnitObj.Visibility -ne 'HiddenMembership') {
-                Throw "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must have HiddenMembership visibility to be used for Cloud Administration."
+                Throw "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must have HiddenMembership visibility to be used for Cloud Administration."
             }
         }
 
@@ -301,10 +329,10 @@ $AdminUnitIsMemberManagementRestricted = $false
             )
         ) {
             if (-Not $AdminUnitObj.IsMemberManagementRestricted) {
-                Write-Warning "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider recreating with `-IsMemberManagementRestricted:$true` to increase security."
+                Write-Warning "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider recreating with `-IsMemberManagementRestricted:$true` to increase security."
             }
             if ($AdminUnitObj.Visibility -ne 'HiddenMembership') {
-                Write-Warning "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider recreating with `-Visibility 'HiddenMembership'` to increase security."
+                Write-Warning "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider recreating with `-Visibility 'HiddenMembership'` to increase security."
             }
         }
 
@@ -313,7 +341,7 @@ $AdminUnitIsMemberManagementRestricted = $false
             ($null -ne $AdminUnitObj.AdditionalProperties.membershipRuleProcessingState) -and
             ($AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -eq 'On')
         ) {
-            Throw "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must use static membership only as it is intended to contain privileged role groups only."
+            Throw "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Must use static membership only as it is intended to contain privileged role groups only."
         }
 
         if (
@@ -327,7 +355,10 @@ $AdminUnitIsMemberManagementRestricted = $false
             )
         ) {
             $script:AllowPrivilegedRoleAdministratorInAzureAutomation = $true
-            Write-Warning "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider changing membership rule to dynamic for automatic member assignment and avoid Privileged Role Administrator permissions. You may use property extensionAttribute$AccountTypeExtensionAttribute to identify Cloud Administrator account types."
+            Write-Warning "[AdministrativeUnitValidation]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)): Consider changing membership rule to dynamic for automatic member assignment and avoid Privileged Role Administrator permissions. You may use property extensionAttribute$AccountTypeExtensionAttribute to identify Cloud Administrator account types as well as UPN naming schema to identify accounts."
+            .\Common_0001__Connect-MgGraph.ps1 -Scopes @(
+                'AdministrativeUnit.ReadWrite.All'
+            ) 1> $null
         }
     }
 }
@@ -340,27 +371,20 @@ if ($AdminUnitIsMemberManagementRestricted) {
 
 #region Required Microsoft Entra Directory Permissions Validation --------------
 $DirectoryPermissions = .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.ps1 -AllowPrivilegedRoleAdministratorInAzureAutomation:$AllowPrivilegedRoleAdministratorInAzureAutomation -Roles @(
-    # Exchange Online to setup email forwarding
-    if ($DedicatedAccount_Tier0 -or $DedicatedAccount_Tier1 -or $DedicatedAccount_Tier2) {
-        Write-Verbose 'Require directory role: Exchange Recipient Administrator'
-        @{
-            DisplayName = 'Exchange Recipient Administrator'
-            TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
-        }
+    # Read user sign-in activity logs
+    Write-Verbose '[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role: Reports Reader, Directory Scope: /'
+    @{
+        DisplayName = 'Reports Reader'
+        TemplateId  = '4a5d8f65-41da-4de4-8968-e035b65339cf'
     }
 
-    # Cloud Administration Admin Units
-    if ($AllowPrivilegedRoleAdministratorInAzureAutomation) {
-        Write-Verbose 'Require directory role: Privileged Role Administrator'
-        @{
-            DisplayName = 'Privileged Role Administrator'
-            TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
-        }
-    }
-
-    # Cloud Administration Groups
-    if ($GroupId_Tier0 -or $GroupId_Tier1 -or $GroupId_Tier2) {
-        Write-Verbose 'Require directory role: Groups Administrator'
+    # Change Cloud Administration Tiering Security Groups
+    if (
+        (-Not [string]::IsNullOrEmpty($GroupId_Tier0)) -or
+        (-Not [string]::IsNullOrEmpty($GroupId_Tier1)) -or
+        (-Not [string]::IsNullOrEmpty($GroupId_Tier2))
+    ) {
+        Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role: Groups Administrator, Directory Scope: $(if ($CloudAdminRestrictedAdminUnitId) { "/administrativeUnits/$CloudAdminRestrictedAdminUnitId" } else { '/' })"
         @{
             DisplayName      = 'Groups Administrator'
             TemplateId       = 'fdd7a751-b60b-444a-984c-02652fe8fa1c'
@@ -368,56 +392,107 @@ $DirectoryPermissions = .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.p
         }
     }
 
-    # Tier 0 Cloud Admin Accounts
-    if ($DedicatedAccount_Tier0) {
-        Write-Verbose 'Require directory role (Tier 0): User Administrator'
-        @{
-            DisplayName      = 'User Administrator'
-            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-            DirectoryScopeId = if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' }
-        }
-        if (-Not $GroupId_Tier0) {
-            Write-Verbose 'Require directory role (Tier 0): License Administrator'
+    if (
+        ([string]::IsNullOrEmpty($DedicatedAccount_Tier0)) -or
+        ($DedicatedAccount_Tier0 -ne 'None') -or
+        ([string]::IsNullOrEmpty($DedicatedAccount_Tier1)) -or
+        ($DedicatedAccount_Tier1 -ne 'None') -or
+        ([string]::IsNullOrEmpty($DedicatedAccount_Tier2)) -or
+        ($DedicatedAccount_Tier2 -ne 'None')
+    ) {
+        # Create new Cloud Admin Accounts
+        #  (currently only required for Delegated Access it seems, as application
+        #   User.ReadWrite.All Graph scope seems to be sufficient as of today)
+        if ($env:MG_PRINCIPAL_TYPE -eq 'Delegated') {
+            Write-Verbose '[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (New Account): User Administrator, Directory Scope: /'
             @{
-                DisplayName      = 'License Administrator'
-                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DisplayName = 'User Administrator'
+                TemplateId  = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+            }
+        }
+
+        # Exchange Online to set up email forwarding
+        Write-Verbose '[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role: Exchange Recipient Administrator, Directory Scope: /'
+        @{
+            DisplayName = 'Exchange Recipient Administrator'
+            TemplateId  = '31392ffb-586c-42d1-9346-e59415a2cc4e'
+        }
+
+        # Add Cloud Admin Accounts to static Administration Units
+        if ($AllowPrivilegedRoleAdministratorInAzureAutomation -eq $true) {
+            Write-Verbose '[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role: Privileged Role Administrator, Directory Scope: /'
+            @{
+                DisplayName = 'Privileged Role Administrator'
+                TemplateId  = 'e8611ab8-c189-46e8-94e1-60213ab1f814'
+            }
+        }
+
+        # Change existing Tier 0 Cloud Admin Accounts
+        if (
+            ([string]::IsNullOrEmpty($DedicatedAccount_Tier0)) -or
+            ($DedicatedAccount_Tier0 -ne 'None')
+        ) {
+            Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 0): User Administrator, Directory Scope: $(if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' })"
+            @{
+                DisplayName      = 'User Administrator'
+                TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
                 DirectoryScopeId = if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' }
             }
-        }
-    }
 
-    # Tier 1 Cloud Admin Accounts
-    if ($DedicatedAccount_Tier1) {
-        Write-Verbose 'Require directory role (Tier 1): User Administrator'
-        @{
-            DisplayName      = 'User Administrator'
-            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-            DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
-        }
-        if (-Not $GroupId_Tier1) {
-            Write-Verbose 'Require directory role (Tier 1): License Administrator'
-            @{
-                DisplayName      = 'License Administrator'
-                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
-                DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
+            # If for whatever reason one does not want/have group-based licensing, manual license assignment is required
+            if ([string]::IsNullOrEmpty($LicenseGroupId_Tier0)) {
+                Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 0): License Administrator, Directory Scope: $(if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' })"
+                @{
+                    DisplayName      = 'License Administrator'
+                    TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                    DirectoryScopeId = if ($AccountRestrictedAdminUnitId_Tier0) { "/administrativeUnits/$AccountRestrictedAdminUnitId_Tier0" } else { '/' }
+                }
             }
         }
-    }
 
-    # Tier 2 Cloud Admin Accounts
-    if ($DedicatedAccount_Tier2) {
-        Write-Verbose 'Require directory role (Tier 2): User Administrator'
-        @{
-            DisplayName      = 'User Administrator'
-            TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
-            DirectoryScopeId = if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' }
-        }
-        if (-Not $GroupId_Tier2) {
-            Write-Verbose 'Require directory role (Tier 2): License Administrator'
+        # Change existing Tier 1 Cloud Admin Accounts
+        if (
+            ([string]::IsNullOrEmpty($DedicatedAccount_Tier1)) -or
+            ($DedicatedAccount_Tier1 -ne 'None')
+        ) {
+            Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 1): User Administrator, Directory Scope: $(if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' })"
             @{
-                DisplayName      = 'License Administrator'
-                TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                DisplayName      = 'User Administrator'
+                TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
+                DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
+            }
+
+            # If for whatever reason one does not want/have group-based licensing, manual license assignment is required
+            if ([string]::IsNullOrEmpty($LicenseGroupId_Tier1)) {
+                Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 1): License Administrator, Directory Scope: $(if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' })"
+                @{
+                    DisplayName      = 'License Administrator'
+                    TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                    DirectoryScopeId = if ($AccountAdminUnitId_Tier1) { "/administrativeUnits/$AccountAdminUnitId_Tier1" } else { '/' }
+                }
+            }
+        }
+
+        # Change existing Tier 2 Cloud Admin Accounts
+        if (
+            ([string]::IsNullOrEmpty($DedicatedAccount_Tier2)) -or
+            ($DedicatedAccount_Tier2 -ne 'None')
+        ) {
+            Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 2): User Administrator, Directory Scope: $(if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' })"
+            @{
+                DisplayName      = 'User Administrator'
+                TemplateId       = 'fe930be7-5e62-47db-91af-98c3a49a38b1'
                 DirectoryScopeId = if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' }
+            }
+
+            # If for whatever reason one does not want/have group-based licensing, manual license assignment is required
+            if ([string]::IsNullOrEmpty($LicenseGroupId_Tier2)) {
+                Write-Verbose "[RequiredMicrosoftEntraDirectoryPermissionsValidation]: - Require directory role (Tier 2): License Administrator, Directory Scope: $(if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' })"
+                @{
+                    DisplayName      = 'License Administrator'
+                    TemplateId       = '4d6ac14f-3453-41d0-bef9-a3e0c569773a'
+                    DirectoryScopeId = if ($AccountAdminUnitId_Tier2) { "/administrativeUnits/$AccountAdminUnitId_Tier2" } else { '/' }
+                }
             }
         }
     }
@@ -426,7 +501,7 @@ $DirectoryPermissions = .\Common_0003__Confirm-MgDirectoryRoleActiveAssignment.p
 
 #region License Existance Validation -------------------------------------------
 try {
-    $TenantLicensed = Get-MgBetaSubscribedSku -All -ErrorAction Stop
+    $TenantSubscriptions = Get-MgBetaSubscribedSku -All -ErrorAction Stop -Verbose:$false
 }
 catch {
     Throw $_
@@ -436,23 +511,23 @@ $SkuPartNumberWithExchangeServicePlan = $null
 @(($LicenseSkuPartNumber_Tier0 -split ' '); ($LicenseSkuPartNumber_Tier1 -split ' '); ($LicenseSkuPartNumber_Tier2 -split ' ')) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique | & {
     process {
         $SkuPartNumber = $_
-        $Sku = $TenantLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber } | Select-Object -Property Sku*, ServicePlans
+        $Sku = $TenantSubscriptions | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber } | Select-Object -Property Sku*, ServicePlans
         if (-Not $Sku) {
-            Throw "License SkuPartNumber $SkuPartNumber is not available to this tenant. Licenses must be purchased before creating Cloud Administrator accounts."
+            Throw "[LicenseExistanceValidation]: - License SkuPartNumber $SkuPartNumber is not available to this tenant. Licenses must be purchased before creating Cloud Administrator accounts."
         }
         if ($Sku.ServicePlans | Where-Object { ($_.AppliesTo -eq 'User') -and ($_.ServicePlanName -Match 'EXCHANGE') }) {
             if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
                 $script:SkuPartNumberWithExchangeServicePlan = $Sku.SkuPartNumber
-                Write-Verbose "Detected Exchange Online service plan in SkuPartNumber $SkuPartNumberWithExchangeServicePlan."
+                Write-Verbose "[LicenseExistanceValidation]: - Detected Exchange Online service plan in SkuPartNumber $SkuPartNumberWithExchangeServicePlan."
             }
             else {
-                Throw "There can only be one license configured containing an Exchange Online service plan: Make your choice between $SkuPartNumberWithExchangeServicePlan and $($Sku.SkuPartNumber)."
+                Throw "[LicenseExistanceValidation]: - There can only be one license configured containing an Exchange Online service plan: Make your choice between $SkuPartNumberWithExchangeServicePlan and $($Sku.SkuPartNumber)."
             }
         }
     }
 }
 if ($null -eq $SkuPartNumberWithExchangeServicePlan) {
-    Throw "One of the configured SkuPartNumbers must contain an Exchange Online service plan."
+    Throw "[LicenseExistanceValidation]: - One of the configured SkuPartNumbers must contain an Exchange Online service plan."
 }
 #endregion ---------------------------------------------------------------------
 
@@ -478,63 +553,68 @@ if (
     ($null -ne $tenant.tenantType) -and
     ($tenant.tenantType -ne 'AAD')
 ) {
-    Throw "Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.tenantType)."
+    Throw "[TenantValidation]: - Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.tenantType)."
 }
 elseif (
     ($null -ne $tenant.AdditionalProperties.tenantType) -and
     ($tenant.AdditionalProperties.tenantType -ne 'AAD')
 ) {
-    Throw "Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.AdditionalProperties.tenantType)."
+    Throw "[TenantValidation]: - Tenant $($tenant.DisplayName) ($($tenant.Id)) must be of type AAD but is of type $($tenant.AdditionalProperties.tenantType)."
 }
 #endregion ---------------------------------------------------------------------
 
 #region Group Validation -------------------------------------------------------
 if (
-    (@($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) }).Count -ne
-    (@($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Sort-Object -Unique).Count
+    (@($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2, $GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) }).Count -ne
+    (@($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2, $GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Sort-Object -Unique).Count
 ) {
-    Throw "Configured group object IDs in AV_CloudAdminTier<Tier>_GroupId must be unique. Use separate groups for each Tier level."
+    Throw "[GroupValidation]: - Configured group object IDs must be unique. Use separate groups for each Tier level."
 }
 
-@($GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | & {
+@($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2, $GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | & {
     process {
-        $ThisTier = if ($_ -eq $GroupId_Tier0) { 0 } elseif ($_ -eq $GroupId_Tier1) { 1 } elseif ($_ -eq $GroupId_Tier2) { 2 }
+        $IsLicenseGroup = if ($_ -in @($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2)) { $true } else { $false }
+        $ThisTier = if ($_ -in @($LicenseGroupId_Tier0, $GroupId_Tier0)) { 0 } elseif ($_ -in @($LicenseGroupId_Tier1, $GroupId_Tier1)) { 1 } elseif ($_ -in @($LicenseGroupId_Tier2, $GroupId_Tier2)) { 2 }
+
         try {
-            $GroupObj = Get-MgBetaGroup -GroupId $_ -ExpandProperty 'Owners' -ErrorAction Stop
+            $GroupObj = Get-MgBetaGroup -GroupId $_ -ExpandProperty 'Owners' -ErrorAction Stop -Verbose:$false
         }
         catch {
             Throw $_
         }
 
         if (-Not $GroupObj.SecurityEnabled) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be security-enabled to be used for Cloud Administration."
+            Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be security-enabled to be used for Cloud Administration."
         }
 
         if ($null -ne $GroupObj.OnPremisesSyncEnabled) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
+            Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must never be synced from on-premises directory to be used for Cloud Administration."
         }
 
         if (
             $GroupObj.GroupType -and
                 ($GroupObj.GroupType -contains 'Unified')
         ) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
+            Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
         }
 
         if ($GroupObj.MailEnabled) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
+            Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be mail-enabled to be used for Cloud Administration."
         }
 
         if (
                     (-Not $GroupObj.IsManagementRestricted) -and
                     (-Not $GroupObj.IsAssignableToRole)
         ) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
+            Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
         }
 
         if ($GroupObj.IsAssignableToRole) {
+            if (($IsLicenseGroup -eq $true) -and ($ThisTier -eq 0)) {
+                Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must NOT be role enabled and use dynamic membership to be used for Cloud Administration in Tier 0 and ensure email forwarding at all times. MUST also be a member of Management Restricted Administrative Unit that is configured in variable `$env:AV_CloudAdmin_RestrictedAdminUnitId."
+            }
             if ($GroupObj.IsManagementRestricted) {
-                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider recreating the group without role enablement to avoid Privileged Role Administrator role assignment. Using Management Restricted Administrative Unit only should be the preferred protection for Cloud Administration."
+                Write-Warning "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider recreating the group without role enablement to avoid Privileged Role Administrator role assignment. Using Management Restricted Administrative Unit only should be the preferred protection for Cloud Administration."
             }
             if (-Not (
                     $DirectoryPermissions | Where-Object {
@@ -546,32 +626,51 @@ if (
                     }
                 )
             ) {
-                Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Missing Privileged Role Administrator permission to change membership of this group. Preferably, add this group to a Management Restricted Administrative Unit instead of assinging the missing role."
+                Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Missing Privileged Role Administrator permission to change membership of this group. Preferably, add this group to a Management Restricted Administrative Unit instead of assigning the missing role."
             }
         }
 
         if ($GroupObj.IsManagementRestricted) {
             if ($CloudAdminRestrictedAdminUnitId) {
                 if (-Not (Get-MgBetaAdministrativeUnitMemberAsGroup -AdministrativeUnitId $CloudAdminRestrictedAdminUnitId -DirectoryObjectId $GroupObj.Id -ErrorAction SilentlyContinue)) {
-                    Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group must be a member if Management Restricted Administrative Unit $CloudAdminRestrictedAdminUnitId to be used for Cloud Administration."
+                    Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group MUST be a member of Management Restricted Administrative Unit $CloudAdminRestrictedAdminUnitId to be used for Cloud Administration."
                 }
             }
             else {
-                Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group is Management Restricted by undefined Administrative Unit. Please add the respective Administrative Unit ID to configuration variable `$env:AV_CloudAdmin_RestrictedAdminUnitId"
+                Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Group is Management Restricted by undefined Administrative Unit. Please add the respective Administrative Unit ID to configuration variable `$env:AV_CloudAdmin_RestrictedAdminUnitId"
             }
 
             if (
                 ($GroupObj.GroupType -Contains 'DynamicMembership') -and
                 ($GroupObj.MembershipRuleProcessingState -eq 'On')
             ) {
-                if ($ThisTier -eq 0) {
-                    Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not use dynamic membership to be used for Cloud Administration in Tier 0."
-                }
-                else {
-                    Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider disabling dynamic group membership for increased security."
-                }
                 if ($GroupObj.MembershipRule -notmatch '(?m)^.*user\..+$') {
                     Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must only use dynamic membership rule addressing user objects."
+                }
+
+                if ($IsLicenseGroup -ne $true) {
+                    if ($ThisTier -eq 0) {
+                        Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must NOT use dynamic membership to be used for Cloud Administration in Tier 0."
+                    }
+                    else {
+                        Write-Warning "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Consider disabling dynamic group membership for increased security."
+                    }
+                }
+            }
+
+            if (
+                ($IsLicenseGroup -eq $true) -and
+                (
+                    ($null -eq $GroupObj.GroupType) -or
+                    ($GroupObj.GroupType -notContains 'DynamicMembership') -or
+                    ($GroupObj.MembershipRuleProcessingState -ne 'On')
+                )
+            ) {
+                if ($ThisTier -eq 0) {
+                    Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): MUST use dynamic membership to be used for Cloud Administration in Tier 0 and ensure email forwarding at all times."
+                }
+                else {
+                    Write-Warning "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): You may consider enabling dynamic group membership to better ensure proper license assignment at all times (e.g. not loosing mailbox and email forwarding by accidentially removing an account from the group)."
                 }
             }
 
@@ -580,29 +679,10 @@ if (
             ) 1> $null
         }
 
-        $GroupDescription = Get-Variable -ValueOnly -name "GroupDescription_Tier$ThisTier"
-        if (-Not $GroupObj.Description) {
-            if (-Not [string]::IsNullOrEmpty($GroupDescription)) {
-                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Adding missing description for Tier $ThisTier identification."
-                try {
-                    Update-MgBetaGroup -GroupId $GroupObj.Id -Description $GroupDescription -ErrorAction Stop 1> $null
-                }
-                catch {
-                    Throw $_
-                }
-            }
-        }
-        elseif (
-                (-Not [string]::IsNullOrEmpty($GroupDescription)) -and
-                ($GroupObj.Description -ne $GroupDescription)
-        ) {
-            Throw "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): The description does not clearly identify this group as a Tier $ThisTier Administrators group. To avoid incorrect group assignments, please check that you are using the correct group. To use this group for Tier $Tier management, set the description property to '$GroupDescription'."
-        }
-
         if ($GroupObj.Visibility -ne 'Private') {
             Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Correcting visibility to Private for Cloud Administration."
             try {
-                Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' -ErrorAction Stop 1> $null
+                Update-MgBetaGroup -GroupId $GroupObj.Id -Visibility 'Private' -ErrorAction Stop -Verbose:$false 1> $null
             }
             catch {
                 Throw $_
@@ -611,9 +691,9 @@ if (
 
         $GroupObj.Owners | & {
             process {
-                Write-Warning "Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($_.Id)."
+                Write-Warning "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Removing unwanted group owner $($_.Id)."
                 try {
-                    Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $_.Id -ErrorAction Stop 1> $null
+                    Remove-MgBetaGroupOwnerByRef -GroupId $GroupObj.Id -DirectoryObjectId $_.Id -ErrorAction Stop -Verbose:$false 1> $null
                 }
                 catch {
                     Throw $_
@@ -645,8 +725,8 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region Process Referral User --------------------------------------------------
-function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUrl) {
-    Write-Verbose "-----STARTLOOP $ReferralUserId, Tier $Tier ---"
+function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUrl, $RequestDedicatedAccount) {
+    Write-Verbose "[ProcessReferralUser]: -----STARTLOOP $ReferralUserId, Tier $Tier ---"
 
     #region [COMMON] LOOP HANDLING -------------------------------------------------
     # Only process items if there was no error during script initialization before
@@ -668,76 +748,22 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     $Iteration++
     #endregion ---------------------------------------------------------------------
 
-    #region [COMMON] LOOP ENVIRONMENT ----------------------------------------------
-    .\Common_0000__Convert-PSEnvToPSLocalVariable.ps1 -Variable $Constants -scriptParameterOnly $true 1> $null
-
-    $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
-    $AllowedGuestOrExternalUserTypes = @( (Get-Variable -ValueOnly -Name "AllowedGuestOrExternalUserTypes_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
-    $AllowFacebookAccount = Get-Variable -ValueOnly -Name "AllowFacebookAccount_Tier$Tier"
-    $AllowGoogleAccount = Get-Variable -ValueOnly -Name "AllowGoogleAccount_Tier$Tier"
-    $AllowMicrosoftAccount = Get-Variable -ValueOnly -Name "AllowMicrosoftAccount_Tier$Tier"
-    $AllowExternalEntraAccount = Get-Variable -ValueOnly -Name "AllowExternalEntraAccount_Tier$Tier"
-    $AllowFederatedAccount = Get-Variable -ValueOnly -Name "AllowFederatedAccount_Tier$Tier"
-    $AllowSameDomainForReferralUser = Get-Variable -ValueOnly -Name "AllowSameDomainForReferralUser_Tier$Tier"
-    $AdminUnitId = if ($Tier -eq 0) { Get-Variable -ValueOnly -Name "AccountRestrictedAdminUnitId_Tier0" } else { Get-Variable -ValueOnly -Name "AccountAdminUnitId_Tier$Tier" }
-    $LicenseSkuPartNumbers = @( (Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
-    $AccountDomain = if ((Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier") -eq 'onmicrosoft.com') { $tenantDomain.Name } else { Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier" }
-    $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
-    $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
-
-    $AdminUnitObj = $null
-    if (-Not [string]::IsNullOrEmpty($AdminUnitId)) {
-        $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $AdminUnitId
-    }
-
-    $GroupObj = $null
-    if (-Not [string]::IsNullOrEmpty($GroupId)) {
-        $GroupObj = Get-MgBetaGroup -GroupId $GroupId
-    }
-
-    $refUserExObj = $null
-    $UserObj = $null
-    $TenantLicensed = $null
-    $UpdatedUserOnly = $false
-    #endregion ---------------------------------------------------------------------
-
-    #region Group Validation -------------------------------------------------------
-    if ($DedicatedAccount -eq $false) {
-        if (-Not $GroupObj) {
-            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                        Message          = "${ReferralUserId}: Internal configuration error."
-                        ErrorId          = '500'
-                        Category         = 'InvalidData'
-                        TargetName       = $ReferralUserId
-                        TargetObject     = $null
-                        TargetType       = 'UserId'
-                        CategoryActivity = 'Cloud Administrator Creation'
-                        CategoryReason   = "Static group for Tier $Tier must be configured in AV_CloudAdminTier${Tier}_GroupId when using ordinary user accounts."
-                    }))
-            return
-        }
-
-        if (
-            ($GroupObj.GroupType -Contains 'DynamicMembership') -and
-            ($GroupObj.MembershipRuleProcessingState -eq 'On')
-        ) {
-            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                        Message          = "${ReferralUserId}: Internal configuration error."
-                        ErrorId          = '500'
-                        Category         = 'InvalidData'
-                        TargetName       = $ReferralUserId
-                        TargetObject     = $null
-                        TargetType       = 'UserId'
-                        CategoryActivity = 'Cloud Administrator Creation'
-                        CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership when using ordinary user accounts."
-                    }))
-            return
-        }
-    }
-    #endregion
-
     #region [COMMON] PARAMETER VALIDATION ------------------------------------------
     $regex = '^[^\s]+@[^\s]+\.[^\s]+$|^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    if ($ReferralUserId -notmatch $regex) {
+        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: ReferralUserId is invalid ($ReferralUserId)"
+                    ErrorId           = '400'
+                    Category          = 'SyntaxError'
+                    TargetName        = $ReferralUserId
+                    TargetObject      = $null
+                    TargetType        = 'UserId'
+                    RecommendedAction = 'Provide either User Principal Name, or Object ID (UUID).'
+                    CategoryActivity  = 'ReferralUserId parameter validation'
+                    CategoryReason    = "Parameter ReferralUserId does not match $regex"
+                }))
+        return
+    }
     if ($LocalUserId -notmatch $regex) {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
                     Message           = "${ReferralUserId}: LocalUserId is invalid ($LocalUserId)"
@@ -782,7 +808,143 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 }))
         return
     }
+    $regex = '^true$'
+    if (
+        ($null -ne $RequestDedicatedAccount) -and
+        (
+            (
+                ($RequestDedicatedAccount -is [string]) -and
+                ($RequestDedicatedAccount -notmatch $regex)
+            ) -or
+            (
+                ($RequestDedicatedAccount -is [boolean]) -and
+                ($RequestDedicatedAccount -ne $true)
+            )
+        )
+    ) {
+        $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                    Message           = "${ReferralUserId}: RequestDedicatedAccount '$RequestDedicatedAccount' is invalid"
+                    ErrorId           = '400'
+                    Category          = 'SyntaxError'
+                    TargetName        = $ReferralUserId
+                    TargetObject      = $null
+                    TargetType        = 'UserId'
+                    RecommendedAction = 'RequestDedicatedAccount parameter may only be <empty> or true.'
+                    CategoryActivity  = 'RequestDedicatedAccount parameter validation'
+                    CategoryReason    = "Parameter RequestDedicatedAccount does not match $regex"
+                }))
+        return
+    }
     #endregion ---------------------------------------------------------------------
+
+    #region [COMMON] LOOP ENVIRONMENT ----------------------------------------------
+    .\Common_0000__Convert-PSEnvToPSScriptVariable.ps1 -Variable $Constants -scriptParameterOnly $true 1> $null
+
+    $DedicatedAccount = Get-Variable -ValueOnly -Name "DedicatedAccount_Tier$Tier"
+    $AllowedGuestOrExternalUserTypes = @( (Get-Variable -ValueOnly -Name "AllowedGuestOrExternalUserTypes_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
+    $AllowFacebookAccount = Get-Variable -ValueOnly -Name "AllowFacebookAccount_Tier$Tier"
+    $AllowGoogleAccount = Get-Variable -ValueOnly -Name "AllowGoogleAccount_Tier$Tier"
+    $AllowMicrosoftAccount = Get-Variable -ValueOnly -Name "AllowMicrosoftAccount_Tier$Tier"
+    $AllowExternalEntraAccount = Get-Variable -ValueOnly -Name "AllowExternalEntraAccount_Tier$Tier"
+    $AllowFederatedAccount = Get-Variable -ValueOnly -Name "AllowFederatedAccount_Tier$Tier"
+    $AllowSameDomainForReferralUser = Get-Variable -ValueOnly -Name "AllowSameDomainForReferralUser_Tier$Tier"
+    $AdminUnitId = if ($Tier -eq 0) { Get-Variable -ValueOnly -Name "AccountRestrictedAdminUnitId_Tier0" } else { Get-Variable -ValueOnly -Name "AccountAdminUnitId_Tier$Tier" }
+    $LicenseSkuPartNumbers = @( (Get-Variable -ValueOnly -Name "LicenseSkuPartNumber_Tier$Tier") -split ' ' | Where-Object { -Not [string]::IsNullOrEmpty($_) } | Select-Object -Unique )
+    $AccountDomain = if ((Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier") -eq 'onmicrosoft.com') { $tenantDomain.Name } else { Get-Variable -ValueOnly -Name "AccountDomain_Tier$Tier" }
+    $GroupId = Get-Variable -ValueOnly -Name "GroupId_Tier$Tier"
+    $LicenseGroupId = Get-Variable -ValueOnly -Name "LicenseGroupId_Tier$Tier"
+    $PhotoUrlUser = Get-Variable -ValueOnly -Name "PhotoUrl_Tier$Tier"
+
+    $AdminUnitObj = $null
+    if (-Not [string]::IsNullOrEmpty($AdminUnitId)) {
+        $AdminUnitObj = Get-MgBetaAdministrativeUnit -AdministrativeUnitId $AdminUnitId
+    }
+
+    $GroupObj = $null
+    if (-Not [string]::IsNullOrEmpty($GroupId)) {
+        $GroupObj = Get-MgBetaGroup -GroupId $GroupId
+    }
+
+    $LicenseGroupObj = $null
+    if (-Not [string]::IsNullOrEmpty($LicenseGroupId)) {
+        $LicenseGroupObj = Get-MgBetaGroup -GroupId $LicenseGroupId
+    }
+
+    $refUserExObj = $null
+    $UserObj = $null
+    $TenantSubscriptions = $null
+    $UpdatedUserOnly = $false
+
+    if (
+        ([string]::IsNullOrEmpty($DedicatedAccount)) -or
+        ($DedicatedAccount -eq 'Require')
+    ) {
+        Write-Verbose "[ProcessReferralUserLoopEnvironment]: - Dedicated admin account is required for Tier $Tier"
+        $DedicatedAccount = $true
+    }
+    elseif ($DedicatedAccount -eq 'Optional') {
+        if ([System.Convert]::ToBoolean($RequestDedicatedAccount) -eq $true) {
+            Write-Verbose "[ProcessReferralUserLoopEnvironment]: - Dedicated admin account for Tier $Tier will be created as requested"
+            $DedicatedAccount = $true
+        }
+        else {
+            Write-Verbose "[ProcessReferralUserLoopEnvironment]: - Optional dedicated admin account for Tier $Tier not requested"
+            $DedicatedAccount = $false
+        }
+    }
+    else {
+        if ([System.Convert]::ToBoolean($RequestDedicatedAccount) -eq $true) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Dedicated Cloud Administrator account is not supported for Tier $Tier."
+                        ErrorId          = '500'
+                        Category         = 'InvalidData'
+                        TargetName       = $ReferralUserId
+                        TargetObject     = $null
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'Cloud Administrator Creation'
+                        CategoryReason   = "Creation of dedicated admin account was requested, but is not enabled in configuration for Tier $Tier."
+                    }))
+            return
+        }
+        Write-Verbose "[ProcessReferralUserLoopEnvironment]: - No dedicated admin account required for Tier $Tier"
+        $DedicatedAccount = $false
+    }
+    #endregion ---------------------------------------------------------------------
+
+    #region Group Validation -------------------------------------------------------
+    if ($DedicatedAccount -eq $false) {
+        if (-Not $GroupObj) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Internal configuration error."
+                        ErrorId          = '500'
+                        Category         = 'InvalidData'
+                        TargetName       = $ReferralUserId
+                        TargetObject     = $null
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'Cloud Administrator Creation'
+                        CategoryReason   = "Static group for Tier $Tier must be configured in AV_CloudAdminTier${Tier}_GroupId when using ordinary user accounts."
+                    }))
+            return
+        }
+
+        if (
+            ($GroupObj.GroupType -Contains 'DynamicMembership') -and
+            ($GroupObj.MembershipRuleProcessingState -eq 'On')
+        ) {
+            $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                        Message          = "${ReferralUserId}: Internal configuration error."
+                        ErrorId          = '500'
+                        Category         = 'InvalidData'
+                        TargetName       = $ReferralUserId
+                        TargetObject     = $null
+                        TargetType       = 'UserId'
+                        CategoryActivity = 'Cloud Administrator Creation'
+                        CategoryReason   = "Group for Tier $Tier Cloud Administration must not use Dynamic Membership when using ordinary user accounts."
+                    }))
+            return
+        }
+    }
+    #endregion
 
     #region Referral User Validation -----------------------------------------------
     $userProperties = @(
@@ -827,10 +989,10 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         Property       = $userProperties
         ExpandProperty = $userExpandPropeties
         ErrorAction    = 'Stop'
+        Verbose        = $false
     }
     try {
         $refUserObj = Get-MgBetaUser @params
-        $refUserObj.SignInActivity = (Get-MgBetaUser -UserId $refUserObj.Id -Property SignInActivity -ErrorAction Stop).SignInActivity
     }
     catch {
         $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -963,7 +1125,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     if ($refUserTypeDetails.IsInternal -eq $true) {
 
         #region Internal Accounts
-        Write-Verbose "${ReferralUserId} is classified as internal user"
+        Write-Verbose "[ProcessReferralUserValidation]: - ${ReferralUserId} is classified as internal user"
 
         if (
             ($DedicatedAccount -eq $true) -and
@@ -1037,7 +1199,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             ($tenant.VerifiedDomains | Where-Object { $_.Name -eq $(($refUserObj.UserPrincipalName).Split('@')[1]) }).Capabilities.Split(', ') -contains 'Email'
         ) {
             try {
-                $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction Stop
+                $refUserExObj = Get-EXOMailbox -ExternalDirectoryObjectId $refUserObj.Id -ErrorAction Stop -Verbose:$false
             }
             catch {
                 $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1053,7 +1215,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 return
             }
 
-            Write-Verbose "Found internal mailbox for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserExObj.Mail) and PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
+            Write-Verbose "[ProcessReferralUserValidationInternalAccounts]: - Found internal mailbox for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) PrimarySmtpAddress $($refUserExObj.PrimarySmtpAddress)"
 
             if (
                 ($refUserExObj.RecipientType -notmatch '^(?:Remote)?UserMailbox$') -or
@@ -1095,7 +1257,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 $refUserDomainMX = (Resolve-Dns -Query (($refUserObj.Mail).Split('@')[1]) -QueryType MX -Timeout (New-Timespan -Sec 30) -ContinueOnDnsError:$false -ContinueOnEmptyResponse:$false -ErrorAction SilentlyContinue).Answers
             }
             else {
-                Write-Warning 'Missing PowerShell module DnsClient-PS to validate MX record.'
+                Write-Warning '[ProcessReferralUserValidationInternalAccounts]: - Missing PowerShell module DnsClient-PS to validate MX record.'
             }
 
             if ($validateRefUserDomainMX -and -not $refUserDomainMX) {
@@ -1112,16 +1274,23 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 return
             }
 
-            Write-Verbose "Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
+            Write-Verbose "[ProcessReferralUserValidationInternalAccounts]: - Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
+        }
+
+        try {
+            $refUserObjSignInActivity = (Get-MgBetaUser -UserId $refUserObj.Id -Property SignInActivity -ErrorAction Stop -Verbose:$false).SignInActivity
+        }
+        catch {
+            Throw $_
         }
 
         if (
-            -Not ($refUserObj.SignInActivity) -or
-            -Not ($refUserObj.SignInActivity.LastSignInDateTime) -or
-            -Not ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime) -or
+            -Not ($refUserObjSignInActivity) -or
+            -Not ($refUserObjSignInActivity.LastSignInDateTime) -or
+            -Not ($refUserObjSignInActivity.LastNonInteractiveSignInDateTime) -or
             (
-                ($refUserObj.SignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-14)) -and
-                ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-14))
+                ($refUserObjSignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-14)) -and
+                ($refUserObjSignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-14))
             )
         ) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1144,7 +1313,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     else {
 
         #region Guest or External Accounts
-        Write-Verbose "${ReferralUserId} is classified as external user"
+        Write-Verbose "[ProcessReferralUserValidation]: - ${ReferralUserId} is classified as external user"
 
         if ($refUserTypeDetails.IsEmailOTPAuthentication -ne $false) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1271,7 +1440,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             $refUserDomainMX = (Resolve-Dns -Query (($refUserObj.Mail).Split('@')[1]) -QueryType MX -Timeout (New-Timespan -Sec 30) -ContinueOnDnsError:$false -ContinueOnEmptyResponse:$false -ErrorAction SilentlyContinue).Answers
         }
         else {
-            Write-Warning 'Missing PowerShell module DnsClient-PS to validate MX record.'
+            Write-Warning '[ProcessReferralUserValidationExternalAccounts]: - Missing PowerShell module DnsClient-PS to validate MX record.'
         }
 
         if ($validateRefUserDomainMX -and -not $refUserDomainMX) {
@@ -1288,7 +1457,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             return
         }
 
-        Write-Verbose "Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
+        Write-Verbose "[ProcessReferralUserValidationExternalAccounts]: - Implying external mailbox exists for $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) with email $($refUserObj.Mail), based on existing MX DNS record"
 
         if (
             ([string]::IsNullOrEmpty($refUserTypeDetails.GuestOrExternalUserType)) -or
@@ -1326,12 +1495,12 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
 
         if (
-            -Not ($refUserObj.SignInActivity) -or
-            -Not ($refUserObj.SignInActivity.LastSignInDateTime) -or
-            -Not ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime) -or
+            -Not ($refUserObjSignInActivity) -or
+            -Not ($refUserObjSignInActivity.LastSignInDateTime) -or
+            -Not ($refUserObjSignInActivity.LastNonInteractiveSignInDateTime) -or
             (
-                ($refUserObj.SignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-30)) -and
-                ($refUserObj.SignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-30))
+                ($refUserObjSignInActivity.LastSignInDateTime -lt $return.Job.CreationTime.AddDays(-30)) -and
+                ($refUserObjSignInActivity.LastNonInteractiveSignInDateTime -lt $return.Job.CreationTime.AddDays(-30))
             )
         ) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1367,9 +1536,9 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     #endregion ---------------------------------------------------------------------
 
-    #region No Dedicated User Account required -------------------------------------
+    #region No Dedicated User Account requested/required ---------------------------
     if ($DedicatedAccount -eq $false) {
-        Write-Verbose "NO dedicated account required for Tier $Tier Cloud Administration, assigning ordinary user account directly instead."
+        Write-Verbose "[ProcessReferralUserNoDedicated]: - NO dedicated account requested/required for Tier $Tier Cloud Administration, assigning ordinary user account directly instead."
 
         if ($PhotoUrlUser) {
             $script:returnInformation.Add(( .\Common_0000__Write-Information.ps1 @{
@@ -1393,7 +1562,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 Filter           = "Id eq '$($refUserObj.Id)'"
             }
             if (-Not (Get-MgBetaGroupMember @params)) {
-                Write-Verbose "Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
+                Write-Verbose "[ProcessReferralUserNoDedicated]: - Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
                 New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $refUserObj.Id
             }
         }
@@ -1411,7 +1580,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             return
         }
 
-        Write-Verbose "Nominated ordinary user account $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) as Tier $Tier Cloud Administrator account" -Verbose
+        Write-Verbose "[ProcessReferralUserNoDedicated]: - Nominated ordinary user account $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) as Tier $Tier Cloud Administrator account" -Verbose
         #endregion ---------------------------------------------------------------------
 
         #region Add Return Data --------------------------------------------------------
@@ -1450,13 +1619,13 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
         #endregion ---------------------------------------------------------------------
 
-        Write-Verbose "-------ENDLOOP $ReferralUserId ---"
+        Write-Verbose "[ProcessReferralUser]: -------ENDLOOP $ReferralUserId ---"
         return $data
     }
     #endregion
 
     #region Prepare New User Account Properties ------------------------------------
-    Write-Verbose "Dedicated account is required for Tier $Tier Cloud Administration"
+    Write-Verbose "[ProcessReferralUserDedicatedAccount]: - Dedicated account requested/required for Tier $Tier Cloud Administration"
 
     $UserPrefix = if (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") {
         (Get-Variable -ValueOnly -Name "UserPrincipalNamePrefix_Tier$Tier") +
@@ -1527,10 +1696,10 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         PasswordPolicies              = 'DisablePasswordExpiration'
     }
 
-    Write-Verbose 'Copying property DisplayName'
+    Write-Verbose '[ProcessReferralUserDedicatedAccountProperties]: - Copying property DisplayName'
     $BodyParams.DisplayName = ''
     if (Get-Variable -ValueOnly -Name "UserDisplayNamePrefix_Tier$Tier") {
-        Write-Verbose "Adding prefix to property DisplayName"
+        Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding prefix to property DisplayName"
         $BodyParams.DisplayName += Get-Variable -ValueOnly -Name "UserDisplayNamePrefix_Tier$Tier"
         if (Get-Variable -ValueOnly -Name "UserDisplayNamePrefixSeparator_Tier$Tier") {
             $BodyParams.DisplayName += Get-Variable -ValueOnly -Name "UserDisplayNamePrefixSeparator_Tier$Tier"
@@ -1538,7 +1707,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     $BodyParams.DisplayName += $refUserObj.DisplayName
     if (Get-Variable -ValueOnly -Name "UserDisplayNameSuffix_Tier$Tier") {
-        Write-Verbose "Adding suffix to property DisplayName"
+        Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding suffix to property DisplayName"
         if (Get-Variable -ValueOnly -Name "UserDisplayNameSuffixSeparator_Tier$Tier") {
             $BodyParams.DisplayName += Get-Variable -ValueOnly -Name "UserDisplayNameSuffixSeparator_Tier$Tier"
         }
@@ -1547,7 +1716,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
     if ($AccountTypeEmployeeType -eq $true) {
         if ([string]::IsNullOrEmpty($refUserObj.EmployeeType)) {
-            Write-Verbose "Creating property EmployeeType"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Creating property EmployeeType"
             $BodyParams.EmployeeType = if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefix_Tier$Tier") {
                 (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefix_Tier$Tier")
             }
@@ -1557,10 +1726,10 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             else { $null }
         }
         else {
-            Write-Verbose "Copying property EmployeeType"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Copying property EmployeeType"
             $BodyParams.EmployeeType = ''
             if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefix_Tier$Tier") {
-                Write-Verbose "Adding prefix to property EmployeeType"
+                Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding prefix to property EmployeeType"
                 $BodyParams.EmployeeType += Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefix_Tier$Tier"
                 if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefixSeparator_Tier$Tier") {
                     $BodyParams.EmployeeType += Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypePrefixSeparator_Tier$Tier"
@@ -1568,7 +1737,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
             $BodyParams.EmployeeType += $refUserObj.EmployeeType
             if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypeSuffix_Tier$Tier") {
-                Write-Verbose "Adding suffix to property EmployeeType"
+                Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding suffix to property EmployeeType"
                 if (Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypeSuffixSeparator_Tier$Tier") {
                     $BodyParams.EmployeeType += Get-Variable -ValueOnly -Name "AccountTypeEmployeeTypeSuffixSeparator_Tier$Tier"
                 }
@@ -1588,7 +1757,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     $extAttrAccountType = 'extensionAttribute' + $AccountTypeExtensionAttribute
     if (-Not [string]::IsNullOrEmpty($AccountTypeExtensionAttribute)) {
         if ([string]::IsNullOrEmpty($refUserObj.OnPremisesExtensionAttributes.$extAttrAccountType)) {
-            Write-Verbose "Creating property $extAttrAccountType"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Creating property $extAttrAccountType"
             $BodyParams.OnPremisesExtensionAttributes.$extAttrAccountType = if (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefix_Tier$Tier") {
                 (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefix_Tier$Tier")
             }
@@ -1598,10 +1767,10 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             else { $null }
         }
         else {
-            Write-Verbose "Copying property $extAttrName"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Copying property $extAttrName"
             $BodyParams.OnPremisesExtensionAttributes.$extAttrName = ''
             if (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefix_Tier$Tier") {
-                Write-Verbose "Adding prefix to property EmployeeType"
+                Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding prefix to property EmployeeType"
                 $BodyParams.EmployeeType += Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefix_Tier$Tier"
                 if (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefixSeparator_Tier$Tier") {
                     $BodyParams.EmployeeType += Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributePrefixSeparator_Tier$Tier"
@@ -1609,7 +1778,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
             $BodyParams.OnPremisesExtensionAttributes.$extAttrName += $refUserObj.EmployeeType
             if (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributeSuffix_Tier$Tier") {
-                Write-Verbose "Adding suffix to property EmployeeType"
+                Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Adding suffix to property EmployeeType"
                 if (Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributeSuffixSeparator_Tier$Tier") {
                     $BodyParams.OnPremisesExtensionAttributes.$extAttrName += Get-Variable -ValueOnly -Name "AccountTypeExtensionAttributeSuffixSeparator_Tier$Tier"
                 }
@@ -1656,7 +1825,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             return
         }
 
-        Write-Verbose "Creating property $extAttrRef"
+        Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Creating property $extAttrRef"
         $BodyParams.OnPremisesExtensionAttributes.$extAttrRef = $refUserObj.Id
     }
 
@@ -1679,17 +1848,17 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
 
     if (-Not [string]::IsNullOrEmpty($refUserObj.GivenName)) {
-        Write-Verbose 'Copying property GivenName'
+        Write-Verbose '[ProcessReferralUserDedicatedAccountProperties]: - Copying property GivenName'
         $BodyParams.GivenName = $(
             if (Get-Variable -ValueOnly -Name "GivenNamePrefix_Tier$Tier") {
-                Write-Verbose 'Adding prefix to property GivenName'
+                Write-Verbose '[ProcessReferralUserDedicatedAccountProperties]: - Adding prefix to property GivenName'
                 (Get-Variable -ValueOnly -Name "GivenNamePrefix_Tier$Tier") +
                 $(if (Get-Variable -ValueOnly -Name "GivenNamePrefixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "GivenNamePrefixSeparator_Tier$Tier" } else { '' } )
             }
             else { '' }
         ) + $refUserObj.GivenName + $(
             if (Get-Variable -ValueOnly -Name "GivenNameSuffix_Tier$Tier") {
-                Write-Verbose 'Adding suffix to property GivenName'
+                Write-Verbose '[ProcessReferralUserDedicatedAccountProperties]: - Adding suffix to property GivenName'
                 $(if (Get-Variable -ValueOnly -Name "GivenNameSuffixSeparator_Tier$Tier") { Get-Variable -ValueOnly -Name "GivenNameSuffixSeparator_Tier$Tier" } else { '' } ) +
                 (Get-Variable -ValueOnly -Name "GivenNameSuffix_Tier$Tier")
             }
@@ -1717,24 +1886,24 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 # Empty or null values require special handling because
                 # MS Graph module momentarily does not handle them properly
                 if ([string]::IsNullOrEmpty($refUserObj.$_)) {
-                    Write-Verbose "Clearing property $_"
+                    Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Clearing property $_"
                     $BodyParamsNull.$_ = $null
                 }
                 else {
-                    Write-Verbose "Copying property $_"
+                    Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Copying property $_"
                     $BodyParams.$_ = $refUserObj.$_
                 }
             }
         }
     }
 
-    if ([string]::IsNullOrEmpty($BodyParams.UsageLocation) -and -not $GroupObj) {
+    if ([string]::IsNullOrEmpty($BodyParams.UsageLocation) -and -not $LicenseGroupObj) {
         $BodyParams.UsageLocation = if ($tenant.DefaultUsageLocation) {
-            Write-Verbose "Creating property UsageLocation from tenant DefaultUsageLocation"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Creating property UsageLocation from tenant DefaultUsageLocation"
             $tenant.DefaultUsageLocation
         }
         else {
-            Write-Verbose "Creating property UsageLocation from tenant CountryLetterCode"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountProperties]: - Creating property UsageLocation from tenant CountryLetterCode"
             $tenant.CountryLetterCode
         }
     }
@@ -1746,6 +1915,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         Method     = 'GET'
         Headers    = @{ ConsistencyLevel = 'eventual' }
         Uri        = "https://graph.microsoft.com/v1.0/directory/deletedItems/microsoft.graph.user?`$count=true&`$filter=endsWith(UserPrincipalName,'$($BodyParams.UserPrincipalName)')"
+        Verbose    = $false
     }
     $deletedUserList = Invoke-MgGraphRequest @params
 
@@ -1790,7 +1960,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     $duplicatesObj = Get-MgBetaUser @params
 
     if ($userCount -gt 1) {
-        Write-Warning "Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
+        Write-Warning "[ProcessReferralUserDedicatedAccountCompliance]: - Admin account $($BodyParams.UserPrincipalName) is not mutually exclusive. $userCount existing accounts found: $( $duplicatesObj.UserPrincipalName )"
 
         $script:returnWarning.Add(( .\Common_0000__Write-Warning.ps1 @{
                     Message           = "${ReferralUserId}: Admin account must be mutually exclusive."
@@ -1838,6 +2008,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             BodyParameter = $BodyParams
             Confirm       = $false
             ErrorAction   = 'Stop'
+            Verbose       = $false
         }
 
         try {
@@ -1865,6 +2036,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 Uri         = "https://graph.microsoft.com/beta/users/$($existingUserObj.Id)"
                 Body        = $BodyParamsNull
                 ErrorAction = 'Stop'
+                Verbose     = $false
             }
             try {
                 Invoke-MgGraphRequest @params 1> $null
@@ -1885,11 +2057,11 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
         $UserObj = Get-MgBetaUser -UserId $existingUserObj.Id
         $UpdatedUserOnly = $true
-        Write-Verbose "Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
+        Write-Verbose "[ProcessReferralUserDedicatedAccountUpdate]: - Updated existing Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
     }
     else {
         #region License Availability Validation Before New Account Creation ------------
-        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
+        $TenantSubscriptions = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
             process {
                 if ($_.ConsumedUnits -ge $_.Enabled) {
                     $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1906,7 +2078,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                     $script:persistentError = $true
                 }
                 else {
-                    Write-Verbose "License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
+                    Write-Verbose "[ProcessReferralUserDedicatedAccountCreate]: - License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
                     $_
                 }
             }
@@ -1921,7 +2093,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
 
         try {
-            $UserObj = New-MgBetaUser -BodyParameter $BodyParams -ErrorAction Stop
+            $UserObj = New-MgBetaUser -BodyParameter $BodyParams -ErrorAction Stop -Verbose:$false
         }
         catch {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -1940,7 +2112,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         # Wait for user provisioning consistency
         $DoLoop = $true
         $RetryCount = 1
-        $MaxRetry = 30
+        $MaxRetry = 120
         $WaitSec = 7
         $newUser = $UserObj
 
@@ -1977,12 +2149,12 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for user provisioning consistency ..." -Verbose
+                Write-Verbose "[ProcessReferralUserDedicatedAccountCreate]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for user provisioning consistency ..." -Verbose
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
 
-        Write-Verbose "Created new Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
+        Write-Verbose "[ProcessReferralUserDedicatedAccountCreate]: - Created new Tier $Tier Cloud Administrator account $($UserObj.UserPrincipalName) ($($UserObj.Id)) with information from $($refUserObj.UserPrincipalName) ($($refUserObj.Id))" -Verbose
     }
 
     if ($null -eq $UserObj) {
@@ -2009,7 +2181,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     if ($AdminUnitObj -and ($null -eq (Get-MgBetaAdministrativeUnitMemberAsUser @params))) {
         if (-not $AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -or ($AdminUnitObj.AdditionalProperties.membershipRuleProcessingState -ne 'On')) {
-            Write-Verbose "Adding account to Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id))"
+            Write-Verbose "[ProcessReferralUserDedicatedAccountUpdate]: - Adding account to Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id))"
             $params = @{
                 OutputType  = 'PSObject'
                 Method      = 'POST'
@@ -2019,6 +2191,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                     '@odata.id' = "https://graph.microsoft.com/beta/users/$($UserObj.Id)"
                 }
                 ErrorAction = 'Stop'
+                Verbose     = $false
             }
 
             try {
@@ -2039,13 +2212,13 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
         }
         else {
-            Write-Verbose "Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)) as dynamic membership processing enabled; skipping manually adding account and wait for dynamic processing instead."
+            Write-Verbose "[ProcessReferralUserDedicatedAccountAdminUnit]: - Admin Unit $($AdminUnitObj.DisplayName) ($($AdminUnitObj.Id)) has dynamic membership processing enabled; skipping manually adding account and wait for dynamic processing instead."
         }
 
         # Wait for admin unit membership
         $DoLoop = $true
         $RetryCount = 1
-        $MaxRetry = 30
+        $MaxRetry = 120
         $WaitSec = 7
 
         do {
@@ -2056,7 +2229,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 ErrorAction          = 'SilentlyContinue'
             }
             if ($null -ne (Get-MgBetaAdministrativeUnitMemberAsUser @params)) {
-                Write-Verbose "OK: Detected admin unit membership."
+                Write-Verbose "[ProcessReferralUserDedicatedAccountAdminUnit]: - OK: Detected admin unit membership."
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
@@ -2080,7 +2253,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for admin unit assignment ..." -Verbose
+                Write-Verbose "[ProcessReferralUserDedicatedAccountAdminUnit]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for admin unit assignment ..." -Verbose
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
@@ -2094,13 +2267,13 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             ($existingUserObj.Manager.Id -ne $refUserObj.Id)
         ) {
             if ($existingUserObj) {
-                Write-Warning "Correcting Manager reference to $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
+                Write-Warning "[ProcessReferralUserDedicatedAccountManager]: - Correcting Manager reference to $($refUserObj.UserPrincipalName) ($($refUserObj.Id))"
             }
             $NewManager = @{
                 '@odata.id' = 'https://graph.microsoft.com/beta/users/' + $refUserObj.Id
             }
             try {
-                Set-MgBetaUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager -ErrorAction Stop 1> $null
+                Set-MgBetaUserManagerByRef -UserId $UserObj.Id -BodyParameter $NewManager -ErrorAction Stop -Verbose:$false 1> $null
             }
             catch {
                 $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -2121,9 +2294,9 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         $existingUserObj -and
         ($null -ne $existingUserObj.Manager.Id)
     ) {
-        Write-Warning "Removing Manager reference to $($existingUserObj.Manager.DisplayName) ($($existingUserObj.Manager.Id))"
+        Write-Warning "[ProcessReferralUserDedicatedAccountManager]: - Removing Manager reference to $($existingUserObj.Manager.DisplayName) ($($existingUserObj.Manager.Id))"
         try {
-            Remove-MgBetaUserManagerByRef -UserId $existingUserObj.Id -ErrorAction Stop
+            Remove-MgBetaUserManagerByRef -UserId $existingUserObj.Id -ErrorAction Stop -Verbose:$false
         }
         catch {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -2142,8 +2315,8 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     #endregion ---------------------------------------------------------------------
 
     #region License Availability Validation For Pre-Existing Account ---------------
-    if (-Not $TenantLicensed) {
-        $TenantLicensed = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
+    if (-Not $TenantSubscriptions) {
+        $TenantSubscriptions = Get-MgBetaSubscribedSku -All | Where-Object { $_.SkuPartNumber -in $LicenseSkuPartNumbers } | Select-Object -Property Sku*, ConsumedUnits, ServicePlans -ExpandProperty PrepaidUnits | & {
             process {
                 if ($_.ConsumedUnits -ge $_.Enabled) {
                     $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -2160,7 +2333,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                     $script:persistentError = $true
                 }
                 else {
-                    Write-Verbose "License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
+                    Write-Verbose "[ProcessReferralUserDedicatedAccountUpdate]: - License SkuPartNumber $($_.SkuPartNumber) has at least 1 free license available to continue"
                     $_
                 }
             }
@@ -2170,22 +2343,23 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     #endregion ---------------------------------------------------------------------
 
     #region Direct License Assignment ----------------------------------------------
-    if (-Not $GroupObj) {
-        Write-Verbose "Implying direct license assignment is required as no GroupId was provided for group-based licensing."
-        $UserLicensed = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
+    if (-Not $LicenseGroupObj) {
+        Write-Verbose "[ProcessReferralUserDedicatedAccountDirectLicensing]: - Implying direct license assignment is required as no GroupId was provided for group-based licensing."
+        $UserLicenses = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
         $params = @{
             UserId         = $UserObj.Id
             AddLicenses    = [System.Collections.ArrayList]::new()
             RemoveLicenses = [System.Collections.ArrayList]::new()
             ErrorAction    = 'Stop'
+            Verbose        = $false
         }
 
         $LicenseSkuPartNumbers | & {
             process {
                 $SkuPartNumber = $_
-                if (-Not ($UserLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber })) {
-                    Write-Verbose "Adding missing license $SkuPartNumber"
-                    $Sku = $TenantLicensed | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber }
+                if (-Not ($UserLicenses | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber })) {
+                    Write-Verbose "[ProcessReferralUserDedicatedAccountDirectLicensing]: - Adding missing license $SkuPartNumber"
+                    $Sku = $TenantSubscriptions | Where-Object { $_.SkuPartNumber -eq $SkuPartNumber }
                     $license = @{
                         SkuId = $Sku.SkuId
                     }
@@ -2221,22 +2395,22 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     #endregion ---------------------------------------------------------------------
 
-    #region Group Membership Assignment --------------------------------------------
-    if ($GroupObj) {
+    #region Licensing Group Membership Assignment ----------------------------------
+    if ($LicenseGroupObj) {
         if (
-            ($GroupObj.GroupType -NotContains 'DynamicMembership') -or
-            ($GroupObj.MembershipRuleProcessingState -ne 'On')
+            ($LicenseGroupObj.GroupType -NotContains 'DynamicMembership') -or
+            ($LicenseGroupObj.MembershipRuleProcessingState -ne 'On')
         ) {
             $params = @{
                 ConsistencyLevel = 'eventual'
-                GroupId          = $GroupObj.Id
+                GroupId          = $LicenseGroupObj.Id
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($UserObj.Id)'"
             }
             if (-Not (Get-MgBetaGroupMember @params)) {
-                Write-Verbose "Adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
+                Write-Verbose "[ProcessReferralUserDedicatedAccountGroupLicensing]: - Adding user to static group $($LicenseGroupObj.DisplayName) ($($LicenseGroupObj.Id))"
                 try {
-                    New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop
+                    New-MgBetaGroupMember -GroupId $LicenseGroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop -Verbose:$false
                 }
                 catch {
                     $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -2254,21 +2428,21 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
             }
         }
 
-        # Wait for group membership
+        # Wait for licensing group membership
         $DoLoop = $true
         $RetryCount = 1
-        $MaxRetry = 30
+        $MaxRetry = 120
         $WaitSec = 7
 
         do {
             $params = @{
                 ConsistencyLevel = 'eventual'
-                GroupId          = $GroupObj.Id
+                GroupId          = $LicenseGroupObj.Id
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($UserObj.Id)'"
             }
             if ($null -ne (Get-MgBetaGroupMember @params)) {
-                Write-Verbose "OK: Detected group memnbership."
+                Write-Verbose "[ProcessReferralUserDedicatedAccountGroupLicensing]: - OK: Detected licensing group membership."
                 $DoLoop = $false
             }
             elseif ($RetryCount -ge $MaxRetry) {
@@ -2278,7 +2452,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 $DoLoop = $false
 
                 $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
-                            Message           = "${ReferralUserId}: Group assignment timeout for $($UserObj.UserPrincipalName)."
+                            Message           = "${ReferralUserId}: Licensing group assignment timeout for $($UserObj.UserPrincipalName)."
                             ErrorId           = '504'
                             Category          = 'OperationTimeout'
                             TargetName        = $refUserObj.UserPrincipalName
@@ -2286,13 +2460,13 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                             TargetType        = 'UserId'
                             RecommendedAction = 'Try again later.'
                             CategoryActivity  = 'Account Provisioning'
-                            CategoryReason    = "A timeout occured during provisioning wait after group assignment."
+                            CategoryReason    = "A timeout occured during provisioning wait after licensing group assignment."
                         }))
                 return
             }
             else {
                 $RetryCount += 1
-                Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for group assignment ..." -Verbose
+                Write-Verbose "[ProcessReferralUserDedicatedAccountGroupLicensing]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for licensing group assignment ..." -Verbose
                 Start-Sleep -Seconds $WaitSec
             }
         } While ($DoLoop)
@@ -2302,22 +2476,18 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     #region Wait for Exchange Service Plan Provisioning ----------------------------
     $DoLoop = $true
     $RetryCount = 1
-    $MaxRetry = 30
+    $MaxRetry = 120
     $WaitSec = 7
 
     do {
-        $UserLicensed = Get-MgBetaUserLicenseDetail -UserId $UserObj.Id
         if (
-            ($null -ne $UserLicensed) -and
-            (
-                $UserLicensed.ServicePlans | Where-Object {
-                    ($_.AppliesTo -eq 'User') -and
-                    ($_.ProvisioningStatus -eq 'Success') -and
-                    ($_.ServicePlanName -Match 'EXCHANGE')
-                }
-            )
+            (Get-MgBetaUser -UserId $UserObj.Id -Property ProvisionedPlans).ProvisionedPlans | Where-Object {
+                ($_.Service -eq 'exchange') -and
+                ($_.ProvisioningStatus -eq 'Success') -and
+                ($_.CapabilityStatus -eq 'Enabled')
+            }
         ) {
-            Write-Verbose "OK: Detected license provisioning completion."
+            Write-Verbose "[ProcessReferralUserDedicatedAccountExchangeLicenseProvisioning]: - OK: Detected license provisioning completion."
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
@@ -2341,7 +2511,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
         else {
             $RetryCount += 1
-            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange license assignment ..." -Verbose
+            Write-Verbose "[ProcessReferralUserDedicatedAccountExchangeLicenseProvisioning]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for Exchange Online license activation ..." -Verbose
             Start-Sleep -Seconds $WaitSec
         }
     } While ($DoLoop)
@@ -2355,9 +2525,9 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
     $userExObj = $null
     do {
-        $userExObj = Get-EXOMailbox -ExternalDirectoryObjectId $UserObj.Id -ErrorAction SilentlyContinue
+        $userExObj = Get-EXOMailbox -ExternalDirectoryObjectId $UserObj.Id -ErrorAction SilentlyContinue -Verbose:$false
         if ($null -ne $userExObj) {
-            Write-Verbose "OK: Detected mailbox provisioning completion."
+            Write-Verbose "[ProcessReferralUserDedicatedAccountExchangeMailbox]: - OK: Detected mailbox provisioning completion."
             $DoLoop = $false
         }
         elseif ($RetryCount -ge $MaxRetry) {
@@ -2381,7 +2551,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
         else {
             $RetryCount += 1
-            Write-Verbose "Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for mailbox creation ..." -Verbose
+            Write-Verbose "[ProcessReferralUserDedicatedAccountExchangeMailbox]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for mailbox creation ..." -Verbose
             Start-Sleep -Seconds $WaitSec
         }
     } While ($DoLoop)
@@ -2396,6 +2566,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         HiddenFromAddressListsEnabled = $true
         WarningAction                 = 'SilentlyContinue'
         ErrorAction                   = 'Stop'
+        Verbose                       = $false
     }
     try {
         Set-Mailbox @params 1> $null
@@ -2416,6 +2587,84 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
     $userExMbObj = Get-Mailbox -Identity $userExObj.Identity
     $UserObj = Get-MgBetaUser -UserId $UserObj.Id -Property $userProperties -ExpandProperty $userExpandPropeties
+    #endregion ---------------------------------------------------------------------
+
+    #region Tiering Group Membership Assignment ------------------------------------
+    if ($GroupObj) {
+        if (
+            ($GroupObj.GroupType -NotContains 'DynamicMembership') -or
+            ($GroupObj.MembershipRuleProcessingState -ne 'On')
+        ) {
+            $params = @{
+                ConsistencyLevel = 'eventual'
+                GroupId          = $GroupObj.Id
+                CountVariable    = 'CountVar'
+                Filter           = "Id eq '$($UserObj.Id)'"
+            }
+            if (-Not (Get-MgBetaGroupMember @params)) {
+                Write-Verbose "[ProcessReferralUserDedicatedAccountTieringGroup]: - Adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
+                try {
+                    New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $UserObj.Id -ErrorAction Stop -Verbose:$false
+                }
+                catch {
+                    $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                                Message          = $Error[0].Exception.Message
+                                ErrorId          = '500'
+                                Category         = $Error[0].CategoryInfo.Category
+                                TargetName       = $refUserObj.UserPrincipalName
+                                TargetObject     = $refUserObj.Id
+                                TargetType       = 'UserId'
+                                CategoryActivity = 'Account Provisioning'
+                                CategoryReason   = $Error[0].CategoryInfo.Reason
+                            }))
+                    return
+                }
+            }
+        }
+
+        # Wait for tiering group membership
+        $DoLoop = $true
+        $RetryCount = 1
+        $MaxRetry = 120
+        $WaitSec = 7
+
+        do {
+            $params = @{
+                ConsistencyLevel = 'eventual'
+                GroupId          = $GroupObj.Id
+                CountVariable    = 'CountVar'
+                Filter           = "Id eq '$($UserObj.Id)'"
+            }
+            if ($null -ne (Get-MgBetaGroupMember @params)) {
+                Write-Verbose "[ProcessReferralUserDedicatedAccountTieringGroup]: - OK: Detected tiering group membership."
+                $DoLoop = $false
+            }
+            elseif ($RetryCount -ge $MaxRetry) {
+                if (-Not $UpdatedUserOnly) {
+                    Remove-MgBetaUser -UserId $UserObj.Id -ErrorAction SilentlyContinue 1> $null
+                }
+                $DoLoop = $false
+
+                $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
+                            Message           = "${ReferralUserId}: Group assignment timeout for $($UserObj.UserPrincipalName)."
+                            ErrorId           = '504'
+                            Category          = 'OperationTimeout'
+                            TargetName        = $refUserObj.UserPrincipalName
+                            TargetObject      = $refUserObj.Id
+                            TargetType        = 'UserId'
+                            RecommendedAction = 'Try again later.'
+                            CategoryActivity  = 'Account Provisioning'
+                            CategoryReason    = "A timeout occured during provisioning wait after group assignment."
+                        }))
+                return
+            }
+            else {
+                $RetryCount += 1
+                Write-Verbose "[ProcessReferralUserDedicatedAccountTieringGroup]: - Try $RetryCount of ${MaxRetry}: Waiting another $WaitSec seconds for tiering group assignment ..." -Verbose
+                Start-Sleep -Seconds $WaitSec
+            }
+        } While ($DoLoop)
+    }
     #endregion ---------------------------------------------------------------------
 
     #region Set User Photo ---------------------------------------------------------
@@ -2443,35 +2692,37 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 Uri             = $_
                 TimeoutSec      = 10
                 ErrorAction     = 'Stop'
+                Verbose         = $false
             }
 
             try {
                 $return = Invoke-WebRequest @params
                 if ($return.StatusCode -eq 200) {
                     if ($return.Headers.'Content-Type' -notmatch '^image/') {
-                        Write-Error "Photo from URL $($params.Uri) must have Content-Type 'image/*'."
+                        Write-Error "[ProcessReferralUserDedicatedAccountPhoto]: - Photo from URL $($params.Uri) must have Content-Type 'image/*'."
                     }
                     else {
-                        Write-Verbose "Successfully retrieved User Photo from $($params.Uri)"
+                        Write-Verbose "[ProcessReferralUserDedicatedAccountPhoto]: - Successfully retrieved User Photo from $($params.Uri)"
                         $script:PhotoUrl = $params.Uri
                         $return
                     }
                 }
             }
             catch {
-                Write-Warning "Failed to retrieve User Photo from $($params.Uri)"
+                Write-Warning "[ProcessReferralUserDedicatedAccountPhoto]: - Failed to retrieve User Photo from $($params.Uri)"
             }
         }
     } | & {
         process {
             $ExoUserPhoto = $false
 
-            Write-Verbose 'Uploading User Photo to Microsoft Graph'
+            Write-Verbose '[ProcessReferralUserDedicatedAccountPhoto]: - Uploading User Photo to Microsoft Graph'
             $params = @{
                 InFile      = 'nonExistat.lat'
                 UserId      = $UserObj.Id
                 Data        = ([System.IO.MemoryStream]::new($_.Content))
                 ErrorAction = 'Stop'
+                Verbose     = $false
             }
             try {
                 Set-MgBetaUserPhotoContent @params 1> $null
@@ -2480,7 +2731,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 if ($AdminUnitObj) {
                     $ExoUserPhoto = $true
                     if ($Iteration -eq 1) {
-                        Write-Warning "Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
+                        Write-Warning "[ProcessReferralUserDedicatedAccountPhoto]: - Cannot use Microsoft Graph API to update User Photo. Open feature request at Microsoft to implement Administrative Unit support in Microsoft Graph API when using Set-MgUserPhotoContent. Also see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
                     }
                 }
                 else {
@@ -2499,13 +2750,14 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
             # This is a workaround that is announced to stop working in April 2024 due to Deprecation of Exchange Online PowerShell UserPhoto cmdlets: https://go.microsoft.com/fwlink/p/?linkid=2249705
             if ($ExoUserPhoto) {
-                Write-Verbose 'Uploading User Photo to Exchange Online'
+                Write-Verbose '[ProcessReferralUserDedicatedAccountPhoto]: - Uploading User Photo to Exchange Online'
                 $params = @{
                     Identity      = $userExObj.Identity
                     PictureData   = $_.Content
                     Confirm       = $false
                     ErrorAction   = 'Stop'
                     WarningAction = 'SilentlyContinue'
+                    Verbose       = $false
                 }
                 try {
                     Set-UserPhoto @params 1> $null
@@ -2523,7 +2775,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                             }))
                 }
                 if ($Iteration -eq 1) {
-                    Write-Warning "User Photo update used Exchange Online cmdlet Set-UserPhoto that is announced to stop working in April 2024 due to deprecation of Exchange Online PowerShell UserPhoto cmdlets, see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
+                    Write-Warning "[ProcessReferralUserDedicatedAccountPhoto]: - User Photo update used Exchange Online cmdlet Set-UserPhoto that is announced to stop working in April 2024 due to deprecation of Exchange Online PowerShell UserPhoto cmdlets, see 'https://go.microsoft.com/fwlink/p/?linkid=2249705'."
                 }
             }
         }
@@ -2579,7 +2831,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     }
     #endregion ---------------------------------------------------------------------
 
-    Write-Verbose "-------ENDLOOP $ReferralUserId ---"
+    Write-Verbose "[ProcessReferralUser]: -------ENDLOOP $ReferralUserId ---"
 
     return $data
 }
@@ -2587,18 +2839,83 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 $LocalUserId = @( .\Common_0002__Convert-UserIdToLocalUserId.ps1 -UserId $ReferralUserId -VerifiedDomains $tenant.VerifiedDomains )
 if ($LocalUserId.Count -ne $ReferralUserId.Count) { Throw 'ReferralUserId count must not be different after LocalUserId conversion.' }
 
-0..$($ReferralUserId.Count) | & {
+0..$($ReferralUserId.Count - 1) | & {
     process {
-        if ([string]::IsNullOrEmpty($ReferralUserId[$_])) { return }
-        if ([string]::IsNullOrEmpty($Tier[$_])) { return }
-        [System.GC]::Collect()
-        [GC]::Collect()
-        [GC]::WaitForPendingFinalizers()
+        if (
+            ($null -eq $ReferralUserId[$_]) -or
+            ($ReferralUserId[$_] -isnot [string]) -or
+            [string]::IsNullOrEmpty( $ReferralUserId[$_].Trim() )
+        ) {
+            Write-Verbose "[ProcessReferralUserLoop]: - ReferralUserId-$_ Type : $(($ReferralUserId[$_]).GetType().Name)"
+            Write-Verbose "[ProcessReferralUserLoop]: - ReferralUserId-$_ Value: '$($ReferralUserId[$_])'"
+            Write-Warning "[ProcessReferralUserLoop]: - Ignoring array item $_ because 'ReferralUserId' is not a string or IsNullOrEmpty"
+            return
+        }
+
+        if (
+            ($null -eq $LocalUserId[$_]) -or
+            ($LocalUserId[$_] -isnot [string]) -or
+            [string]::IsNullOrEmpty( $LocalUserId[$_].Trim() )
+        ) {
+            Write-Verbose "[ProcessReferralUserLoop]: - LocalUserId-$_ Type : $(($LocalUserId[$_]).GetType().Name)"
+            Write-Verbose "[ProcessReferralUserLoop]: - LocalUserId-$_ Value: '$($LocalUserId[$_])'"
+            Write-Warning "[ProcessReferralUserLoop]: - Ignoring array item $_ because 'LocalUserId' is not a string or IsNullOrEmpty"
+            return
+        }
+
+        if (
+            ($null -ne $Tier[$_]) -and
+            ($Tier[$_] -is [string]) -and
+            (-Not [string]::IsNullOrEmpty( $Tier[$_].Trim() ))
+        ) {
+            try {
+                $Tier[$_] = [System.Convert]::ToInt32( $Tier[$_].Trim() )
+            }
+            catch {
+                Write-Error '[ProcessReferralUserLoop]: - Auto-converting of Tier string to Int32 failed'
+            }
+        }
+
+        if (
+            ($null -eq $Tier[$_]) -or
+            ($Tier[$_] -isnot [Int32])
+        ) {
+            Write-Verbose "[ProcessReferralUserLoop]: - Tier-$_ Type : $(($Tier[$_]).GetType().Name)"
+            Write-Verbose "[ProcessReferralUserLoop]: - Tier-$_ Value: '$($Tier[$_])'"
+            Write-Warning "[ProcessReferralUserLoop]: - Ignoring array item $_ because 'Tier' is not an integer or IsNullOrEmpty"
+            return
+        }
+
+        # When working on multiple accounts in Azure Automation sandbox,
+        # do some manual garbage collection to improve memory consumption
+        if ($_ -gt 0 -and $PSPrivateMetadata.JobId) {
+            Write-Verbose "[ProcessReferralUserLoop]: - Azure Automation Sandbox memory consumption BEFORE garbage collection: $([Math]::Round(((Get-Process -Id $PID).WorkingSet64 / 1MB))) MByte"
+            [System.GC]::Collect()
+            Write-Verbose "[ProcessReferralUserLoop]: - Azure Automation Sandbox memory consumption AFTER garbage collection: $([Math]::Round(((Get-Process -Id $PID).WorkingSet64 / 1MB))) MByte"
+        }
+
         $params = @{
-            ReferralUserId = $ReferralUserId[$_]
-            LocalUserId    = $LocalUserId[$_]
-            Tier           = $Tier[$_]
-            UserPhotoUrl   = if ([string]::IsNullOrEmpty($UserPhotoUrl) -or [string]::IsNullOrEmpty($UserPhotoUrl[$_])) { $null } else { $UserPhotoUrl[$_] }
+            ReferralUserId          = $ReferralUserId[$_].Trim()
+            LocalUserId             = $LocalUserId[$_].Trim()
+            Tier                    = $Tier[$_]
+            UserPhotoUrl            = if (
+                ($null -eq $UserPhotoUrl) -or
+                ($UserPhotoUrl[$_] -isnot [string]) -or
+                ([string]::IsNullOrEmpty($UserPhotoUrl[$_]))
+            ) { $null } else { $UserPhotoUrl[$_].Trim() }
+            RequestDedicatedAccount = if (
+                ($null -eq $RequestDedicatedAccount) -or
+                (
+                    ($RequestDedicatedAccount[$_] -isnot [string]) -and
+                    ($RequestDedicatedAccount[$_] -isnot [boolean])
+                ) -or
+                (
+                    ($RequestDedicatedAccount[$_] -is [string]) -and
+                    ([string]::IsNullOrEmpty($RequestDedicatedAccount[$_].Trim()))
+                )
+            ) { $null } elseif (
+                $RequestDedicatedAccount[$_] -is [string]
+            ) { $RequestDedicatedAccount[$_].Trim() } else { $RequestDedicatedAccount[$_] }
         }
         $null = $returnOutput.Add((ProcessReferralUser @params))
     }

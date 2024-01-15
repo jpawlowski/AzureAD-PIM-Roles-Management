@@ -60,11 +60,11 @@ if (-Not (Get-AzContext)) {
     }
 
     if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        Write-Verbose 'Using system-assigned Managed Service Identity'
+        Write-Verbose '[COMMON]: - Using system-assigned Managed Service Identity'
         $params.Identity = $true
     }
     else {
-        Write-Verbose 'Using interactive sign in'
+        Write-Verbose '[COMMON]: - Using interactive sign in'
     }
 
     try {
@@ -76,7 +76,7 @@ if (-Not (Get-AzContext)) {
         $Context = Set-AzContext -SubscriptionName $Context.Subscription -DefaultProfile $Context
 
         if ($params.Identity -eq $true) {
-            Write-Verbose 'Running in Azure Automation - Generating connection environment variables'
+            Write-Verbose '[COMMON]: - Running in Azure Automation - Generating connection environment variables'
 
             if ($env:MG_PRINCIPAL_DISPLAYNAME) {
                 #region [COMMON] ENVIRONMENT ---------------------------------------------------
@@ -85,9 +85,9 @@ if (-Not (Get-AzContext)) {
                 ) 1> $null
                 #endregion ---------------------------------------------------------------------
 
-                $AzAutomationAccount = Get-AzAutomationAccount -DefaultProfile $Context -ErrorAction Stop | Where-Object { $_.AutomationAccountName -eq $env:MG_PRINCIPAL_DISPLAYNAME }
+                $AzAutomationAccount = Get-AzAutomationAccount -DefaultProfile $Context -ErrorAction Stop -Verbose:$false | Where-Object { $_.AutomationAccountName -eq $env:MG_PRINCIPAL_DISPLAYNAME }
                 if ($AzAutomationAccount) {
-                    Write-Verbose 'Retrievedd Automation Account details'
+                    Write-Verbose '[COMMON]: - Retrievedd Automation Account details'
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_SubscriptionId', $AzAutomationAccount.SubscriptionId)
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_ResourceGroupName', $AzAutomationAccount.ResourceGroupName)
                     [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_AccountName', $AzAutomationAccount.AutomationAccountName)
@@ -97,41 +97,41 @@ if (-Not (Get-AzContext)) {
 
                     if ($PSPrivateMetadata.JobId) {
 
-                        $AzAutomationJob = Get-AzAutomationJob -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Id $PSPrivateMetadata.JobId -ErrorAction Stop
+                        $AzAutomationJob = Get-AzAutomationJob -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Id $PSPrivateMetadata.JobId -ErrorAction Stop -Verbose:$false
                         if ($AzAutomationJob) {
-                            Write-Verbose 'Retrievedd Automation Job details'
+                            Write-Verbose '[COMMON]: - Retrievedd Automation Job details'
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_Name', $AzAutomationJob.RunbookName)
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_CreationTime', $AzAutomationJob.CreationTime.ToUniversalTime())
                             [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_JOB_StartTime', $AzAutomationJob.StartTime.ToUniversalTime())
 
-                            $AzAutomationRunbook = Get-AzAutomationRunbook -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Name $AzAutomationJob.RunbookName -ErrorAction Stop
+                            $AzAutomationRunbook = Get-AzAutomationRunbook -DefaultProfile $Context -ResourceGroupName $AzAutomationAccount.ResourceGroupName -AutomationAccountName $AzAutomationAccount.AutomationAccountName -Name $AzAutomationJob.RunbookName -ErrorAction Stop -Verbose:$false
                             if ($AzAutomationRunbook) {
-                                Write-Verbose 'Retrievedd Automation Runbook details'
+                                Write-Verbose '[COMMON]: - Retrievedd Automation Runbook details'
                                 [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_CreationTime', $AzAutomationRunbook.CreationTime.ToUniversalTime())
                                 [Environment]::SetEnvironmentVariable('AZURE_AUTOMATION_RUNBOOK_LastModifiedTime', $AzAutomationRunbook.LastModifiedTime.ToUniversalTime())
                             }
                             else {
-                                Throw "Unable to find own Automation Runbook details for runbook name $($AzAutomationJob.RunbookName)"
+                                Throw "[COMMON]: - Unable to find own Automation Runbook details for runbook name $($AzAutomationJob.RunbookName)"
                             }
                         }
                         else {
-                            Throw "Unable to find own Automation Job details for job Id $($PSPrivateMetadata.JobId)"
+                            Throw "[COMMON]: - Unable to find own Automation Job details for job Id $($PSPrivateMetadata.JobId)"
                         }
                     }
                     else {
-                        Throw 'Missing global variable $PSPrivateMetadata.JobId'
+                        Throw '[COMMON]: - Missing global variable $PSPrivateMetadata.JobId'
                     }
                 }
                 else {
-                    Throw "Unable to find own Automation Account details for '$env:MG_PRINCIPAL_DISPLAYNAME'"
+                    Throw "[COMMON]: - Unable to find own Automation Account details for '$env:MG_PRINCIPAL_DISPLAYNAME'"
                 }
             }
             else {
-                Throw 'Missing environment variable $env:MG_PRINCIPAL_DISPLAYNAME. Please run Common_0001__Connect-MgGraph.ps1 first.'
+                Throw '[COMMON]: - Missing environment variable $env:MG_PRINCIPAL_DISPLAYNAME. Please run Common_0001__Connect-MgGraph.ps1 first.'
             }
         }
         else {
-            Write-Verbose 'Not running in Azure Automation - no connection environment variables set.'
+            Write-Verbose '[COMMON]: - Not running in Azure Automation - no connection environment variables set.'
         }
     }
     catch {

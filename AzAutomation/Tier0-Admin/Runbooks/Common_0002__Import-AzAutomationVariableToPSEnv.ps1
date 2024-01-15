@@ -45,7 +45,7 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
             Throw 'Missing environment variable $env:AZURE_AUTOMATION_AccountName'
         }
         else {
-            $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName
+            $AutomationVariables = Get-AzAutomationVariable -ResourceGroupName $env:AZURE_AUTOMATION_ResourceGroupName -AutomationAccountName $env:AZURE_AUTOMATION_AccountName -Verbose:$false
         }
     }
     catch {
@@ -56,20 +56,20 @@ if ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.
         process {
             if (($null -ne $script:Variable) -and ($_.Name -notin $script:Variable)) { return }
             if ($_.Value.GetType().Name -ne 'String') {
-                Write-Verbose "SKIPPING $($_.Name) because it is not a String but '$($_.GetType().Name)'"
+                Write-Verbose "[COMMON]: - SKIPPING $($_.Name) because it is not a String but '$($_.GetType().Name)'"
                 return
             }
             elseif ([string]::IsNullOrEmpty($_.Value)) {
-                Write-Verbose "SKIPPING $($_.Name) because it has NullOrEmpty value"
+                Write-Verbose "[COMMON]: - SKIPPING $($_.Name) because it has NullOrEmpty value"
                 return
             }
-            Write-Verbose "Setting `$env:$($_.Name)"
+            Write-Verbose "[COMMON]: - Setting `$env:$($_.Name)"
             [Environment]::SetEnvironmentVariable($_.Name, $_.Value)
         }
     }
 }
 else {
-    Write-Verbose 'Not running in Azure Automation. Script environment variables must be set manually before local run.'
+    Write-Verbose '[COMMON]: - Not running in Azure Automation. Script environment variables must be set manually before local run.'
 }
 
 Get-Variable | Where-Object { $StartupVariables -notcontains $_.Name } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox

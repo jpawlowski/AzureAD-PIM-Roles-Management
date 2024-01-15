@@ -43,7 +43,7 @@ $tenantVerifiedDomains = if ($VerifiedDomains) { $VerifiedDomains } else {
     #endregion ---------------------------------------------------------------------
 
     try {
-        (Get-MgBetaOrganization -OrganizationId (Get-MgContext).TenantId -ErrorAction Stop).VerifiedDomains
+        (Get-MgBetaOrganization -OrganizationId (Get-MgContext).TenantId -ErrorAction Stop -Verbose:$false).VerifiedDomains
     }
     catch {
         $_
@@ -54,14 +54,14 @@ $tenantDomain = ($tenantVerifiedDomains | Where-Object { $_.IsInitial -eq $true 
 $UserId | & {
     process {
         if ($_.GetType().Name -ne 'String') {
-            Write-Error "Input array UserId contains item of type $($_.GetType().Name)"
+            Write-Error "[COMMON]: - Input array UserId contains item of type $($_.GetType().Name)"
             return
         }
-        if ([string]::IsNullOrEmpty($_)) {
-            Write-Error 'Input array UserId contains IsNullOrEmpty string'
+        if ([string]::IsNullOrEmpty( $_.Trim() )) {
+            Write-Error '[COMMON]: - Input array UserId contains IsNullOrEmpty string'
             return
         }
-        switch -Regex ($_) {
+        switch -Regex ( $_.Trim() ) {
             '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$' {
                 $null = $script:return.Add($_)
                 break
@@ -73,10 +73,10 @@ $UserId | & {
                     $null = $UPN.Append('@')
                     $null = $UPN.Append(($Matches[2]).ToLower())
                     $null = $script:return.Add( $UPN.ToString() )
-                    Write-Verbose "$_ > $($UPN.ToString()) (Uses a verified domain of this tenant, but was provided in external format)"
+                    Write-Verbose "[COMMON]: - $_ > $($UPN.ToString()) (Uses a verified domain of this tenant, but was provided in external format)"
                 }
                 elseif ($Matches[3] -in $tenantVerifiedDomains.Name) {
-                    Write-Verbose "$_ > $_ (Already in external format)"
+                    Write-Verbose "[COMMON]: - $_ > $_ (Already in external format)"
                     $null = $script:return.Add($_)
                 }
                 else {
@@ -87,13 +87,13 @@ $UserId | & {
                     $null = $UPN.Append('#EXT#@')
                     $null = $UPN.Append($script:tenantDomain)
                     $null = $script:return.Add( $UPN.ToString() )
-                    Write-Verbose "$_ > $($UPN.ToString()) (Uses an external domain in external format)"
+                    Write-Verbose "[COMMON]: - $_ > $($UPN.ToString()) (Uses an external domain in external format)"
                 }
                 break
             }
-            '^(.+)@(.+)$' {
+            '^([^\s]+)@([^\s]+\.[^\s]+)$' {
                 if ($Matches[2] -in $tenantVerifiedDomains.Name) {
-                    Write-Verbose "$_ > $_ (Uses a verified domain of this tenant)"
+                    Write-Verbose "[COMMON]: - $_ > $_ (Uses a verified domain of this tenant)"
                     $null = $script:return.Add($_)
                 }
                 else {
@@ -104,12 +104,12 @@ $UserId | & {
                     $null = $UPN.Append('#EXT#@')
                     $null = $UPN.Append($script:tenantDomain)
                     $null = $script:return.Add( $UPN.ToString() )
-                    Write-Verbose "$_ > $($UPN.ToString()) (Uses an external domain)"
+                    Write-Verbose "[COMMON]: - $_ > $($UPN.ToString()) (Uses an external domain)"
                 }
                 break
             }
             default {
-                Write-Warning "Could not convert $_ to local User Principal Name."
+                Write-Warning "[COMMON]: - Could not convert $_ to local User Principal Name."
                 $null = $script:return.Add($_)
                 break
             }

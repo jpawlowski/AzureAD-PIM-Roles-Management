@@ -64,15 +64,12 @@ else {
 if (-Not $PSCommandPath) { Throw 'This runbook is used by other runbooks and must not be run directly.' }
 
 if (-Not [string]::IsNullOrEmpty($AutoloadingPreference)) {
-    Write-Verbose "Setting PowerShell module AutoloadingPreference to $AutoloadingPreference"
+    Write-Verbose "[COMMON]: - Setting PowerShell module AutoloadingPreference to $AutoloadingPreference"
     $global:PSModuleAutoloadingPreference = $AutoloadingPreference
 }
 elseif ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-    Write-Verbose 'Enforcing manual Import-Module in Azure Automation'
+    Write-Verbose '[COMMON]: - Enforcing manual Import-Module in Azure Automation'
     $global:PSModuleAutoloadingPreference = 'ModuleQualified'
-}
-else {
-    Remove-Variable -Scope Global -Name PSModuleAutoloadingPreference -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false
 }
 
 $VerbosePreference = 'SilentlyContinue'
@@ -86,7 +83,7 @@ $Modules | Where-Object { (-Not [string]::IsNullOrEmpty($_.Name)) -and ($LoadedM
         $Module = $_
         $Optional = $_.Optional
         if ($null -ne $Module.Optional) { $Module.Remove('Optional') }
-        Write-Debug "Importing module $($Module.Name)"
+        Write-Debug "[COMMON]: - Importing module $($Module.Name)"
         $Module.Debug = $false
         $Module.Verbose = $false
         $Module.InformationAction = 'SilentlyContinue'
@@ -105,7 +102,7 @@ $Modules | Where-Object { (-Not [string]::IsNullOrEmpty($_.Name)) -and ($LoadedM
             $Module.ErrorDetails = $_
 
             if ($Optional -eq $true) {
-                Write-Warning "Optional module could not be loaded: $(Module.Name)"
+                Write-Warning "[COMMON]: - Optional module could not be loaded: $(Module.Name)"
             }
             else {
                 $null = $script:Missing.Add($Module)

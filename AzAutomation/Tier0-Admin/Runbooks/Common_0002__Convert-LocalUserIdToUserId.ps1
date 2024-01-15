@@ -37,11 +37,11 @@ $return = [System.Collections.ArrayList]::new($UserId.Count)
 $UserId | & {
     process {
         if ($_.GetType().Name -ne 'String') {
-            Write-Error "Input array UserId contains item of type $($_.GetType().Name)"
+            Write-Error "[COMMON]: - Input array UserId contains item of type $($_.GetType().Name)"
             return
         }
         if ([string]::IsNullOrEmpty($_)) {
-            Write-Error 'Input array UserId contains IsNullOrEmpty string'
+            Write-Error '[COMMON]: - Input array UserId contains IsNullOrEmpty string'
             return
         }
         switch -Regex ($_) {
@@ -62,7 +62,7 @@ $UserId | & {
                 break
             }
             default {
-                Write-Warning "Could not convert $_ to user name."
+                Write-Warning "[COMMON]: - Could not convert $_ to user name."
                 $null = $script:return.Add($_)
                 break
             }

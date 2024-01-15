@@ -63,10 +63,10 @@ if ($GlobalAdmin) {
         if (-Not $AllowGlobalAdministratorInAzureAutomation) {
             Throw 'Running this script with Global Administrator permissions in Azure Automation is prohibited.'
         }
-        Write-Warning 'Runbooks running with Global Administrator permissions in Azure Automation is a HIGH RISK!' -Verbose -WarningAction Continue
+        Write-Warning '[COMMON]: - Runbooks running with Global Administrator permissions in Azure Automation is a HIGH RISK!' -Verbose -WarningAction Continue
     }
     else {
-        Write-Warning 'Running with Global Administrator permissions: You should reconsider following the principle of least privilege.' -Verbose -WarningAction Continue
+        Write-Warning '[COMMON]: - Running with Global Administrator permissions: You should reconsider following the principle of least privilege.' -Verbose -WarningAction Continue
     }
 
     if (-Not $AllowGlobalAdministratorInAzureAutomation -and
@@ -86,7 +86,7 @@ if ($GlobalAdmin) {
             }
         )
     ) {
-        Write-Warning '+++ATTENTION+++ Running with active Global Administrator permissions, but it was not explicitly requested by the script!' -Verbose -WarningAction Continue
+        Write-Warning '[COMMON]: - +++ATTENTION+++ Running with active Global Administrator permissions, but it was not explicitly requested by the script!' -Verbose -WarningAction Continue
     }
 }
 
@@ -95,7 +95,7 @@ if ($PrivRoleAdmin) {
         if (-Not $AllowPrivilegedRoleAdministratorInAzureAutomation) {
             Throw 'Running this script with Privileged Role Administrator permissions in Azure Automation is prohibited.'
         }
-        Write-Verbose 'WARNING: Runbooks running with Privileged Role Administrator permissions in Azure Automation is a HIGH RISK!' -Verbose
+        Write-Verbose '[COMMON]: - WARNING: Runbooks running with Privileged Role Administrator permissions in Azure Automation is a HIGH RISK!' -Verbose
     }
 
     if (-Not $AllowPrivilegedRoleAdministratorInAzureAutomation -and
@@ -115,7 +115,7 @@ if ($PrivRoleAdmin) {
             }
         )
     ) {
-        Write-Warning '+++ATTENTION+++ Running with active Privileged Role Administrator permissions, but it was not explicitly requested by the script!' -Verbose -WarningAction Continue
+        Write-Warning '[COMMON]: - +++ATTENTION+++ Running with active Privileged Role Administrator permissions, but it was not explicitly requested by the script!' -Verbose -WarningAction Continue
     }
 }
 
@@ -147,21 +147,21 @@ foreach (
     }
     if ($AssignedRole) {
         if ($superseededRole) {
-            Write-Warning "Superseeded directory role by root directory scope: $($AssignedRole.RoleDefinition.DisplayName) ($($AssignedRole.RoleDefinition.TemplateId)), Directory Scope: $($AssignedRole.DirectoryScopeId). You might want to reduce permission scope to Administrative Unit $DirectoryScopeId only."
+            Write-Warning "[COMMON]: - Superseeded directory role by root directory scope: $($AssignedRole.RoleDefinition.DisplayName) ($($AssignedRole.RoleDefinition.TemplateId)), Directory Scope: $($AssignedRole.DirectoryScopeId). You might want to reduce permission scope to Administrative Unit $DirectoryScopeId only."
         }
         else {
-            Write-Verbose "Confirmed directory role: $($AssignedRole.RoleDefinition.DisplayName) ($($AssignedRole.RoleDefinition.TemplateId)), Directory Scope: $($AssignedRole.DirectoryScopeId)"
+            Write-Verbose "[COMMON]: - Confirmed directory role: $($AssignedRole.RoleDefinition.DisplayName) ($($AssignedRole.RoleDefinition.TemplateId)), Directory Scope: $($AssignedRole.DirectoryScopeId)"
         }
     }
     else {
         if ($Optional) {
-            Write-Verbose "Missing optional directory role permission: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
+            Write-Verbose "[COMMON]: - Missing optional directory role permission: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
         }
         elseif ($GlobalAdmin -and $DirectoryScopeId -ne '/') {
-            Write-Warning "Missing scoped directory role permission: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
+            Write-Warning "[COMMON]: - Missing scoped directory role permission: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
         }
         elseif ($GlobalAdmin) {
-            Write-Warning "Superseeded directory role by active Global Administrator: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
+            Write-Warning "[COMMON]: - Superseeded directory role by active Global Administrator: $DisplayName $(if ($TemplateId -and ($TemplateId -ne $DisplayName)) { "($TemplateId)" }), Directory Scope: $DirectoryScopeId"
         }
         else {
             $null = $missingRoles.Add(@{ DirectoryScopeId = $DirectoryScopeId; TemplateId = $TemplateId; DisplayName = $DisplayName })

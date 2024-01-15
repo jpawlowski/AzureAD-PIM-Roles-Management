@@ -35,6 +35,7 @@ $params = @{
     Method      = 'GET'
     Uri         = "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?`$filter=PrincipalId eq %27$($env:MG_PRINCIPAL_ID)%27&`$expand=roleDefinition"
     ErrorAction = 'Stop'
+    Verbose     = $false
 }
 
 try {

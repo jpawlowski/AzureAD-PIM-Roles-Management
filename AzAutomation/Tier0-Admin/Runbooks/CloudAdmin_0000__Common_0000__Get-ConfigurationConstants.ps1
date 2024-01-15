@@ -19,7 +19,7 @@
     Returns an array of Constants that are shared between all Cloud Administrator scripts.
 
 .DESCRIPTION
-    These constants are transformed using Common_0000__Convert-PSEnvToPSLocalVariable.ps1.
+    These constants are transformed using Common_0000__Convert-PSEnvToPSScriptVariable.ps1.
     Values come from local environment variables and are validated against the Regex or Type property,
     otherwise a default value is used.
     Script variables that are already set (e.g. via script parameters) may take higher priority using
@@ -36,7 +36,7 @@
     =============================
 
     Variables for custom configuration settings, either from $env:<VariableName>,
-    or Azure Automation Account Variables, whose will automatically be published in $env.
+    or Azure Automation Account Variables, whose will automatically be published in $env when running in Azure Automation.
 
     ********************************************************************************************************
     * Please note that <Tier> in the variable name must be replaced by the intended Tier level 0, 1, or 2. *
@@ -82,10 +82,7 @@
     AV_CloudAdminTier<Tier>_GroupId - [String] - Default Value: <empty>
         Entra Group Object ID where the user shall be added. If the group is dynamic, group membership update will only be monitored before continuing.
 
-    AV_CloudAdminTier<Tier>_GroupDescription - [String] - Default Value: Tier <Tier> Cloud Administrators
-        ...
-
-    AV_CloudAdminTier<Tier>_DedicatedAccount - [Boolean] - Default Value: $true for Tier 0, $false for Tier 1 and 2
+    AV_CloudAdminTier<Tier>_DedicatedAccount - [String] - Default Value: 'Require' for Tier 0, 'Optional' for Tier 1, 'None' for Tier 2
         ...
 
     AV_CloudAdminTier<Tier>_AccountDomain - [String] - Default Value: onmicrosoft.com
@@ -205,6 +202,12 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
+        sourceName    = "AV_CloudAdminTier0_LicenseGroupId"
+        mapToVariable = 'LicenseGroupId_Tier0'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
         sourceName    = "AV_CloudAdminTier0_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier0'
         defaultValue  = 'EXCHANGEDESKLESS'
@@ -217,12 +220,6 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
-        sourceName    = "AV_CloudAdminTier0_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier0'
-        defaultValue  = 'Tier 0 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
         sourceName             = "AV_CloudAdminTier0_UserPhotoUrl"
         respectScriptParameter = 'UserPhotoUrl'
         mapToVariable          = 'PhotoUrl_Tier0'
@@ -232,7 +229,13 @@ $Constants = [array] @(
     @{
         sourceName    = "AV_CloudAdminTier0_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier0'
-        defaultValue  = $true
+        defaultValue  = 'Require'
+        Regex         = '^(?:Require|Optional|None)$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier0_AllowedGuestOrExternalForDedicatedAccount"
+        mapToVariable = 'AllowedGuestOrExternalForDedicatedAccount_Tier0'
+        defaultValue  = $false
     }
     @{
         sourceName    = "AV_CloudAdminTier0_AllowedGuestOrExternalUserTypes"
@@ -406,6 +409,12 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
+        sourceName    = "AV_CloudAdminTier1_LicenseGroupId"
+        mapToVariable = 'LicenseGroupId_Tier1'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
         sourceName    = "AV_CloudAdminTier1_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier1'
         defaultValue  = 'EXCHANGEDESKLESS'
@@ -418,12 +427,6 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
-        sourceName    = "AV_CloudAdminTier1_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier1'
-        defaultValue  = 'Tier 1 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
         sourceName             = "AV_CloudAdminTier1_UserPhotoUrl"
         respectScriptParameter = 'UserPhotoUrl'
         mapToVariable          = 'PhotoUrl_Tier1'
@@ -433,6 +436,12 @@ $Constants = [array] @(
     @{
         sourceName    = "AV_CloudAdminTier1_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier1'
+        defaultValue  = 'Optional'
+        Regex         = '^(?:Require|Optional)$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier1_AllowedGuestOrExternalForDedicatedAccount"
+        mapToVariable = 'AllowedGuestOrExternalForDedicatedAccount_Tier1'
         defaultValue  = $false
     }
     @{
@@ -607,6 +616,12 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
+        sourceName    = "AV_CloudAdminTier2_LicenseGroupId"
+        mapToVariable = 'LicenseGroupId_Tier2'
+        defaultValue  = $null
+        Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+    }
+    @{
         sourceName    = "AV_CloudAdminTier2_LicenseSkuPartNumber"
         mapToVariable = 'LicenseSkuPartNumber_Tier2'
         defaultValue  = ''
@@ -619,12 +634,6 @@ $Constants = [array] @(
         Regex         = '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
     }
     @{
-        sourceName    = "AV_CloudAdminTier2_GroupDescription"
-        mapToVariable = 'GroupDescription_Tier2'
-        defaultValue  = 'Tier 2 Cloud Administrators'
-        Regex         = '^[^\s].*[^\s]$|^.$'
-    }
-    @{
         sourceName             = "AV_CloudAdminTier2_UserPhotoUrl"
         respectScriptParameter = 'UserPhotoUrl'
         mapToVariable          = 'PhotoUrl_Tier2'
@@ -634,6 +643,12 @@ $Constants = [array] @(
     @{
         sourceName    = "AV_CloudAdminTier2_DedicatedAccount"
         mapToVariable = 'DedicatedAccount_Tier2'
+        defaultValue  = 'Optional'
+        Regex         = '^(?:Require|Optional|None)$'
+    }
+    @{
+        sourceName    = "AV_CloudAdminTier2_AllowedGuestOrExternalForDedicatedAccount"
+        mapToVariable = 'AllowedGuestOrExternalForDedicatedAccount_Tier2'
         defaultValue  = $false
     }
     @{

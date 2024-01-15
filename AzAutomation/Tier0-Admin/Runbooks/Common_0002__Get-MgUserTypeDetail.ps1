@@ -44,12 +44,11 @@ $return = @{
 }
 
 if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
-    Write-Verbose 'Evaluating identities'
     if (
         (($UserObject.Identities).Issuer -contains 'mail') -or
         (($UserObject.Identities).SignInType -contains 'emailAddress')
     ) {
-        Write-Verbose '- IsEmailOTPAuthentication'
+        Write-Verbose '[COMMON]: - IsEmailOTPAuthentication'
         $return.IsEmailOTPAuthentication = $true
     }
     else {
@@ -57,7 +56,7 @@ if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
     }
 
     if (($UserObject.Identities).Issuer -contains 'facebook.com') {
-        Write-Verbose '- IsFacebookAccount'
+        Write-Verbose '[COMMON]: - IsFacebookAccount'
         $return.IsFacebookAccount = $true
     }
     else {
@@ -65,7 +64,7 @@ if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
     }
 
     if (($UserObject.Identities).Issuer -contains 'google.com') {
-        Write-Verbose '- IsGoogleAccount'
+        Write-Verbose '[COMMON]: - IsGoogleAccount'
         $return.IsGoogleAccount = $true
     }
     else {
@@ -73,7 +72,7 @@ if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
     }
 
     if (($UserObject.Identities).Issuer -contains 'MicrosoftAccount') {
-        Write-Verbose '- IsMicrosoftAccount'
+        Write-Verbose '[COMMON]: - IsMicrosoftAccount'
         $return.IsMicrosoftAccount = $true
     }
     else {
@@ -81,7 +80,7 @@ if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
     }
 
     if (($UserObject.Identities).Issuer -contains 'ExternalAzureAD') {
-        Write-Verbose '- ExternalAzureAD'
+        Write-Verbose '[COMMON]: - ExternalAzureAD'
         $return.IsExternalEntraAccount = $true
     }
     else {
@@ -91,7 +90,7 @@ if (-Not [string]::IsNullOrEmpty($UserObject.Identities)) {
     if (
         ($UserObject.Identities).SignInType -contains 'federated'
     ) {
-        Write-Verbose '- IsFederated'
+        Write-Verbose '[COMMON]: - IsFederated'
         $return.IsFederated = $true
     }
     else {
@@ -103,8 +102,6 @@ if (
     (-Not [string]::IsNullOrEmpty($UserObject.UserType)) -and
     (-Not [string]::IsNullOrEmpty($UserObject.UserPrincipalName))
 ) {
-    Write-Verbose 'Evaluating UserType'
-
     if ($UserObject.UserType -eq 'Member') {
         if ($UserObject.UserPrincipalName -notmatch '^.+#EXT#@.+\.onmicrosoft\.com$') {
             $return.GuestOrExternalUserType = 'None'
@@ -124,7 +121,7 @@ if (
     else {
         $return.GuestOrExternalUserType = 'otherExternalUser'
     }
-    Write-Verbose "- $($return.GuestOrExternalUserType)"
+    Write-Verbose "[COMMON]: - GuestOrExternalUserType: $($return.GuestOrExternalUserType)"
 }
 
 if (
@@ -136,7 +133,7 @@ if (
     ($return.IsFederated -eq $false) -and
     ($return.GuestOrExternalUserType -eq 'None')
 ) {
-    Write-Verbose "Internal state: True"
+    Write-Verbose "[COMMON]: - IsInternal: True"
     $return.IsInternal = $true
 }
 elseif (
@@ -148,11 +145,11 @@ elseif (
     ($null -ne $return.IsFederated) -and
     ($null -ne $return.GuestOrExternalUserType)
 ) {
-    Write-Verbose "Internal state: False"
+    Write-Verbose "[COMMON]: - IsInternal: False"
     $return.IsInternal = $false
 }
 else {
-    Write-Warning "Internal state: UNKNOWN"
+    Write-Warning "[COMMON]: - IsInternal: UNKNOWN"
 }
 
 # Get-Variable | Where-Object { $StartupVariables -notcontains @($_.Name, 'return') } | & { process { Remove-Variable -Scope 0 -Name $_.Name -Force -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -Verbose:$false -Debug:$false } }        # Delete variables created in this script to free up memory for tiny Azure Automation sandbox

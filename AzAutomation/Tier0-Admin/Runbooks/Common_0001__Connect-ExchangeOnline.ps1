@@ -91,7 +91,7 @@ if (-Not ($Connection)) {
         $params.CommandName = $CommandName
     }
     elseif ('AzureAutomation/' -eq $env:AZUREPS_HOST_ENVIRONMENT -or $PSPrivateMetadata.JobId) {
-        Write-Warning 'Loading all Exchange Online commands. For improved memory consumption, consider adding -CommandName parameter with only required commands to be loaded.'
+        Write-Warning '[COMMON]: - Loading all Exchange Online commands. For improved memory consumption, consider adding -CommandName parameter with only required commands to be loaded.'
     }
 
     try {

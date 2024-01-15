@@ -45,7 +45,7 @@ $Variable | & {
         ) { return }
 
         if ($null -eq $_.mapToVariable) {
-            Write-Warning "[$($_.sourceName) --> `$script:???] Missing mapToVariable property in configuration."
+            Write-Warning "[COMMON]: - [$($_.sourceName) --> `$script:???] Missing mapToVariable property in configuration."
             return
         }
 
@@ -62,18 +62,18 @@ $Variable | & {
             ($null -ne $(Get-Variable -Name $_.respectScriptParameter -Scope $params.Scope -ValueOnly -ErrorAction SilentlyContinue))
         ) {
             $params.Value = Get-Variable -Name $_.respectScriptParameter -Scope $params.Scope -ValueOnly
-            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] Using value from script parameter $($_.respectScriptParameter)"
+            Write-Verbose "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Using value from script parameter $($_.respectScriptParameter)"
         }
         elseif ([Environment]::GetEnvironmentVariable($_.sourceName)) {
             $params.Value = (Get-ChildItem -Path "env:$($_.sourceName)").Value
-            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] Using value from `$env:$($_.sourceName)"
+            Write-Verbose "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Using value from `$env:$($_.sourceName)"
         }
         elseif ($_.ContainsKey('defaultValue')) {
             $params.Value = $_.defaultValue
-            Write-Verbose "[$($_.sourceName) --> `$script:$($params.Name)] `$env:$($_.sourceName) not found, using built-in default value"
+            Write-Verbose "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] `$env:$($_.sourceName) not found, using built-in default value"
         }
         else {
-            Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Missing default value in configuration."
+            Write-Error "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Missing default value in configuration."
             return
         }
 
@@ -83,10 +83,10 @@ $Variable | & {
         ) {
             if ($_.ContainsKey('defaultValue')) {
                 $params.Value = $_.defaultValue
-                Write-Warning "[$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, using built-in default value"
+                Write-Warning "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, using built-in default value"
             }
             else {
-                Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, and no default value was found in configuration."
+                Write-Error "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Value does not seem to be a boolean, and no default value was found in configuration."
                 return
             }
         }
@@ -99,10 +99,10 @@ $Variable | & {
             $params.Value = $null
             if ($_.ContainsKey('defaultValue')) {
                 $params.Value = $_.defaultValue
-                Write-Warning "[$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', using built-in default value"
+                Write-Warning "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', using built-in default value"
             }
             else {
-                Write-Error "[$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', and no default value was found in configuration."
+                Write-Error "[COMMON]: - [$($_.sourceName) --> `$script:$($params.Name)] Value does not match '$($_.Regex)', and no default value was found in configuration."
                 return
             }
         }

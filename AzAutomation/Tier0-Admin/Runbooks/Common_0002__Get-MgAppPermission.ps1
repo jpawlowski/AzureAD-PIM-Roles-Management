@@ -48,26 +48,30 @@ try {
                 -UserId $env:MG_PRINCIPAL_ID `
                 -ConsistencyLevel eventual `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
 
             $PermissionGrants = Get-MgBetaOauth2PermissionGrant `
                 -All `
                 -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
         }
         else {
             $AppRoleAssignments = Get-MgBetaServicePrincipalAppRoleAssignment `
                 -ServicePrincipalId $env:MG_PRINCIPAL_ID `
                 -ConsistencyLevel eventual `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
 
             $PermissionGrants = Get-MgBetaOauth2PermissionGrant `
                 -All `
                 -Filter "ClientId eq '$($env:MG_PRINCIPAL_ID)'" `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
         }
 
         if ($null -eq $App) {
@@ -101,14 +105,14 @@ try {
             }
 
             if ($AppId) {
-                $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')"
+                $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')" -Verbose:$false
             }
             elseif ($DisplayName) {
-                $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'"
+                $AppResource = Get-MgBetaServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'" -Verbose:$false
             }
 
             if (-Not $AppResource) {
-                Write-Warning "Unable to find application: $DisplayName $(if ($AppId) { $AppId })"
+                Write-Warning "[COMMON]: - Unable to find application: $DisplayName $(if ($AppId) { $AppId })"
                 continue
             }
 
@@ -162,26 +166,30 @@ try {
                 -UserId $env:MG_PRINCIPAL_ID `
                 -ConsistencyLevel eventual `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
 
             $PermissionGrants = Get-MgOauth2PermissionGrant `
                 -All `
                 -Filter "PrincipalId eq '$($env:MG_PRINCIPAL_ID)'" `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
         }
         else {
             $AppRoleAssignments = Get-MgServicePrincipalAppRoleAssignment `
                 -ServicePrincipalId $env:MG_PRINCIPAL_ID `
                 -ConsistencyLevel eventual `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
 
             $PermissionGrants = Get-MgOauth2PermissionGrant `
                 -All `
                 -Filter "ClientId eq '$($env:MG_PRINCIPAL_ID)'" `
                 -CountVariable countVar `
-                -ErrorAction SilentlyContinue
+                -ErrorAction SilentlyContinue `
+                -Verbose:$false
         }
 
         if ($null -eq $App) {
@@ -215,14 +223,14 @@ try {
             }
 
             if ($AppId) {
-                $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')"
+                $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and (Id eq '$($AppId)') or (appId eq '$($AppId)')" -Verbose:$false
             }
             elseif ($DisplayName) {
-                $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'"
+                $AppResource = Get-MgServicePrincipal -All -ConsistencyLevel eventual -Filter "ServicePrincipalType eq 'Application' and DisplayName eq '$($DisplayName)'" -Verbose:$false
             }
 
             if (-Not $AppResource) {
-                Write-Warning "Unable to find application: $DisplayName $(if ($AppId) { $AppId })"
+                Write-Warning "[COMMON]: - Unable to find application: $DisplayName $(if ($AppId) { $AppId })"
                 continue
             }
 

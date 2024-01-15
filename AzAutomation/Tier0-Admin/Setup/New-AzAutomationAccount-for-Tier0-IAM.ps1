@@ -277,7 +277,37 @@ if ($PSCmdlet.ShouldProcess(
             Value = [String]''
         }
         @{
+            Name  = 'AV_CloudAdminTier0_LicenseGroupId'
+            Value = [String]''
+        }
+        @{
             Name  = 'AV_CloudAdminTier0_UserPhotoUrl'
+            Value = [String]''
+        }
+
+        @{
+            Name  = 'AV_CloudAdminTier1_AccountAdminUnitId'
+            Value = [String]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier1_LicenseGroupId'
+            Value = [String]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier1_UserPhotoUrl'
+            Value = [String]''
+        }
+
+        @{
+            Name  = 'AV_CloudAdminTier2_AccountAdminUnitId'
+            Value = [String]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier2_LicenseGroupId'
+            Value = [String]''
+        }
+        @{
+            Name  = 'AV_CloudAdminTier2_UserPhotoUrl'
             Value = [String]''
         }
     )
@@ -790,6 +820,10 @@ if ($automationAccount.Identity.PrincipalId) {
         )) {
 
         $EntraRoles = @(
+            @{
+                DisplayName = 'Reports Reader'
+                TemplateId  = '4a5d8f65-41da-4de4-8968-e035b65339cf'
+            }
             @{
                 DisplayName    = 'Exchange Recipient Administrator'
                 roleTemplateId = '31392ffb-586c-42d1-9346-e59415a2cc4e'
