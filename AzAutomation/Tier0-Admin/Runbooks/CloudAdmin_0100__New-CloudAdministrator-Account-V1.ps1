@@ -53,6 +53,11 @@
     For some Tier levels, a dedicated Cloud Administrator account may be optionally requested.
     In case a referral user ID shall explicitly receive a dedicated account, this parameter may be set to 'true'.
 
+.PARAMETER SendWelcomeMail
+    Send a notification email to the referring user ID in case Cloud Administration access was enabled for the first time, either by creating a new dedicated account,
+    or by adding the referring account to the respective security group.
+    In case a new dedicated account was created, the manager of the referring user ID is notified as well.
+
 .PARAMETER JobReference
     This information may be added for back reference in other IT systems. It will simply be added to the Job data.
 
@@ -227,10 +232,11 @@ Param (
 
     [Array]$UserPhotoUrl,
     [Array]$RequestDedicatedAccount,
+    [Boolean]$SendWelcomeMail,
+    [Hashtable]$JobReference,
     [Boolean]$OutJson,
     [Boolean]$OutText,
-    [Boolean]$OutObject,
-    [Hashtable]$JobReference
+    [Boolean]$OutObject
 )
 
 #region [COMMON] PARAMETER COUNT VALIDATION ------------------------------------
@@ -269,7 +275,7 @@ if (
     'User.ReadWrite.All'
 
     # Other permissions
-    'Mail.Send'
+    if ($SendWelcomeMail -eq $true) { 'Mail.Send' }
 ) 1> $null
 #endregion ---------------------------------------------------------------------
 
@@ -573,8 +579,16 @@ if (
 
 @($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2, $GroupId_Tier0, $GroupId_Tier1, $GroupId_Tier2) | Where-Object { -Not [string]::IsNullOrEmpty($_) } | & {
     process {
-        $IsLicenseGroup = if ($_ -in @($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2)) { $true } else { $false }
+        $IsLicenseGroup = if ($_ -in @($LicenseGroupId_Tier0, $LicenseGroupId_Tier1, $LicenseGroupId_Tier2)) {
+            Write-Verbose "[GroupValidation]: - GroupId ${_} is a licensing group"
+            $true
+        }
+        else {
+            Write-Verbose "[GroupValidation]: - GroupId ${_} is a tiering group"
+            $false
+        }
         $ThisTier = if ($_ -in @($LicenseGroupId_Tier0, $GroupId_Tier0)) { 0 } elseif ($_ -in @($LicenseGroupId_Tier1, $GroupId_Tier1)) { 1 } elseif ($_ -in @($LicenseGroupId_Tier2, $GroupId_Tier2)) { 2 }
+        Write-Verbose "[GroupValidation]: - GroupId ${_} belongs to Tier $Tier"
 
         try {
             $GroupObj = Get-MgBetaGroup -GroupId $_ -ExpandProperty 'Owners' -ErrorAction Stop -Verbose:$false
@@ -592,8 +606,8 @@ if (
         }
 
         if (
-            $GroupObj.GroupType -and
-                ($GroupObj.GroupType -contains 'Unified')
+            $GroupObj.GroupTypes -and
+            ($GroupObj.GroupTypes -contains 'Unified')
         ) {
             Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must not be a Microsoft 365 Group to be used for Cloud Administration."
         }
@@ -603,8 +617,8 @@ if (
         }
 
         if (
-                    (-Not $GroupObj.IsManagementRestricted) -and
-                    (-Not $GroupObj.IsAssignableToRole)
+            (-Not $GroupObj.IsManagementRestricted) -and
+            (-Not $GroupObj.IsAssignableToRole)
         ) {
             Throw "[GroupValidation]: - Group $($GroupObj.DisplayName) ($($GroupObj.Id)): Must be protected by a Restricted Management Administrative Unit (preferred), or at least role-enabled to be used for Cloud Administration. (IsMemberManagementRestricted = $($GroupObj.IsManagementRestricted), IsAssignableToRole = $($GroupObj.IsAssignableToRole))"
         }
@@ -641,7 +655,7 @@ if (
             }
 
             if (
-                ($GroupObj.GroupType -Contains 'DynamicMembership') -and
+                ($GroupObj.GroupTypes -Contains 'DynamicMembership') -and
                 ($GroupObj.MembershipRuleProcessingState -eq 'On')
             ) {
                 if ($GroupObj.MembershipRule -notmatch '(?m)^.*user\..+$') {
@@ -661,8 +675,8 @@ if (
             if (
                 ($IsLicenseGroup -eq $true) -and
                 (
-                    ($null -eq $GroupObj.GroupType) -or
-                    ($GroupObj.GroupType -notContains 'DynamicMembership') -or
+                    ($null -eq $GroupObj.GroupTypes) -or
+                    ($GroupObj.GroupTypes -notContains 'DynamicMembership') -or
                     ($GroupObj.MembershipRuleProcessingState -ne 'On')
                 )
             ) {
@@ -725,7 +739,7 @@ if (
 #endregion ---------------------------------------------------------------------
 
 #region Process Referral User --------------------------------------------------
-function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUrl, $RequestDedicatedAccount) {
+Function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUrl, $RequestDedicatedAccount) {
     Write-Verbose "[ProcessReferralUser]: -----STARTLOOP $ReferralUserId, Tier $Tier ---"
 
     #region [COMMON] LOOP HANDLING -------------------------------------------------
@@ -928,7 +942,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
 
         if (
-            ($GroupObj.GroupType -Contains 'DynamicMembership') -and
+            ($GroupObj.GroupTypes -Contains 'DynamicMembership') -and
             ($GroupObj.MembershipRuleProcessingState -eq 'On')
         ) {
             $script:returnError.Add(( .\Common_0000__Write-Error.ps1 @{
@@ -970,6 +984,8 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         'OnPremisesSamAccountName'
         'OnPremisesSyncEnabled'
         'OnPremisesExtensionAttributes'
+        'PreferredLanguage'
+        'PreferredName'
         'CompanyName'
         'Department'
         'StreetAddress'
@@ -1561,7 +1577,10 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
                 CountVariable    = 'CountVar'
                 Filter           = "Id eq '$($refUserObj.Id)'"
             }
-            if (-Not (Get-MgBetaGroupMember @params)) {
+            if (Get-MgBetaGroupMember @params) {
+                $UpdatedUserOnly = $true
+            }
+            else {
                 Write-Verbose "[ProcessReferralUserNoDedicated]: - Implying manually adding user to static group $($GroupObj.DisplayName) ($($GroupObj.Id))"
                 New-MgBetaGroupMember -GroupId $GroupObj.Id -DirectoryObjectId $refUserObj.Id
             }
@@ -1581,6 +1600,72 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
         }
 
         Write-Verbose "[ProcessReferralUserNoDedicated]: - Nominated ordinary user account $($refUserObj.UserPrincipalName) ($($refUserObj.Id)) as Tier $Tier Cloud Administrator account" -Verbose
+        #endregion ---------------------------------------------------------------------
+
+        #region Send Welcome Email -----------------------------------------------------
+        if ($SendWelcomeMail -ne $true) {
+            Write-Verbose "[ProcessReferralUserDedicatedAccountSendWelcomeMail]: - No welcome email requested"
+        }
+        else {
+            # elseif ($UpdatedUserOnly -eq $false) {
+            $params = @{
+                From = $WelcomeMailSender
+                To   = $refUserObj.Id
+            }
+
+            if ($refUserObj.PreferredLanguage -match '^de-?') {
+                $params.Language = 'de'
+                $params.Subject = "Dein Tier $Tier Cloud Administrator Zugang wurde freigeschaltet"
+                $params.Message = @(
+                    "Hallo $($refUserObj.GivenName) $($refUserObj.Surname),"
+                    ''
+                    "Dein Benutzer <strong>$(.\Common_0002__Convert-LocalUserIdToUserId.ps1 $refUserObj.UserPrincipalName)</strong> wurde soeben erfolgreich für die <i>Tier $Tier</i> Cloud Administration bei <strong>$($tenant.DisplayName)</strong> freigeschaltet:"
+                    "&nbsp;&nbsp;&nbsp;&nbsp;Microsoft Entra-Mandant: $($tenantDomain) ($($tenant.Id))<br>&nbsp;&nbsp;&nbsp;&nbsp;<a href=`"https://entra.microsoft.com/$($tenantDomain)/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles`">&#128279;Zum Microsoft Entra Portal</a>&nbsp;|&nbsp;<a href=`"https://portal.azure.com/$($tenantDomain)/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles`">&#128279;Zum Azure Portal</a>"
+                    '<u>Bitte beachte, dass du noch keine Rollen oder Rechte erhalten hast.</u>'
+                    'Diese zu beantragen ist der nächste Schritt. Weitere Informationen erhältst du auf den Hilfeseiten deiner IT-Abteilung oder kontaktiere deinen IT-Helpdesk.'
+                    ''
+                    'Beste Grüße,<br>Deine IT-Administratoren'
+                )
+            }
+            else {
+                $params.Language = 'en'
+                $params.Subject = "Your Tier $Tier Cloud Administrator access has been activated"
+                $params.Message = @(
+                    "Hello $($refUserObj.GivenName) $($refUserObj.Surname),"
+                    ''
+                    "Your user <strong>$(.\Common_0002__Convert-LocalUserIdToUserId.ps1 $refUserObj.UserPrincipalName)</strong> has just been successfully activated for <i>Tier $Tier</i> Cloud Administration at <strong>$($tenant.DisplayName)</strong>."
+                    "&nbsp;&nbsp;&nbsp;&nbsp;Microsoft Entra tenant: $($tenantDomain) ($($tenant.Id))<br>&nbsp;&nbsp;&nbsp;&nbsp;<a href=`"https://entra.microsoft.com/$($tenantDomain)/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles`">&#128279;Open Microsoft Entra portal</a>&nbsp;|&nbsp;<a href=`"https://portal.azure.com/$($tenantDomain)/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles`">&#128279;Open Azure portal</a>"
+                    '<u>Please note that you have not yet received any roles or rights.</u>'
+                    'Applying for this is the next step. For more information, check the help pages of your IT department or contact your IT help desk.'
+                    ''
+                    'Best regards,<br>Your IT administrators'
+                )
+            }
+            Write-Verbose $($params | ConvertTo-Json -Depth 10)
+
+            if ([string]::IsNullOrEmpty($WelcomeMailSender)) {
+                Write-Warning "[ProcessReferralUserDedicatedAccountSendWelcomeMail]: - Unable to send welcome email: Missing sender address in configuration"
+            }
+            elseif ($(.\Common_0002__Send-Mail.ps1 @params) -ne $true) {
+                Write-Verbose "[ProcessReferralUserDedicatedAccountSendWelcomeMail]: - FAILED to send welcome email to $($params.To)"
+                $script:returnWarning.Add(( .\Common_0000__Write-Error.ps1 @{
+                            Message          = "${ReferralUserId}: Failed to send welcome email."
+                            ErrorId          = '500'
+                            Category         = 'InvalidData'
+                            TargetName       = $refUserObj.UserPrincipalName
+                            TargetObject     = $refUserObj.Id
+                            TargetType       = 'UserId'
+                            CategoryActivity = 'Cloud Administrator Creation'
+                            CategoryReason   = "The Send-Mail runbook returned an error."
+                        }))
+            }
+            else {
+                Write-Verbose "[ProcessReferralUserDedicatedAccountSendWelcomeMail]: - Welcome email successfully sent to $($params.To)"
+            }
+        }
+        # else {
+        #     Write-Verbose "[ProcessReferralUserDedicatedAccountSendWelcomeMail]: - No welcome email needed as user was activated already for Tier $Tier Cloud Administration"
+        # }
         #endregion ---------------------------------------------------------------------
 
         #region Add Return Data --------------------------------------------------------
@@ -2003,6 +2088,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
 
         $BodyParams.Remove('UserPrincipalName')
         $BodyParams.Remove('AccountEnabled')
+        $BodyParams.Remove('PreferredLanguage')     # let admins change their preference after account creation
         $params = @{
             UserId        = $existingUserObj.Id
             BodyParameter = $BodyParams
@@ -2398,7 +2484,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     #region Licensing Group Membership Assignment ----------------------------------
     if ($LicenseGroupObj) {
         if (
-            ($LicenseGroupObj.GroupType -NotContains 'DynamicMembership') -or
+            ($LicenseGroupObj.GroupTypes -NotContains 'DynamicMembership') -or
             ($LicenseGroupObj.MembershipRuleProcessingState -ne 'On')
         ) {
             $params = @{
@@ -2592,7 +2678,7 @@ function ProcessReferralUser ($ReferralUserId, $LocalUserId, $Tier, $UserPhotoUr
     #region Tiering Group Membership Assignment ------------------------------------
     if ($GroupObj) {
         if (
-            ($GroupObj.GroupType -NotContains 'DynamicMembership') -or
+            ($GroupObj.GroupTypes -NotContains 'DynamicMembership') -or
             ($GroupObj.MembershipRuleProcessingState -ne 'On')
         ) {
             $params = @{

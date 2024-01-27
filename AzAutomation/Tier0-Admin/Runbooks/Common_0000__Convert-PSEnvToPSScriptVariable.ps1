@@ -5,8 +5,8 @@
 .COMPANYNAME Workoho GmbH
 .COPYRIGHT (c) 2024 Workoho GmbH. All rights reserved.
 .TAGS
-.LICENSEURI
-.PROJECTURI
+.LICENSEURI https://github.com/Workoho/Azure-Automation-Common-Runbooks-Framework/LICENSE
+.PROJECTURI https://github.com/Workoho/Azure-Automation-Common-Runbooks-Framework
 .ICONURI
 .EXTERNALMODULEDEPENDENCIES
 .REQUIREDSCRIPTS

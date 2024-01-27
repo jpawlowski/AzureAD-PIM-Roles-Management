@@ -80,7 +80,7 @@ if (-Not (Get-MgContext)) {
         Connect-MgGraph @params 1> $null
     }
     catch {
-        Throw "Failed to connect to Microsoft Graph";
+        Throw $_;
     }
 }
 
